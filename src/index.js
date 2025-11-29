@@ -1,6 +1,10 @@
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Astra Editor 网站已加载');
+    // 初始化多语言功能
+    initMultiLanguage();
+    
+    const currentLang = getCurrentLanguage();
+    console.log(translations[currentLang].loadingMessage);
     
     // 添加加载完成标记
     document.body.classList.add('loaded');
@@ -66,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const onlineVersionBtn = document.getElementById('online-version-btn');
     if (onlineVersionBtn) {
         onlineVersionBtn.addEventListener('click', function() {
-            window.location.href = 'build/build/editor.html';
+            window.location.href = 'build/editor.html';
         });
     }
     
