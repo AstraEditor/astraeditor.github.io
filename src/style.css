@@ -1,0 +1,492 @@
+/* 全局样式重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.6;
+    color: #e0e0e0;
+    background: #0a0a0a;
+    overflow-x: hidden;
+}
+
+/* 蓝图背景动画 */
+.blueprint-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0a0a0a;
+    z-index: -1;
+    opacity: 0;
+    animation: fadeIn 2s ease-out 1s forwards;
+}
+
+.blueprint-grid {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(rgba(0, 153, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 153, 255, 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: blueprintMove 2s linear infinite;
+}
+
+@keyframes blueprintMove {
+    0% { background-position: 0 0; }
+    100% { background-position: 50px 50px; }
+}
+
+.blueprint-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.blueprint-lines::before,
+.blueprint-lines::after {
+    content: '';
+    position: absolute;
+    background: #0099ff;
+    opacity: 0.3;
+}
+
+.blueprint-lines::before {
+    top: 50%;
+    left: -100%;
+    width: 100%;
+    height: 2px;
+    animation: scanLine 2s ease-in-out infinite;
+}
+
+.blueprint-lines::after {
+    top: -100%;
+    left: 50%;
+    width: 2px;
+    height: 100%;
+    animation: scanLineVertical 2s ease-in-out infinite 0.5s;
+}
+
+@keyframes scanLine {
+    0% { left: -100%; }
+    50% { left: 100%; }
+    100% { left: 100%; }
+}
+
+@keyframes scanLineVertical {
+    0% { top: -100%; }
+    50% { top: 100%; }
+    100% { top: 100%; }
+}
+
+
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* 主网站内容 */
+.main-content {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+@keyframes contentFadeIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* 简洁主页样式 */
+.hero-center {
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    animation: contentFadeIn 1.5s ease-out 3s forwards;
+    width: 100%;
+    height: 100%;
+}
+
+.center-logo {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.center-logo img {
+    filter: drop-shadow(0 0 20px rgba(0, 153, 255, 0.5));
+    animation: logoGlow 3s ease-in-out infinite alternate;
+    max-width: 40vw;
+    max-height: 40vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+@keyframes logoGlow {
+    0% {
+        filter: drop-shadow(0 0 20px rgba(0, 153, 255, 0.5));
+    }
+    100% {
+        filter: drop-shadow(0 0 30px rgba(0, 153, 255, 0.8));
+    }
+}
+
+/* 内容区域 */
+.content-section {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    margin-top: 100vh;
+    z-index: 2;
+}
+
+.black-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: #000000;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.content-container {
+    position: relative;
+    z-index: 3;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+    color: #e0e0e0;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* 内容部分样式 */
+.about-section, .features-section, .download-section, .comparison-section, .requirements-section {
+    margin-bottom: 4rem;
+    text-align: center;
+}
+
+.about-section h2, .features-section h2, .download-section h2, .comparison-section h2, .requirements-section h2 {
+    font-size: 2.5rem;
+    font-weight: 300;
+    margin-bottom: 1.5rem;
+    color: #0099ff;
+    letter-spacing: 0.05rem;
+}
+
+.about-section p {
+    font-size: 1.2rem;
+    line-height: 1.8;
+    max-width: 800px;
+    margin: 0 auto 2rem;
+    color: #b0b0b0;
+}
+
+/* 关于亮点 */
+.about-highlights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.highlight-item {
+    background: rgba(0, 153, 255, 0.05);
+    border: 1px solid rgba(0, 153, 255, 0.1);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.highlight-item:hover {
+    background: rgba(0, 153, 255, 0.1);
+    border-color: rgba(0, 153, 255, 0.3);
+    transform: translateY(-3px);
+}
+
+.highlight-item h4 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: #e0e0e0;
+}
+
+.highlight-item p {
+    font-size: 0.9rem;
+    color: #888;
+    margin: 0;
+}
+
+/* 特性网格 */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.feature-item {
+    background: rgba(0, 153, 255, 0.1);
+    border: 1px solid rgba(0, 153, 255, 0.2);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.feature-item:hover {
+    background: rgba(0, 153, 255, 0.15);
+    border-color: rgba(0, 153, 255, 0.4);
+    transform: translateY(-5px);
+}
+
+.feature-item h3 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    color: #e0e0e0;
+}
+
+.feature-item p {
+    color: #b0b0b0;
+    line-height: 1.6;
+}
+
+/* 下载按钮 */
+.download-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.download-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.download-btn.primary {
+    background: #0099ff;
+    color: #ffffff;
+}
+
+.download-btn.primary:hover {
+    background: #007acc;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 153, 255, 0.3);
+}
+
+.download-btn.secondary {
+    background: transparent;
+    color: #0099ff;
+    border: 2px solid #0099ff;
+}
+
+.download-btn.secondary:hover {
+    background: #0099ff;
+    color: #ffffff;
+}
+
+/* 版本对比 */
+.comparison-table {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.comparison-item {
+    background: rgba(0, 153, 255, 0.05);
+    border: 1px solid rgba(0, 153, 255, 0.1);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: left;
+    transition: all 0.3s ease;
+}
+
+.comparison-item:hover {
+    background: rgba(0, 153, 255, 0.1);
+    border-color: rgba(0, 153, 255, 0.3);
+    transform: translateY(-3px);
+}
+
+.comparison-item h3 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    color: #0099ff;
+    text-align: center;
+}
+
+.comparison-item ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.comparison-item li {
+    padding: 0.5rem 0;
+    color: #b0b0b0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.comparison-item li:last-child {
+    border-bottom: none;
+}
+
+/* 系统要求 */
+.requirements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 3rem;
+}
+
+.requirement-item {
+    background: rgba(0, 153, 255, 0.05);
+    border: 1px solid rgba(0, 153, 255, 0.1);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.requirement-item:hover {
+    background: rgba(0, 153, 255, 0.1);
+    border-color: rgba(0, 153, 255, 0.3);
+}
+
+.requirement-item h4 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: #0099ff;
+}
+
+.requirement-item p {
+    font-size: 0.9rem;
+    color: #b0b0b0;
+    margin: 0;
+}
+
+/* 内容页脚 */
+.content-footer {
+    text-align: center;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(0, 153, 255, 0.2);
+    color: #666;
+    margin-top: 4rem;
+}
+
+.footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 1rem;
+}
+
+.footer-links a {
+    color: #0099ff;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.footer-links a:hover {
+    color: #007acc;
+}
+
+
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .center-logo img {
+        max-width: 60vw;
+        max-height: 50vh;
+    }
+    
+    .main-content {
+        padding: 10px;
+    }
+    
+    .content-container {
+        padding: 2rem 1rem;
+    }
+    
+    .about-section h2, .features-section h2, .download-section h2, .comparison-section h2, .requirements-section h2 {
+        font-size: 2rem;
+    }
+    
+    .about-highlights {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .features-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .comparison-table {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .requirements-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    .download-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .download-btn {
+        width: 200px;
+    }
+    
+    .footer-links {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
