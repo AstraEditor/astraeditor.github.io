@@ -197,13 +197,20 @@ body {
 }
 
 /* 内容部分样式 */
-.about-section, .features-section, .download-section, .comparison-section, .requirements-section {
+.about-section, .features-section, .download-section, .comparison-section, .requirements-section,.update {
     margin-bottom: 4rem;
     text-align: center;
 }
 
-.about-section h2, .features-section h2, .download-section h2, .comparison-section h2, .requirements-section h2 {
+.about-section h2, .features-section h2, .download-section h2, .comparison-section h2, .requirements-section h2,.update h2{
     font-size: 2.5rem;
+    font-weight: 300;
+    margin-bottom: 1.5rem;
+    color: #0099ff;
+    letter-spacing: 0.05rem;
+}
+.updateTitle{
+    font-size: 1.5rem;
     font-weight: 300;
     margin-bottom: 1.5rem;
     color: #0099ff;

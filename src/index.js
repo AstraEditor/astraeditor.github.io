@@ -1,6 +1,8 @@
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
     // 初始化多语言功能
+    window.scrollTo(0)
+
     initMultiLanguage();
     
     const currentLang = getCurrentLanguage();
@@ -49,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 behavior: 'smooth'
             });
         }
-    }, 5000);
+    }, 4000);
     
     // 简单的鼠标移动视差效果
     document.addEventListener('mousemove', function(e) {
