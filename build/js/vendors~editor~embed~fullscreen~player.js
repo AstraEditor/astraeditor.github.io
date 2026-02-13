@@ -167149,192 +167149,184 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _compound_path__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./compound-path */ "./node_modules/scratch-paint/src/helper/compound-path.js");
 
 
+const BOOLEAN_OPTIONS = {
+  insert: false
+};
+const isValidPath = path => Boolean(path && path.bounds.width > 0 && path.bounds.height > 0 && path.length > 0);
+const applyResultStyle = (target, source) => {
+  target.fillColor = source.fillColor;
+  target.strokeColor = source.strokeColor;
+  target.strokeWidth = source.strokeWidth;
+};
 const validateBooleanOperation = items => {
   if (items.length < 2) return false;
-  for (let item of items) {
+  for (const item of items) {
     if (!(item instanceof _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.PathItem)) return false;
     if (Object(_compound_path__WEBPACK_IMPORTED_MODULE_1__["isCompoundPathChild"])(item)) return false;
   }
   return true;
 };
 
-//合并
+// 合并
 const uniteShapes = items => {
   if (!validateBooleanOperation(items)) return null;
-  let result = items[0].clone();
-  result.insertAbove(items[0]);
+  let result = items[0].clone(false);
   for (let i = 1; i < items.length; i++) {
-    const temp = result.unite(items[i]);
-    if (!temp) {
-      result.remove();
-      return null;
-    }
-    if (temp.bounds.width == 0 || temp.bounds.height == 0) {
-      result.remove();
-      temp.remove();
-      return null;
-    }
-    temp.insertBelow(result);
+    const temp = result.unite(items[i], BOOLEAN_OPTIONS);
     result.remove();
+    if (!isValidPath(temp)) {
+      if (temp) temp.remove();
+      return null;
+    }
     result = temp;
   }
-  result.fillColor = items[0].fillColor;
-  result.strokeColor = items[0].strokeColor;
-  result.strokeWidth = items[0].strokeWidth;
+  applyResultStyle(result, items[0]);
+  result.insertAbove(items[0]);
   return result;
 };
 
-//香蕉
+// 香蕉
 const intersectShapes = items => {
   if (!validateBooleanOperation(items)) return null;
-  let result = items[0].clone();
-  result.insertAbove(items[0]);
+  let result = items[0].clone(false);
   for (let i = 1; i < items.length; i++) {
-    const temp = result.intersect(items[i]);
-    if (!temp || temp.bounds.width === 0 || temp.bounds.height === 0) {
+    if (!result.bounds.intersects(items[i].bounds)) {
       result.remove();
       return null;
     }
-    temp.insertBelow(result);
+    const temp = result.intersect(items[i], BOOLEAN_OPTIONS);
     result.remove();
+    if (!isValidPath(temp)) {
+      if (temp) temp.remove();
+      return null;
+    }
     result = temp;
   }
-  result.fillColor = items[0].fillColor;
-  result.strokeColor = items[0].strokeColor;
-  result.strokeWidth = items[0].strokeWidth;
+  applyResultStyle(result, items[0]);
+  result.insertAbove(items[0]);
   return result;
 };
 
-//剪除
+// 剪除
 const subtractShapes = items => {
   if (!validateBooleanOperation(items)) return null;
-  let result = items[0].clone();
-  result.insertAbove(items[0]);
+  let result = items[0].clone(false);
   for (let i = 1; i < items.length; i++) {
-    const temp = result.subtract(items[i]);
-    if (!temp || temp.bounds.width === 0 || temp.bounds.height === 0) {
-      result.remove();
+    if (!result.bounds.intersects(items[i].bounds)) {
+      continue;
+    }
+    const temp = result.subtract(items[i], BOOLEAN_OPTIONS);
+    result.remove();
+    if (!isValidPath(temp)) {
+      if (temp) temp.remove();
       return null;
     }
-    temp.insertBelow(result);
-    result.remove();
     result = temp;
   }
-  result.fillColor = items[0].fillColor;
-  result.strokeColor = items[0].strokeColor;
-  result.strokeWidth = items[0].strokeWidth;
+  applyResultStyle(result, items[0]);
+  result.insertAbove(items[0]);
   return result;
 };
 
-//拆分
+// 拆分
 const splitShapes = items => {
   if (!validateBooleanOperation(items)) return null;
+  if (items.length >= 31) return null;
   const resultGroup = new _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.Group();
-  const extractPaths = item => {
-    const paths = [];
-    const collectPaths = obj => {
-      if (obj instanceof _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.Path && !(obj instanceof _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.CompoundPath)) {
-        paths.push(obj);
-      } else if (obj.children) {
-        obj.children.forEach(child => collectPaths(child));
-      }
-    };
-    collectPaths(item);
-    return paths;
-  };
-  const isValidPath = path => {
-    if (!path) return false;
-    if (path.bounds.width === 0 || path.bounds.height === 0) return false;
-    if (path.length === 0) return false;
-    return true;
-  };
   const addPathToGroup = path => {
     if (!isValidPath(path)) {
       if (path) path.remove();
       return;
     }
-    path.fillColor = items[0].fillColor;
-    path.strokeColor = items[0].strokeColor;
-    path.strokeWidth = items[0].strokeWidth;
+    applyResultStyle(path, items[0]);
     resultGroup.addChild(path);
   };
-  const getCombinations = arr => {
-    const result = [];
-    const n = arr.length;
-    for (let i = 1; i < 1 << n; i++) {
-      const combo = [];
-      for (let j = 0; j < n; j++) {
-        if (i & 1 << j) {
-          combo.push(arr[j]);
-        }
-      }
-      result.push(combo);
+  const extractPathsToGroup = item => {
+    if (!item) return;
+    if (item instanceof _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.Path && !(item instanceof _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.CompoundPath)) {
+      addPathToGroup(item);
+      return;
     }
-    return result;
+    if (item.children && item.children.length) {
+      const children = item.children.slice();
+      for (const child of children) {
+        extractPathsToGroup(child.remove());
+      }
+    }
+    item.remove();
   };
-  const combinations = getCombinations(items);
-  for (const combo of combinations) {
-    if (combo.length === 0) continue;
-    let intersection = combo[0].clone();
-    intersection.insertAbove(combo[0]);
-    for (let i = 1; i < combo.length; i++) {
-      const temp = intersection.intersect(combo[i]);
-      if (!temp || temp.bounds.width === 0 || temp.bounds.height === 0) {
-        intersection.remove();
-        intersection = null;
-        break;
-      }
-      temp.insertBelow(intersection);
-      intersection.remove();
-      intersection = temp;
+  const itemCount = items.length;
+  const totalMasks = 1 << itemCount;
+  const fullMask = totalMasks - 1;
+  const intersections = new Array(totalMasks).fill(null);
+  const boundsIntersections = new Array(itemCount);
+  for (let i = 0; i < itemCount; i++) {
+    boundsIntersections[i] = new Array(itemCount).fill(true);
+  }
+  for (let i = 0; i < itemCount; i++) {
+    for (let j = i + 1; j < itemCount; j++) {
+      const intersects = items[i].bounds.intersects(items[j].bounds);
+      boundsIntersections[i][j] = intersects;
+      boundsIntersections[j][i] = intersects;
     }
-    if (!intersection || !isValidPath(intersection)) {
-      if (intersection) intersection.remove();
+  }
+  for (let mask = 1; mask < totalMasks; mask++) {
+    const lowBit = mask & -mask;
+    const bitIndex = Math.log2(lowBit);
+    const prevMask = mask ^ lowBit;
+    if (prevMask === 0) {
+      const cloned = items[bitIndex].clone(false);
+      if (isValidPath(cloned)) {
+        intersections[mask] = cloned;
+      } else {
+        cloned.remove();
+      }
       continue;
     }
-    let finalResult = intersection;
-    for (const otherCombo of combinations) {
-      if (otherCombo.length <= combo.length) continue;
-      const isSuperset = combo.every(item => otherCombo.includes(item));
-      if (!isSuperset) continue;
-      let otherIntersection = otherCombo[0].clone();
-      otherIntersection.insertAbove(otherCombo[0]);
-      for (let i = 1; i < otherCombo.length; i++) {
-        const temp = otherIntersection.intersect(otherCombo[i]);
-        if (!temp || temp.bounds.width === 0 || temp.bounds.height === 0) {
-          otherIntersection.remove();
-          otherIntersection = null;
-          break;
-        }
-        temp.insertBelow(otherIntersection);
-        otherIntersection.remove();
-        otherIntersection = temp;
+    const prevIntersection = intersections[prevMask];
+    if (!prevIntersection) continue;
+    let hasDisjointPair = false;
+    for (let bit = prevMask; bit > 0; bit &= bit - 1) {
+      const idx = Math.log2(bit & -bit);
+      if (!boundsIntersections[bitIndex][idx]) {
+        hasDisjointPair = true;
+        break;
       }
-      if (otherIntersection && isValidPath(otherIntersection)) {
-        const subtracted = finalResult.subtract(otherIntersection);
-        otherIntersection.remove();
-        if (subtracted) {
-          subtracted.insertBelow(finalResult);
-          finalResult.remove();
-          finalResult = subtracted;
-        } else {
-          finalResult.remove();
-          finalResult = null;
-          break;
-        }
-      }
-      if (!finalResult) break;
     }
-    if (finalResult && isValidPath(finalResult)) {
-      const paths = extractPaths(finalResult);
+    if (hasDisjointPair) continue;
+    if (!prevIntersection.bounds.intersects(items[bitIndex].bounds)) continue;
+    const nextIntersection = prevIntersection.intersect(items[bitIndex], BOOLEAN_OPTIONS);
+    if (isValidPath(nextIntersection)) {
+      intersections[mask] = nextIntersection;
+    } else if (nextIntersection) {
+      nextIntersection.remove();
+    }
+  }
+  for (let mask = 1; mask < totalMasks; mask++) {
+    const intersection = intersections[mask];
+    if (!intersection) continue;
+    let finalResult = intersection.clone(false);
+    const remaining = fullMask ^ mask;
+    for (let subset = remaining; subset > 0; subset = subset - 1 & remaining) {
+      const supersetIntersection = intersections[mask | subset];
+      if (!supersetIntersection) continue;
+      if (!finalResult.bounds.intersects(supersetIntersection.bounds)) continue;
+      const subtracted = finalResult.subtract(supersetIntersection, BOOLEAN_OPTIONS);
       finalResult.remove();
-      paths.forEach(path => {
-        const clonedPath = path.clone();
-        addPathToGroup(clonedPath);
-        path.remove();
-      });
-    } else if (finalResult) {
-      finalResult.remove();
+      if (!isValidPath(subtracted)) {
+        if (subtracted) subtracted.remove();
+        finalResult = null;
+        break;
+      }
+      finalResult = subtracted;
+    }
+    if (finalResult) {
+      extractPathsToGroup(finalResult);
+    }
+  }
+  for (let mask = 1; mask < totalMasks; mask++) {
+    if (intersections[mask]) {
+      intersections[mask].remove();
     }
   }
   if (resultGroup.children.length === 0) {
@@ -169769,6 +169761,8 @@ class ReshapeTool extends _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @turbowarp/paper */ "./node_modules/scratch-paint/node_modules/@turbowarp/paper/dist/paper-full.js");
 /* harmony import */ var _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_turbowarp_paper__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _layer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../layer */ "./node_modules/scratch-paint/src/helper/layer.js");
+
 
 
 /**
@@ -169782,6 +169776,8 @@ class RotateTool {
     this.rotItems = [];
     this.rotGroupPivot = null;
     this.prevRot = 90;
+    this.currentRotation = 0;
+    this.rotationLabel = null;
     this.onUpdateImage = onUpdateImage;
   }
 
@@ -169791,6 +169787,7 @@ class RotateTool {
    * @param {!Array.<paper.Item>} selectedItems Set of selected paper.Items
    */
   onMouseDown(hitResult, boundsPath, selectedItems) {
+    this.rotItems.length = 0;
     this.rotGroupPivot = boundsPath.bounds.center;
     for (const item of selectedItems) {
       // Rotate only root items
@@ -169799,16 +169796,21 @@ class RotateTool {
       }
     }
     this.prevRot = 90;
+    this.currentRotation = 0;
+    this._createRotationLabel();
   }
   onMouseDrag(event) {
     let rotAngle = event.point.subtract(this.rotGroupPivot).angle;
     if (event.modifiers.shift) {
       rotAngle = Math.round(rotAngle / 45) * 45;
     }
+    const deltaRotation = rotAngle - this.prevRot;
     for (let i = 0; i < this.rotItems.length; i++) {
       const item = this.rotItems[i];
-      item.rotate(rotAngle - this.prevRot, this.rotGroupPivot);
+      item.rotate(deltaRotation, this.rotGroupPivot);
     }
+    this.currentRotation += deltaRotation;
+    this._updateRotationLabel();
     this.prevRot = rotAngle;
   }
   onMouseUp(event) {
@@ -169817,7 +169819,44 @@ class RotateTool {
     this.rotItems.length = 0;
     this.rotGroupPivot = null;
     this.prevRot = 90;
+    this.currentRotation = 0;
+    this._removeRotationLabel();
     this.onUpdateImage();
+  }
+  _createRotationLabel() {
+    this._removeRotationLabel();
+    this.rotationLabel = new _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.PointText({
+      content: '0°',
+      fillColor: "#0099ff",
+      strokeColor: new _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.Color(1, 1, 1, 0.8),
+      justification: 'center',
+      fontWeight: 'bold',
+      data: {
+        isHelperItem: true,
+        noSelect: true,
+        noHover: true
+      }
+    });
+    Object(_layer__WEBPACK_IMPORTED_MODULE_1__["setGuideItem"])(this.rotationLabel);
+    this.rotationLabel.parent = Object(_layer__WEBPACK_IMPORTED_MODULE_1__["getGuideLayer"])();
+    this._updateRotationLabel();
+  }
+  _updateRotationLabel() {
+    if (!this.rotationLabel || !this.rotGroupPivot) return;
+    let angle = Math.round(this.currentRotation);
+    if (Object.is(angle, -0)) {
+      angle = 0;
+    }
+    this.rotationLabel.content = "".concat(angle, "\xB0");
+    this.rotationLabel.fontSize = 36 / _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.view.zoom;
+    this.rotationLabel.strokeWidth = 1 / _turbowarp_paper__WEBPACK_IMPORTED_MODULE_0___default.a.view.zoom;
+    this.rotationLabel.position = this.rotGroupPivot;
+    this.rotationLabel.bringToFront();
+  }
+  _removeRotationLabel() {
+    if (!this.rotationLabel) return;
+    this.rotationLabel.remove();
+    this.rotationLabel = null;
   }
 }
 /* harmony default export */ __webpack_exports__["default"] = (RotateTool);
