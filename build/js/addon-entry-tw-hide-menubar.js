@@ -93,7 +93,7 @@ __webpack_require__.r(__webpack_exports__);
   let topBarHeight = Math.max(topBar.offsetHeight, 1);
   let pointerY = Number.POSITIVE_INFINITY;
   let autoHideTimer = null;
-  let lastResizeTriggeredVisible = isVisible;
+  let lastWorkspaceLayoutSignature = '';
   let postTransitionResizeTimer = null;
   let lateResizeTimer = null;
   let blocklyPromise = null;
@@ -116,7 +116,10 @@ __webpack_require__.r(__webpack_exports__);
     }
     if (!blocklyPromise) return;
     blocklyPromise.then(Blockly => {
-      if (!Blockly) return;
+      if (!Blockly) {
+        blocklyPromise = null;
+        return;
+      }
       const mainWorkspace = typeof Blockly.getMainWorkspace === 'function' && Blockly.getMainWorkspace() || Blockly.mainWorkspace;
       if (!mainWorkspace) return;
       if (typeof Blockly.svgResize === 'function') Blockly.svgResize(mainWorkspace);
@@ -124,6 +127,8 @@ __webpack_require__.r(__webpack_exports__);
       if (mainWorkspace.toolbox_ && typeof mainWorkspace.toolbox_.position === 'function') {
         mainWorkspace.toolbox_.position();
       }
+    }).catch(() => {
+      blocklyPromise = null;
     });
   }
   function scheduleWorkspaceResizeAfterTransition() {
@@ -136,11 +141,18 @@ __webpack_require__.r(__webpack_exports__);
       forceWorkspaceResize();
     }, 520);
   }
+  function getWorkspaceLayoutSignature() {
+    if (isLock) {
+      return "lock:".concat(topBarHeight);
+    }
+    return "float:".concat(isVisible ? 1 : 0);
+  }
   function updateWorkspace() {
-    if (lastResizeTriggeredVisible !== isVisible) {
+    const nextLayoutSignature = getWorkspaceLayoutSignature();
+    if (lastWorkspaceLayoutSignature !== nextLayoutSignature) {
       forceWorkspaceResize();
       scheduleWorkspaceResizeAfterTransition();
-      lastResizeTriggeredVisible = isVisible;
+      lastWorkspaceLayoutSignature = nextLayoutSignature;
     }
   }
   function refreshTopBarHeight() {
@@ -255,6 +267,7 @@ __webpack_require__.r(__webpack_exports__);
   button.appendChild(text);
   gui.appendChild(button);
   applyVisualState();
+  lastWorkspaceLayoutSignature = getWorkspaceLayoutSignature();
   if (window.PointerEvent) {
     document.addEventListener('pointermove', onPointerMove, {
       passive: true

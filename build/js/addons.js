@@ -2638,7 +2638,8 @@ __webpack_require__.r(__webpack_exports__);
   "block-pins": () => __webpack_require__.e(/*! import() | addon-entry-block-pins */ "addon-entry-block-pins").then(__webpack_require__.bind(null, /*! ../addons/block-pins/_runtime_entry.js */ "./src/addons/addons/block-pins/_runtime_entry.js")),
   "bookmark": () => __webpack_require__.e(/*! import() | addon-entry-block-pins */ "addon-entry-block-pins").then(__webpack_require__.bind(null, /*! ../addons/bookmark/_runtime_entry.js */ "./src/addons/addons/bookmark/_runtime_entry.js")),
   "Terminal": () => __webpack_require__.e(/*! import() | addon-entry-terminal */ "addon-entry-terminal").then(__webpack_require__.bind(null, /*! ../addons/Terminal/_runtime_entry.js */ "./src/addons/addons/Terminal/_runtime_entry.js")),
-  "my-blocks-plus": () => __webpack_require__.e(/*! import() | addon-entry-my-blocks-plus */ "addon-entry-my-blocks-plus").then(__webpack_require__.bind(null, /*! ../addons/my-blocks-plus/_runtime_entry.js */ "./src/addons/addons/my-blocks-plus/_runtime_entry.js"))
+  "my-blocks-plus": () => __webpack_require__.e(/*! import() | addon-entry-my-blocks-plus */ "addon-entry-my-blocks-plus").then(__webpack_require__.bind(null, /*! ../addons/my-blocks-plus/_runtime_entry.js */ "./src/addons/addons/my-blocks-plus/_runtime_entry.js")),
+  "astras-copilot": () => __webpack_require__.e(/*! import() | addon-entry-astras-copilot */ "addon-entry-astras-copilot").then(__webpack_require__.bind(null, /*! ../addons/astras-copilot/_runtime_entry.js */ "./src/addons/addons/astras-copilot/_runtime_entry.js"))
 });
 
 /***/ }),

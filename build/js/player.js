@@ -65,7 +65,7 @@ var GUI =
 /******/
 /******/ 	// script path function
 /******/ 	function jsonpScriptSrc(chunkId) {
-/******/ 		return __webpack_require__.p + "js/" + ({"addons":"addons","iframe-extension-worker":"iframe-extension-worker","library-backdrops":"library-backdrops","library-costumes":"library-costumes","library-sounds":"library-sounds","library-sprites":"library-sprites","sb":"sb","addon-default-entry":"addon-default-entry","addon-entry-2d-color-picker":"addon-entry-2d-color-picker","addon-entry-better-img-uploads":"addon-entry-better-img-uploads","addon-entry-block-count":"addon-entry-block-count","addon-entry-block-palette-icons":"addon-entry-block-palette-icons","addon-entry-block-pins":"addon-entry-block-pins","addon-entry-blocks2image":"addon-entry-blocks2image","addon-entry-cat-blocks":"addon-entry-cat-blocks","addon-entry-clones":"addon-entry-clones","addon-entry-columns":"addon-entry-columns","addon-entry-copy-reporter":"addon-entry-copy-reporter","addon-entry-custom-block-shape":"addon-entry-custom-block-shape","addon-entry-custom-block-text":"addon-entry-custom-block-text","addon-entry-custom-menu-bar":"addon-entry-custom-menu-bar","addon-entry-custom-zoom":"addon-entry-custom-zoom","addon-entry-data-category-tweaks-v2":"addon-entry-data-category-tweaks-v2","addon-entry-debugger":"addon-entry-debugger","addon-entry-default-costume-editor-color":"addon-entry-default-costume-editor-color","addon-entry-disable-paste-offset":"addon-entry-disable-paste-offset","addon-entry-disable-stage-drag-select":"addon-entry-disable-stage-drag-select","addon-entry-editor-buttons-reverse-order":"addon-entry-editor-buttons-reverse-order","addon-entry-editor-colored-context-menus":"addon-entry-editor-colored-context-menus","addon-entry-editor-compact":"addon-entry-editor-compact","addon-entry-editor-extra-keys":"addon-entry-editor-extra-keys","addon-entry-editor-number-arrow-keys":"addon-entry-editor-number-arrow-keys","addon-entry-editor-sounds":"addon-entry-editor-sounds","addon-entry-editor-square-inputs":"addon-entry-editor-square-inputs","addon-entry-editor-stage-left":"addon-entry-editor-stage-left","addon-entry-editor-stepping":"addon-entry-editor-stepping","addon-entry-editor-theme3":"addon-entry-editor-theme3","addon-entry-expanded-backpack":"addon-entry-expanded-backpack","addon-entry-fullscreen":"addon-entry-fullscreen","addon-entry-gamepad":"addon-entry-gamepad","addon-entry-hide-delete-button":"addon-entry-hide-delete-button","addon-entry-hide-flyout":"addon-entry-hide-flyout","addon-entry-hide-new-variables":"addon-entry-hide-new-variables","addon-entry-hide-stage":"addon-entry-hide-stage","addon-entry-initialise-sprite-position":"addon-entry-initialise-sprite-position","addon-entry-load-extensions":"addon-entry-load-extensions","addon-entry-mediarecorder":"addon-entry-mediarecorder","addon-entry-mouse-pos":"addon-entry-mouse-pos","addon-entry-move-to-top-layer":"addon-entry-move-to-top-layer","addon-entry-my-blocks-plus":"addon-entry-my-blocks-plus","addon-entry-no-script-bumping":"addon-entry-no-script-bumping","addon-entry-number-pad":"addon-entry-number-pad","addon-entry-paint-by-default":"addon-entry-paint-by-default","addon-entry-paint-snap":"addon-entry-paint-snap","addon-entry-remove-curved-stage-border":"addon-entry-remove-curved-stage-border","addon-entry-remove-sprite-confirm":"addon-entry-remove-sprite-confirm","addon-entry-script-snap":"addon-entry-script-snap","addon-entry-search-sprites":"addon-entry-search-sprites","addon-entry-simple-project-analyzer":"addon-entry-simple-project-analyzer","addon-entry-sprite-properties":"addon-entry-sprite-properties","addon-entry-swap-local-global":"addon-entry-swap-local-global","addon-entry-terminal":"addon-entry-terminal","addon-entry-toolbox-category-drag":"addon-entry-toolbox-category-drag","addon-entry-transparent-orphans":"addon-entry-transparent-orphans","addon-entry-tw-comment-markdown-editor":"addon-entry-tw-comment-markdown-editor","addon-entry-tw-disable-cloud-variables":"addon-entry-tw-disable-cloud-variables","addon-entry-tw-disable-compiler":"addon-entry-tw-disable-compiler","addon-entry-tw-disable-vibration":"addon-entry-tw-disable-vibration","addon-entry-tw-hide-menubar":"addon-entry-tw-hide-menubar","addon-entry-tw-remove-backpack":"addon-entry-tw-remove-backpack","addon-entry-tw-remove-feedback":"addon-entry-tw-remove-feedback","addon-entry-tw-show-fps":"addon-entry-tw-show-fps","addon-entry-tw-straighten-comments":"addon-entry-tw-straighten-comments","addon-entry-variable-manager":"addon-entry-variable-manager","addon-entry-vol-slider":"addon-entry-vol-slider","addon-entry-zebra-striping":"addon-entry-zebra-striping","addon-l10n-de":"addon-l10n-de","addon-l10n-es":"addon-l10n-es","addon-l10n-fi":"addon-l10n-fi","addon-l10n-fr":"addon-l10n-fr","addon-l10n-hu":"addon-l10n-hu","addon-l10n-it":"addon-l10n-it","addon-l10n-ja":"addon-l10n-ja","addon-l10n-ko":"addon-l10n-ko","addon-l10n-nl":"addon-l10n-nl","addon-l10n-pl":"addon-l10n-pl","addon-l10n-pt":"addon-l10n-pt","addon-l10n-ro":"addon-l10n-ro","addon-l10n-ru":"addon-l10n-ru","addon-l10n-sl":"addon-l10n-sl","addon-l10n-tr":"addon-l10n-tr","addon-l10n-zh-cn":"addon-l10n-zh-cn","addon-l10n-zh-tw":"addon-l10n-zh-tw"}[chunkId]||chunkId) + ".js"
+/******/ 		return __webpack_require__.p + "js/" + ({"addons":"addons","iframe-extension-worker":"iframe-extension-worker","library-backdrops":"library-backdrops","library-costumes":"library-costumes","library-sounds":"library-sounds","library-sprites":"library-sprites","sb":"sb","addon-default-entry":"addon-default-entry","addon-entry-2d-color-picker":"addon-entry-2d-color-picker","addon-entry-astras-copilot":"addon-entry-astras-copilot","addon-entry-better-img-uploads":"addon-entry-better-img-uploads","addon-entry-block-count":"addon-entry-block-count","addon-entry-block-palette-icons":"addon-entry-block-palette-icons","addon-entry-block-pins":"addon-entry-block-pins","addon-entry-blocks2image":"addon-entry-blocks2image","addon-entry-cat-blocks":"addon-entry-cat-blocks","addon-entry-clones":"addon-entry-clones","addon-entry-columns":"addon-entry-columns","addon-entry-copy-reporter":"addon-entry-copy-reporter","addon-entry-custom-block-shape":"addon-entry-custom-block-shape","addon-entry-custom-block-text":"addon-entry-custom-block-text","addon-entry-custom-menu-bar":"addon-entry-custom-menu-bar","addon-entry-custom-zoom":"addon-entry-custom-zoom","addon-entry-data-category-tweaks-v2":"addon-entry-data-category-tweaks-v2","addon-entry-debugger":"addon-entry-debugger","addon-entry-default-costume-editor-color":"addon-entry-default-costume-editor-color","addon-entry-disable-paste-offset":"addon-entry-disable-paste-offset","addon-entry-disable-stage-drag-select":"addon-entry-disable-stage-drag-select","addon-entry-editor-buttons-reverse-order":"addon-entry-editor-buttons-reverse-order","addon-entry-editor-colored-context-menus":"addon-entry-editor-colored-context-menus","addon-entry-editor-compact":"addon-entry-editor-compact","addon-entry-editor-extra-keys":"addon-entry-editor-extra-keys","addon-entry-editor-number-arrow-keys":"addon-entry-editor-number-arrow-keys","addon-entry-editor-sounds":"addon-entry-editor-sounds","addon-entry-editor-square-inputs":"addon-entry-editor-square-inputs","addon-entry-editor-stage-left":"addon-entry-editor-stage-left","addon-entry-editor-stepping":"addon-entry-editor-stepping","addon-entry-editor-theme3":"addon-entry-editor-theme3","addon-entry-expanded-backpack":"addon-entry-expanded-backpack","addon-entry-fullscreen":"addon-entry-fullscreen","addon-entry-gamepad":"addon-entry-gamepad","addon-entry-hide-delete-button":"addon-entry-hide-delete-button","addon-entry-hide-flyout":"addon-entry-hide-flyout","addon-entry-hide-new-variables":"addon-entry-hide-new-variables","addon-entry-hide-stage":"addon-entry-hide-stage","addon-entry-initialise-sprite-position":"addon-entry-initialise-sprite-position","addon-entry-load-extensions":"addon-entry-load-extensions","addon-entry-mediarecorder":"addon-entry-mediarecorder","addon-entry-mouse-pos":"addon-entry-mouse-pos","addon-entry-move-to-top-layer":"addon-entry-move-to-top-layer","addon-entry-my-blocks-plus":"addon-entry-my-blocks-plus","addon-entry-no-script-bumping":"addon-entry-no-script-bumping","addon-entry-number-pad":"addon-entry-number-pad","addon-entry-paint-by-default":"addon-entry-paint-by-default","addon-entry-paint-snap":"addon-entry-paint-snap","addon-entry-remove-curved-stage-border":"addon-entry-remove-curved-stage-border","addon-entry-remove-sprite-confirm":"addon-entry-remove-sprite-confirm","addon-entry-script-snap":"addon-entry-script-snap","addon-entry-search-sprites":"addon-entry-search-sprites","addon-entry-simple-project-analyzer":"addon-entry-simple-project-analyzer","addon-entry-sprite-properties":"addon-entry-sprite-properties","addon-entry-swap-local-global":"addon-entry-swap-local-global","addon-entry-terminal":"addon-entry-terminal","addon-entry-toolbox-category-drag":"addon-entry-toolbox-category-drag","addon-entry-transparent-orphans":"addon-entry-transparent-orphans","addon-entry-tw-comment-markdown-editor":"addon-entry-tw-comment-markdown-editor","addon-entry-tw-disable-cloud-variables":"addon-entry-tw-disable-cloud-variables","addon-entry-tw-disable-compiler":"addon-entry-tw-disable-compiler","addon-entry-tw-disable-vibration":"addon-entry-tw-disable-vibration","addon-entry-tw-hide-menubar":"addon-entry-tw-hide-menubar","addon-entry-tw-remove-backpack":"addon-entry-tw-remove-backpack","addon-entry-tw-remove-feedback":"addon-entry-tw-remove-feedback","addon-entry-tw-show-fps":"addon-entry-tw-show-fps","addon-entry-tw-straighten-comments":"addon-entry-tw-straighten-comments","addon-entry-variable-manager":"addon-entry-variable-manager","addon-entry-vol-slider":"addon-entry-vol-slider","addon-entry-zebra-striping":"addon-entry-zebra-striping","addon-l10n-de":"addon-l10n-de","addon-l10n-es":"addon-l10n-es","addon-l10n-fi":"addon-l10n-fi","addon-l10n-fr":"addon-l10n-fr","addon-l10n-hu":"addon-l10n-hu","addon-l10n-it":"addon-l10n-it","addon-l10n-ja":"addon-l10n-ja","addon-l10n-ko":"addon-l10n-ko","addon-l10n-nl":"addon-l10n-nl","addon-l10n-pl":"addon-l10n-pl","addon-l10n-pt":"addon-l10n-pt","addon-l10n-ro":"addon-l10n-ro","addon-l10n-ru":"addon-l10n-ru","addon-l10n-sl":"addon-l10n-sl","addon-l10n-tr":"addon-l10n-tr","addon-l10n-zh-cn":"addon-l10n-zh-cn","addon-l10n-zh-tw":"addon-l10n-zh-tw"}[chunkId]||chunkId) + ".js"
 /******/ 	}
 /******/
 /******/ 	// The require function
@@ -11235,6 +11235,9 @@ const messages = Object(react_intl__WEBPACK_IMPORTED_MODULE_2__["defineMessages"
     "defaultMessage": "Wizard"
   }
 });
+const CODE_STATE_DEBOUNCE_MS = 120;
+const AUTO_SAVE_DEBOUNCE_MS = 900;
+const AUTO_RUN_DEBOUNCE_MS = 180;
 class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.Component {
   constructor(props) {
     super(props);
@@ -11493,8 +11496,12 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
         return;
       }
       try {
-        for (const extension of this.state.savedExtensions) {
-          await scratch_extension_editor__WEBPACK_IMPORTED_MODULE_5__["extensionEditorStorage"].deleteExtension(extension.id);
+        if (typeof scratch_extension_editor__WEBPACK_IMPORTED_MODULE_5__["extensionEditorStorage"].clearAllExtensions === 'function') {
+          await scratch_extension_editor__WEBPACK_IMPORTED_MODULE_5__["extensionEditorStorage"].clearAllExtensions();
+        } else {
+          for (const extension of this.state.savedExtensions) {
+            await scratch_extension_editor__WEBPACK_IMPORTED_MODULE_5__["extensionEditorStorage"].deleteExtension(extension.id);
+          }
         }
         this.setState({
           savedExtensions: []
@@ -11521,10 +11528,11 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
         color2,
         color3
       } = config;
-      return "// Name: ".concat(name, "\n// Description: A Extensions named ").concat(name, "\n// ID: ").concat(id, "\n// By: You Name <Personal Web>\n// License: MPL-2.0\n\n(function (Scratch) {\n    \"use strict\";\n    class ").concat(this.toClassName(id), " {\n        constructor(runtime) {\n            this.runtime = runtime;\n        }\n        getInfo() {\n            return {\n                id: '").concat(id, "',\n                name: '").concat(name, "',\n                color1: '").concat(color1, "',\n                color2: '").concat(color2, "',\n                color3: '").concat(color3, "',\n                blocks: [\n                    {\n                    opcode: 'hello',\n                    blockType: 'command',\n                    text: 'Hello [MESSAGE]',\n                    arguments: {\n                        MESSAGE: {\n                        type: 'string',\n                        defaultValue: 'World'\n                        }\n                    }\n                    },\n                    {\n                    opcode: 'getRandomNumber',\n                    blockType: 'reporter',\n                    text: 'Random [MIN] \u5230 [MAX]',\n                    arguments: {\n                        MIN: {\n                        type: 'number',\n                        defaultValue: 1\n                        },\n                        MAX: {\n                        type: 'number',\n                        defaultValue: 100\n                        }\n                    }\n                    }\n                ]\n            };\n        }\n        hello(args) {\n            console.log('Hello, ' + args.MESSAGE);\n        }\n        getRandomNumber(args) {\n            const min = args.MIN;\n            const max = args.MAX;\n            return Math.floor(Math.random() * (max - min + 1)) + min;\n        }\n    }\n    Scratch.extensions.register(new ").concat(this.toClassName(id), "());\n})(Scratch);\n");
+      return "// Name: ".concat(name, "\n// Description: A Extensions named ").concat(name, "\n// ID: ").concat(id, "\n// By: You Name <Personal Web>\n// License: MPL-2.0\n\n(function (Scratch) {\n    \"use strict\";\n    class ").concat(this.toClassName(id), " {\n        constructor(runtime) {\n            this.runtime = runtime;\n        }\n        getInfo() {\n            return {\n                id: '").concat(id, "',\n                name: '").concat(name, "',\n                color1: '").concat(color1, "',\n                color2: '").concat(color2, "',\n                color3: '").concat(color3, "',\n                blocks: [\n                    {\n                    opcode: 'hello',\n                    blockType: 'command',\n                    text: 'Hello [MESSAGE]',\n                    arguments: {\n                        MESSAGE: {\n                        type: 'string',\n                        defaultValue: 'World'\n                        }\n                    }\n                    },\n                    {\n                    opcode: 'getRandomNumber',\n                    blockType: 'reporter',\n                    text: 'Random [MIN] to [MAX]',\n                    arguments: {\n                        MIN: {\n                        type: 'number',\n                        defaultValue: 1\n                        },\n                        MAX: {\n                        type: 'number',\n                        defaultValue: 100\n                        }\n                    }\n                    }\n                ]\n            };\n        }\n        hello(args) {\n            console.log('Hello, ' + args.MESSAGE);\n        }\n        getRandomNumber(args) {\n            const min = args.MIN;\n            const max = args.MAX;\n            return Math.floor(Math.random() * (max - min + 1)) + min;\n        }\n    }\n    Scratch.extensions.register(new ").concat(this.toClassName(id), "());\n})(Scratch);\n");
     });
     _defineProperty(this, "handleTabClick", tabId => {
       if (tabId !== this.props.activeTabId) {
+        this.flushPendingForTab(this.props.activeTabId);
         // 在切换标签卡之前，卸载当前标签卡的扩展
         this.unloadCurrentTabExtension();
         this.props.activateTab(tabId);
@@ -11546,18 +11554,14 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
           // 卸载扩展，让VM自动处理内部状态的清理
           this.props.vm.extensionManager.unloadExtension(extensionId);
           // 触发主编辑器的workspace更新
-          setTimeout(() => {
-            if (this.props.vm) {
-              this.props.vm.refreshWorkspace();
-              this.props.vm.emitWorkspaceUpdate();
-            }
-          }, 100);
+          this.scheduleWorkspaceRefresh();
           console.log('Unloaded extension:', extensionId);
         }
       }
     });
     _defineProperty(this, "handleTabClose", (tabId, event) => {
       event.stopPropagation();
+      this.flushPendingForTab(tabId);
       // 卸载该标签卡的扩展
       const extensionId = this.state.loadedExtensionIds[tabId];
       if (extensionId && this.props.vm && this.props.vm.extensionManager && this.props.vm.runtime) {
@@ -11571,64 +11575,65 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
           // 卸载扩展，让VM自动处理内部状态的清理
           this.props.vm.extensionManager.unloadExtension(extensionId);
           // 触发主编辑器的workspace更新
-          setTimeout(() => {
-            if (this.props.vm) {
-              this.props.vm.refreshWorkspace();
-              this.props.vm.emitWorkspaceUpdate();
-            }
-          }, 100);
+          this.scheduleWorkspaceRefresh();
           console.log('Unloaded extension:', extensionId);
         }
       }
       // 从记录中删除
       const newLoadedIds = _objectSpread({}, this.state.loadedExtensionIds);
       delete newLoadedIds[tabId];
+      this.clearTabCaches(tabId);
       this.setState({
         loadedExtensionIds: newLoadedIds
       });
       this.props.removeTab(tabId);
     });
     _defineProperty(this, "handleCodeChange", code => {
-      this.props.updateTabCode(this.props.activeTabId, code);
-      // Auto-save to IndexedDB
       const activeTab = this.getActiveTab();
-      if (activeTab) {
-        scratch_extension_editor__WEBPACK_IMPORTED_MODULE_5__["extensionEditorStorage"].saveExtension({
-          id: activeTab.id,
-          name: activeTab.name,
-          code: code,
-          createdAt: activeTab.createdAt,
-          updatedAt: Date.now()
-        }).then(() => {
-          this.props.setTabSaved(activeTab.id, true);
-        }).catch(error => {
-          console.error('Failed to auto-save extension:', error);
-        });
+      if (!activeTab) return;
+      const tabId = activeTab.id;
+      this.latestCodeByTab[tabId] = code;
+      if (activeTab.isSaved) {
+        this.props.setTabSaved(tabId, false);
       }
-      // 防抖延迟执行，避免频繁重新加载扩展
-      // 增加防抖时间到500ms，给用户更多编辑时间
-      if (this.runExtensionDebounce) {
-        clearTimeout(this.runExtensionDebounce);
-      }
-      this.runExtensionDebounce = setTimeout(() => {
-        // 检查代码是否有语法错误
-        try {
-          // 简单的语法检查
-          const idMatch = code.match(/id:\s*['"]([^'"]+)['"]/);
-          if (!idMatch) {
-            console.warn('No extension ID found in code, skipping auto-load');
-            return;
-          }
-          this.handleRunExtension();
-        } catch (e) {
-          console.warn('Syntax check failed, skipping auto-load:', e);
+      this.scheduleCodeUpdate(tabId, code);
+      this.scheduleAutoSave(activeTab, code);
+    });
+    _defineProperty(this, "handleAutoRunRequest", code => {
+      const activeTab = this.getActiveTab();
+      if (!activeTab) return;
+      const tabId = activeTab.id;
+      const latestCode = typeof code === 'string' ? code : this.getTabCode(tabId);
+      if (!latestCode) return;
+      this.latestCodeByTab[tabId] = latestCode;
+      if (this.isRunningExtension) {
+        if (this.autoRunDebounce) {
+          clearTimeout(this.autoRunDebounce);
+          this.autoRunDebounce = null;
         }
-      }, 500);
+        this.queueRunExtension({
+          tabId,
+          code: latestCode,
+          showLoading: false
+        });
+        return;
+      }
+      if (this.autoRunDebounce) clearTimeout(this.autoRunDebounce);
+      this.autoRunDebounce = setTimeout(() => {
+        this.autoRunDebounce = null;
+        const currentTab = this.getActiveTab();
+        if (!currentTab || currentTab.id !== tabId) return;
+        this.queueRunExtension({
+          tabId,
+          code: this.getTabCode(tabId),
+          showLoading: false
+        });
+      }, AUTO_RUN_DEBOUNCE_MS);
     });
     _defineProperty(this, "handleExport", async () => {
       const activeTab = this.getActiveTab();
       if (!activeTab) return;
-      const blob = new Blob([activeTab.code], {
+      const blob = new Blob([this.getTabCode(activeTab.id)], {
         type: 'text/javascript'
       });
       const url = URL.createObjectURL(blob);
@@ -11642,76 +11647,14 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
     });
     _defineProperty(this, "handleRunExtension", async () => {
       const activeTab = this.getActiveTab();
-      if (!activeTab || !activeTab.code) return;
-      // Parse extension ID from code
-      const idMatch = activeTab.code.match(/id:\s*['"]([^'"]+)['"]/);
-      const newExtensionId = idMatch ? idMatch[1] : "ext_".concat(Date.now());
-      console.log('Running extension:', newExtensionId);
-      // 显示加载状态
-      this.setState({
-        isLoadingExtension: true,
-        loadError: null
+      if (!activeTab) return;
+      const code = this.getTabCode(activeTab.id);
+      if (!code) return;
+      this.queueRunExtension({
+        tabId: activeTab.id,
+        code,
+        showLoading: true
       });
-      try {
-        // Unload existing extension if loaded
-        if (this.props.vm && this.props.vm.extensionManager && this.props.vm.runtime) {
-          // 先卸载之前记录的扩展ID（如果用户修改了id，这个ID可能与新的不同）
-          const oldExtensionId = this.state.loadedExtensionIds[activeTab.id];
-          if (oldExtensionId && this.props.vm.extensionManager.isExtensionLoaded(oldExtensionId)) {
-            console.log('Unloading previously loaded extension:', oldExtensionId);
-            this.props.vm.extensionManager.unloadExtension(oldExtensionId);
-          }
-          // 再检查新的扩展ID是否已加载（防止重复加载）
-          if (this.props.vm.extensionManager.isExtensionLoaded(newExtensionId)) {
-            console.log('Unloading extension with same ID:', newExtensionId);
-            this.props.vm.extensionManager.unloadExtension(newExtensionId);
-          }
-
-          // 停止所有线程，防止运行中的积木引用已卸载的扩展
-          const threads = [...this.props.vm.runtime.threads];
-          for (const thread of threads) {
-            this.props.vm.runtime.stopThread(thread);
-          }
-
-          // 等待VM完全清理
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-
-        // Load the extension using data URL (standard flow)
-        if (this.props.vm && this.props.vm.extensionManager) {
-          // 使用IIFE包裹代码，避免全局作用域污染导致的重复声明错误
-          const wrappedCode = "\n                    (function() {\n                        ".concat(activeTab.code, "\n                    })();\n                ");
-          // 使用data URL格式，与原版自定义扩展加载保持一致
-          const dataUrl = "data:application/javascript,".concat(encodeURIComponent(wrappedCode));
-          console.log('Loading extension from data URL...');
-          // 信任此扩展URL，使其使用无沙箱模式加载
-          Object(_containers_tw_security_manager_jsx__WEBPACK_IMPORTED_MODULE_7__["manuallyTrustExtension"])(dataUrl);
-          await this.props.vm.extensionManager.loadExtensionURL(dataUrl);
-          console.log('Extension loaded successfully');
-          // 触发主编辑器的workspace更新
-          setTimeout(() => {
-            if (this.props.vm) {
-              this.props.vm.refreshWorkspace();
-              this.props.vm.emitWorkspaceUpdate();
-            }
-          }, 100);
-          // 记录新加载的扩展ID
-          this.setState({
-            loadedExtensionIds: _objectSpread(_objectSpread({}, this.state.loadedExtensionIds), {}, {
-              [activeTab.id]: newExtensionId
-            }),
-            isLoadingExtension: false,
-            loadError: null
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load extension:', error);
-        // 加载失败时显示错误信息
-        this.setState({
-          isLoadingExtension: false,
-          loadError: error.message || '加载扩展失败'
-        });
-      }
     });
     this.state = {
       showCreateForm: false,
@@ -11732,11 +11675,24 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
       loadError: null,
       loadedExtensionIds: {},
       // 记录每个标签卡已加载的扩展ID {tabId: extensionId}
+      previewRevisionByTab: {},
+      // 每次成功加载扩展后递增，用于驱动预览刷新
       showStorageManager: false,
       // 显示存储管理器
       blocksPanelMode: 'preview' // blocksPanel 显示模式: 'preview' (积木预览) 或 'wizard' (向导)
     };
-    this.runExtensionDebounce = null;
+    this.latestCodeByTab = {};
+    this.lastDispatchedCodeByTab = {};
+    this.codeUpdateTimers = {};
+    this.autoSaveTimers = {};
+    this.cachedScratchBlocksVm = null;
+    this.cachedScratchBlocks = null;
+    this.isRunningExtension = false;
+    this.pendingRunRequest = null;
+    this.runRequestSequence = 0;
+    this.latestRequestedRunByTab = {};
+    this.workspaceRefreshTimeout = null;
+    this.autoRunDebounce = null;
     this.fileInputRef = /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createRef();
   }
   componentDidMount() {
@@ -11752,49 +11708,57 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
     if (this.flyoutUpdateTimeout) {
       clearTimeout(this.flyoutUpdateTimeout);
     }
-    if (this.runExtensionDebounce) {
-      clearTimeout(this.runExtensionDebounce);
+    this.clearTimeoutMap(this.codeUpdateTimers);
+    this.clearTimeoutMap(this.autoSaveTimers);
+    if (this.workspaceRefreshTimeout) clearTimeout(this.workspaceRefreshTimeout);
+    if (this.autoRunDebounce) clearTimeout(this.autoRunDebounce);
+  }
+  clearTimeoutMap(map) {
+    for (const key of Object.keys(map)) {
+      clearTimeout(map[key]);
+      delete map[key];
     }
   }
+  clearTimer(map, key) {
+    if (map[key]) {
+      clearTimeout(map[key]);
+      delete map[key];
+    }
+  }
+  scheduleWorkspaceRefresh() {
+    if (this.workspaceRefreshTimeout) clearTimeout(this.workspaceRefreshTimeout);
+    this.workspaceRefreshTimeout = setTimeout(() => {
+      this.workspaceRefreshTimeout = null;
+      if (this.props.vm) {
+        this.props.vm.refreshWorkspace();
+        this.props.vm.emitWorkspaceUpdate();
+      }
+    }, 60);
+  }
   async loadSavedExtensions() {
+    const defaultCreateFormState = {
+      showCreateForm: true,
+      currentStep: 0,
+      createForm: {
+        name: '',
+        id: '',
+        color1: '#FF6680',
+        color2: '#FF4D6A',
+        color3: '#CC3D55'
+      },
+      errors: {
+        name: '',
+        id: ''
+      }
+    };
     try {
       const extensions = await scratch_extension_editor__WEBPACK_IMPORTED_MODULE_5__["extensionEditorStorage"].getAllExtensions();
-      this.setState({
+      this.setState(_objectSpread(_objectSpread({}, defaultCreateFormState), {}, {
         savedExtensions: extensions
-      });
-      // Always show create form at startup
-      this.setState({
-        showCreateForm: true,
-        currentStep: 0,
-        createForm: {
-          name: '',
-          id: '',
-          color1: '#FF6680',
-          color2: '#FF4D6A',
-          color3: '#CC3D55'
-        },
-        errors: {
-          name: '',
-          id: ''
-        }
-      });
+      }));
     } catch (error) {
       console.error('Failed to load saved extensions:', error);
-      this.setState({
-        showCreateForm: true,
-        currentStep: 0,
-        createForm: {
-          name: '',
-          id: '',
-          color1: '#FF6680',
-          color2: '#FF4D6A',
-          color3: '#CC3D55'
-        },
-        errors: {
-          name: '',
-          id: ''
-        }
-      });
+      this.setState(defaultCreateFormState);
     }
   }
   isValidClassName(name) {
@@ -11830,20 +11794,189 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
     // Convert ID to class name (e.g., 'my_extension' -> 'MyExtension')
     return id.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
   }
+  getTabCode(tabId) {
+    if (!tabId) return '';
+    if (Object.prototype.hasOwnProperty.call(this.latestCodeByTab, tabId)) {
+      return this.latestCodeByTab[tabId];
+    }
+    const tab = this.props.tabs.find(t => t.id === tabId);
+    return tab ? tab.code : '';
+  }
+  scheduleCodeUpdate(tabId, code) {
+    this.clearTimer(this.codeUpdateTimers, tabId);
+    this.codeUpdateTimers[tabId] = setTimeout(() => {
+      this.codeUpdateTimers[tabId] = null;
+      delete this.codeUpdateTimers[tabId];
+      if (this.lastDispatchedCodeByTab[tabId] === code) return;
+      this.lastDispatchedCodeByTab[tabId] = code;
+      this.props.updateTabCode(tabId, code);
+    }, CODE_STATE_DEBOUNCE_MS);
+  }
+  flushCodeUpdate(tabId) {
+    if (!tabId) return;
+    this.clearTimer(this.codeUpdateTimers, tabId);
+    const code = this.getTabCode(tabId);
+    if (this.lastDispatchedCodeByTab[tabId] === code) return;
+    this.lastDispatchedCodeByTab[tabId] = code;
+    this.props.updateTabCode(tabId, code);
+  }
+  scheduleAutoSave(tab, code) {
+    const tabId = tab.id;
+    this.clearTimer(this.autoSaveTimers, tabId);
+    this.autoSaveTimers[tabId] = setTimeout(() => {
+      this.autoSaveTimers[tabId] = null;
+      delete this.autoSaveTimers[tabId];
+      const latestCode = this.getTabCode(tabId);
+      if (latestCode !== code) return;
+      scratch_extension_editor__WEBPACK_IMPORTED_MODULE_5__["extensionEditorStorage"].saveExtension({
+        id: tab.id,
+        name: tab.name,
+        code: latestCode,
+        createdAt: tab.createdAt,
+        updatedAt: Date.now()
+      }).then(() => {
+        this.props.setTabSaved(tab.id, true);
+      }).catch(error => {
+        console.error('Failed to auto-save extension:', error);
+      });
+    }, AUTO_SAVE_DEBOUNCE_MS);
+  }
+  flushPendingForTab(tabId) {
+    if (!tabId) return;
+    this.flushCodeUpdate(tabId);
+    this.clearTimer(this.autoSaveTimers, tabId);
+  }
+  clearTabCaches(tabId) {
+    this.clearTimer(this.codeUpdateTimers, tabId);
+    this.clearTimer(this.autoSaveTimers, tabId);
+    delete this.latestCodeByTab[tabId];
+    delete this.lastDispatchedCodeByTab[tabId];
+    delete this.latestRequestedRunByTab[tabId];
+  }
+  queueRunExtension(_ref) {
+    let {
+      tabId,
+      code,
+      showLoading
+    } = _ref;
+    const requestId = ++this.runRequestSequence;
+    this.latestRequestedRunByTab[tabId] = requestId;
+    this.pendingRunRequest = {
+      tabId,
+      code,
+      showLoading: Boolean(showLoading),
+      requestId
+    };
+    if (!this.isRunningExtension) {
+      this.processRunQueue();
+    }
+  }
+  async processRunQueue() {
+    while (this.pendingRunRequest) {
+      const request = this.pendingRunRequest;
+      this.pendingRunRequest = null;
+      this.isRunningExtension = true;
+      try {
+        await this.runExtensionNow(request);
+      } finally {
+        this.isRunningExtension = false;
+      }
+    }
+  }
+  async runExtensionNow(_ref2) {
+    let {
+      tabId,
+      code,
+      showLoading,
+      requestId
+    } = _ref2;
+    if (!tabId || !code || !this.props.vm || !this.props.vm.extensionManager) return;
+    if (this.latestRequestedRunByTab[tabId] !== requestId) return;
+    const tab = this.props.tabs.find(t => t.id === tabId);
+    if (!tab) return;
+    const idMatch = code.match(/id:\s*['"]([^'"]+)['"]/);
+    const newExtensionId = idMatch ? idMatch[1] : "ext_".concat(Date.now());
+    if (showLoading) {
+      this.setState({
+        isLoadingExtension: true,
+        loadError: null
+      });
+    }
+    try {
+      if (this.props.vm.runtime) {
+        const oldExtensionId = this.state.loadedExtensionIds[tabId];
+        if (oldExtensionId && this.props.vm.extensionManager.isExtensionLoaded(oldExtensionId)) {
+          this.props.vm.extensionManager.unloadExtension(oldExtensionId);
+        }
+        if (this.props.vm.extensionManager.isExtensionLoaded(newExtensionId)) {
+          this.props.vm.extensionManager.unloadExtension(newExtensionId);
+        }
+        const threads = [...this.props.vm.runtime.threads];
+        for (const thread of threads) {
+          this.props.vm.runtime.stopThread(thread);
+        }
+        await new Promise(resolve => setTimeout(resolve, 40));
+      }
+      if (this.latestRequestedRunByTab[tabId] !== requestId) {
+        return;
+      }
+      const wrappedCode = "\n                    (function() {\n                        ".concat(code, "\n                    })();\n                ");
+      const dataUrl = "data:application/javascript,".concat(encodeURIComponent(wrappedCode));
+      Object(_containers_tw_security_manager_jsx__WEBPACK_IMPORTED_MODULE_7__["manuallyTrustExtension"])(dataUrl);
+      await this.props.vm.extensionManager.loadExtensionURL(dataUrl);
+
+      // 只提交最新一次请求的结果，避免高频编辑时旧结果覆盖新结果。
+      if (this.latestRequestedRunByTab[tabId] !== requestId) {
+        return;
+      }
+      // 标签已被关闭时跳过提交。
+      if (!this.props.tabs.some(t => t.id === tabId)) {
+        return;
+      }
+      this.scheduleWorkspaceRefresh();
+      this.setState(prevState => ({
+        loadedExtensionIds: _objectSpread(_objectSpread({}, prevState.loadedExtensionIds), {}, {
+          [tabId]: newExtensionId
+        }),
+        previewRevisionByTab: _objectSpread(_objectSpread({}, prevState.previewRevisionByTab), {}, {
+          [tabId]: (prevState.previewRevisionByTab[tabId] || 0) + 1
+        }),
+        isLoadingExtension: showLoading ? false : prevState.isLoadingExtension,
+        loadError: null
+      }));
+    } catch (error) {
+      console.error('Failed to load extension:', error);
+      if (this.latestRequestedRunByTab[tabId] !== requestId) {
+        return;
+      }
+      this.setState({
+        isLoadingExtension: showLoading ? false : this.state.isLoadingExtension,
+        loadError: error.message || '加载扩展失败'
+      });
+    }
+  }
   getActiveTab() {
     return this.props.tabs.find(tab => tab.id === this.props.activeTabId);
   }
   getScratchBlocks() {
     if (!this.props.vm) return null;
+    if (this.cachedScratchBlocksVm === this.props.vm && this.cachedScratchBlocks) {
+      return this.cachedScratchBlocks;
+    }
     try {
-      return Object(_lib_blocks__WEBPACK_IMPORTED_MODULE_6__["default"])(this.props.vm, false);
+      this.cachedScratchBlocksVm = this.props.vm;
+      this.cachedScratchBlocks = Object(_lib_blocks__WEBPACK_IMPORTED_MODULE_6__["default"])(this.props.vm, false);
+      return this.cachedScratchBlocks;
     } catch (e) {
+      this.cachedScratchBlocksVm = null;
+      this.cachedScratchBlocks = null;
       return null;
     }
   }
   render() {
     const activeTab = this.getActiveTab();
-    const code = activeTab ? activeTab.code : '';
+    const code = activeTab ? this.getTabCode(activeTab.id) : '';
+    const editorThemeMode = this.props.theme && typeof this.props.theme.isDark === 'function' && this.props.theme.isDark() ? 'dark' : 'light';
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("div", {
       className: _extension_editor_tabs_css__WEBPACK_IMPORTED_MODULE_8___default.a.container
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("div", {
@@ -11907,6 +12040,8 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
       vm: this.props.vm,
       ScratchBlocks: this.getScratchBlocks(),
       blocksMediaPath: this.props.blocksMediaPath,
+      loadedExtensionId: activeTab ? this.state.loadedExtensionIds[activeTab.id] : null,
+      previewRevision: activeTab ? this.state.previewRevisionByTab[activeTab.id] || 0 : 0,
       extensionCode: code,
       isLoading: this.state.isLoadingExtension,
       loadError: this.state.loadError,
@@ -11918,9 +12053,11 @@ class ExtensionEditorTabs extends react__WEBPACK_IMPORTED_MODULE_1___default.a.C
       vm: this.props.vm,
       initialCode: code,
       onCodeChange: this.handleCodeChange,
+      onAutoRunRequest: this.handleAutoRunRequest,
       onOpenExtensionEditorSettings: this.props.onOpenExtensionEditorSettings,
       fontSize: this.props.fontSize,
       onFontSizeChange: this.props.onFontSizeChange,
+      themeMode: editorThemeMode,
       onToggleWizard: this.handleToggleWizardPanel,
       wizardActive: this.state.blocksPanelMode === 'wizard',
       intl: this.props.intl
@@ -12061,12 +12198,14 @@ ExtensionEditorTabs.propTypes = {
   setTabSaved: prop_types__WEBPACK_IMPORTED_MODULE_0___default.a.func.isRequired,
   openExtensionEditorCreate: prop_types__WEBPACK_IMPORTED_MODULE_0___default.a.func.isRequired,
   onOpenExtensionEditorSettings: prop_types__WEBPACK_IMPORTED_MODULE_0___default.a.func,
+  theme: prop_types__WEBPACK_IMPORTED_MODULE_0___default.a.object,
   fontSize: prop_types__WEBPACK_IMPORTED_MODULE_0___default.a.number,
   onFontSizeChange: prop_types__WEBPACK_IMPORTED_MODULE_0___default.a.func
 };
 const mapStateToProps = state => ({
   tabs: state.scratchGui.extensionEditorTabs.tabs,
   activeTabId: state.scratchGui.extensionEditorTabs.activeTabId,
+  theme: state.scratchGui.theme.theme,
   fontSize: state.scratchGui.extensionEditor.fontSize,
   activeTabIndex: state.scratchGui.editorTab.activeTabIndex
 });
@@ -13118,7 +13257,7 @@ const GUIComponent = props => {
       draggable: false,
       alt: "readme",
       style: {
-        width: "25px",
+        width: "30px",
         filter: 'grayscale(100%)'
       }
     }) : "README")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement(react_tabs__WEBPACK_IMPORTED_MODULE_7__["TabPanel"], {
@@ -13615,7 +13754,8 @@ class LibraryItemComponent extends react__WEBPACK_IMPORTED_MODULE_2___default.a.
       className: _library_item_css__WEBPACK_IMPORTED_MODULE_5___default.a.featuredImage,
       loading: "lazy",
       draggable: false,
-      src: this.props.iconURL
+      src: this.props.iconURL,
+      onError: this.props.onImageError
     })), this.props.insetIconURL ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
       className: _library_item_css__WEBPACK_IMPORTED_MODULE_5___default.a.libraryItemInsetImageContainer
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("img", {
@@ -13701,7 +13841,8 @@ class LibraryItemComponent extends react__WEBPACK_IMPORTED_MODULE_2___default.a.
       className: _library_item_css__WEBPACK_IMPORTED_MODULE_5___default.a.libraryItemImage,
       loading: "lazy",
       src: this.props.iconURL,
-      draggable: false
+      draggable: false,
+      onError: this.props.onImageError
     }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("span", {
       className: _library_item_css__WEBPACK_IMPORTED_MODULE_5___default.a.libraryItemName
     }, this.props.name), this.props.showPlayButton ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(_containers_play_button_jsx__WEBPACK_IMPORTED_MODULE_4__["default"], {
@@ -13743,7 +13884,8 @@ LibraryItemComponent.propTypes = {
   onMouseLeave: prop_types__WEBPACK_IMPORTED_MODULE_1___default.a.func.isRequired,
   onPlay: prop_types__WEBPACK_IMPORTED_MODULE_1___default.a.func.isRequired,
   onStop: prop_types__WEBPACK_IMPORTED_MODULE_1___default.a.func.isRequired,
-  showPlayButton: prop_types__WEBPACK_IMPORTED_MODULE_1___default.a.bool
+  showPlayButton: prop_types__WEBPACK_IMPORTED_MODULE_1___default.a.bool,
+  onImageError: prop_types__WEBPACK_IMPORTED_MODULE_1___default.a.func
 };
 LibraryItemComponent.defaultProps = {
   disabled: false,
@@ -32326,10 +32468,11 @@ const messages = Object(react_intl__WEBPACK_IMPORTED_MODULE_3__["defineMessages"
 class LibraryItem extends react__WEBPACK_IMPORTED_MODULE_2___default.a.PureComponent {
   constructor(props) {
     super(props);
-    lodash_bindall__WEBPACK_IMPORTED_MODULE_0___default()(this, ['handleBlur', 'handleClick', 'handleFavorite', 'handleFocus', 'handleKeyPress', 'handleMouseEnter', 'handleMouseLeave', 'handlePlay', 'handleStop', 'rotateIcon', 'startRotatingIcons', 'stopRotatingIcons']);
+    lodash_bindall__WEBPACK_IMPORTED_MODULE_0___default()(this, ['handleBlur', 'handleClick', 'handleFavorite', 'handleFocus', 'handleKeyPress', 'handleMouseEnter', 'handleMouseLeave', 'handlePlay', 'handleStop', 'rotateIcon', 'startRotatingIcons', 'stopRotatingIcons', 'handleImageError']);
     this.state = {
       iconIndex: 0,
-      isRotatingIcon: false
+      isRotatingIcon: false,
+      imageLoadFailed: false
     };
   }
   componentWillUnmount() {
@@ -32410,6 +32553,13 @@ class LibraryItem extends react__WEBPACK_IMPORTED_MODULE_2___default.a.PureCompo
       this.intervalId = clearInterval(this.intervalId);
     }
   }
+  handleImageError() {
+    if (!this.state.imageLoadFailed) {
+      this.setState({
+        imageLoadFailed: true
+      });
+    }
+  }
   rotateIcon() {
     const nextIconIndex = (this.state.iconIndex + 1) % this.props.icons.length;
     this.setState({
@@ -32430,7 +32580,8 @@ class LibraryItem extends react__WEBPACK_IMPORTED_MODULE_2___default.a.PureCompo
   }
   render() {
     const iconMd5 = this.curIconMd5();
-    const iconURL = iconMd5 ? "https://cdn.assets.scratch.mit.edu/internalapi/asset/".concat(iconMd5, "/get/") : this.props.iconRawURL;
+    const baseIconURL = iconMd5 ? "https://cdn.assets.scratch.mit.edu/internalapi/asset/".concat(iconMd5, "/get/") : this.props.iconRawURL;
+    const iconURL = this.state.imageLoadFailed ? 'https://extensions.turbowarp.org/images/unknown.svg' : baseIconURL;
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(_components_library_item_library_item_jsx__WEBPACK_IMPORTED_MODULE_4__["default"], {
       intl: this.props.intl,
       bluetoothRequired: this.props.bluetoothRequired,
@@ -32460,7 +32611,8 @@ class LibraryItem extends react__WEBPACK_IMPORTED_MODULE_2___default.a.PureCompo
       onMouseEnter: this.handleMouseEnter,
       onMouseLeave: this.handleMouseLeave,
       onPlay: this.handlePlay,
-      onStop: this.handleStop
+      onStop: this.handleStop,
+      onImageError: this.handleImageError
     });
   }
 }
