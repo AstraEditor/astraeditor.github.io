@@ -9,7 +9,7 @@ let transitionTimeout = null;
 
 // 打字效果
 const slogan = document.querySelector('.slogan');
-const sloganText = '一把称职的锤子，而不是一朵鲜艳的玫瑰。';
+const sloganText = '锤子，而不是玫瑰。';
 
 function typeWriter() {
     // 预先创建所有字符
