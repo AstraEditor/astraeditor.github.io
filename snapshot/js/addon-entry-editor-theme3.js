@@ -69,7 +69,7 @@ exports = module.exports = __webpack_require__(/*! ../../../../node_modules/css-
 
 
 // module
-exports.push([module.i, ".blocklyDropDownDiv .goog-menuitem-highlight,\n.blocklyDropDownDiv .goog-menuitem-hover,\n.sa-contextmenu-colored .blocklyContextMenu .goog-menuitem-highlight {\n  background-color: var(--editorTheme3-hoveredItem, rgba(0, 0, 0, 0.2));\n}\n\n.scratchCommentRect {\n  fill: var(--editorTheme3-commentColor);\n}\n.scratchCommentBody,\n.scratchCommentTextarea {\n  background-color: var(--editorTheme3-commentColor);\n}\n.scratchWorkspaceCommentBorder {\n  stroke: var(--editorTheme3-commentBorder);\n}\n.scratchCommentTextarea::placeholder {\n  color: var(--editorTheme3-commentTextTransparent);\n}\n.scratchCommentText {\n  fill: var(--editorTheme3-commentText);\n  color: var(--editorTheme3-commentText);\n}\n", ""]);
+exports.push([module.i, ".blocklyDropDownDiv .goog-menuitem-highlight,\n.blocklyDropDownDiv .goog-menuitem-hover,\n.sa-contextmenu-colored .blocklyContextMenu .goog-menuitem-highlight {\n  background-color: var(--editorTheme3-hoveredItem, rgba(0, 0, 0, 0.2));\n}\n\n.scratchCommentRect {\n  /* If the addon CSS loads before its CSS variables are initialized, SVG defaults to black. */\n  fill: var(--editorTheme3-commentColor, #fef49c);\n}\n.scratchCommentBody,\n.scratchCommentTextarea {\n  background-color: var(--editorTheme3-commentColor, #fef49c);\n}\n.scratchWorkspaceCommentBorder {\n  stroke: var(--editorTheme3-commentBorder, #bca903);\n}\n.scratchCommentTextarea::placeholder {\n  color: var(--editorTheme3-commentTextTransparent, rgba(0, 0, 0, 0.5));\n}\n.scratchCommentText {\n  fill: var(--editorTheme3-commentText, black);\n  color: var(--editorTheme3-commentText, black);\n}\n", ""]);
 
 // exports
 

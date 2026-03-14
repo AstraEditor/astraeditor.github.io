@@ -1585,7 +1585,6 @@ const updateSelectTool = (paper, tool, vm) => {
   };
   let removeGuides;
   function onMouseDrag(event) {
-    var _getLayer$children$fi, _getLayer$children$fi2;
     const point = event.point;
     const actionBounds = getActionBounds(this.mode in _helpers_js__WEBPACK_IMPORTED_MODULE_1__["BitmapModes"]);
     point.x = Math.max(actionBounds.left, Math.min(point.x, actionBounds.right));
@@ -1601,7 +1600,8 @@ const updateSelectTool = (paper, tool, vm) => {
     const getDist = (p1, p2) => {
       return p1.getDistance(p2);
     };
-    const selectionAnchor = (_getLayer$children$fi = (_getLayer$children$fi2 = getLayer("isGuideLayer").children.find(c => c.data.isSelectionBound)) === null || _getLayer$children$fi2 === void 0 ? void 0 : _getLayer$children$fi2.selectionAnchor) !== null && _getLayer$children$fi !== void 0 ? _getLayer$children$fi : {};
+    const found = getLayer("isGuideLayer").children.find(c => c.data.isSelectionBound);
+    const selectionAnchor = found && found.selectionAnchor !== undefined && found.selectionAnchor !== null ? found.selectionAnchor : {};
     const resetAnchorColor = () => {
       selectionAnchor.strokeColor = new paper.Color(0.30196078431372547, 0.592156862745098, 1);
       selectionAnchor.fillColor = null;

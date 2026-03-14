@@ -88,7 +88,7 @@ exports = module.exports = __webpack_require__(/*! ../../../../node_modules/css-
 exports.i(__webpack_require__(/*! -!../../../../node_modules/css-loader!../editor-theme3/compatibility.css */ "./node_modules/css-loader/index.js!./src/addons/addons/editor-theme3/compatibility.css"), "");
 
 // module
-exports.push([module.i, ".sa-find-bar {\n  display: flex;\n  align-items: center;\n  white-space: nowrap;\n  font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n  width: 100%;\n  height: 100%;\n  margin-left: 1em;\n}\n.sa-find-bar[hidden] {\n  /* !important to override displayNoneWhileDisabled */\n  display: none !important;\n}\n\n.sa-find-wrapper {\n  overflow: visible;\n  position: relative;\n  height: 2rem;\n  width: 100%;\n  max-width: 16em;\n}\n\n.sa-find-dropdown-out {\n  display: block;\n  top: -6px;\n  z-index: 100;\n  width: 100%;\n  max-width: 16em;\n  position: relative;\n  padding: 4px;\n  border: none;\n  border-radius: 4px;\n  margin-top: 6px;\n}\n\n.sa-find-dropdown-out.visible {\n  position: absolute;\n  width: 16em;\n  box-shadow: 0px 0px 8px 1px rgba(0, 0, 0, 0.3);\n  background-color: var(--ui-modal-background);\n  outline: 1px solid var(--ui-black-transparent);\n}\n\n/* We need to modify Scratch styles so that the place where the find bar is injected */\n/* has actually correct size information, which is used to make the find bar not cover up controls */\n[class*=\"gui_tab-list_\"] {\n  width: 100%;\n}\n[class*=\"gui_tab_\"] {\n  flex-grow: 0;\n}\n\n.sa-find-input {\n  width: 100%;\n  box-sizing: border-box !important;\n  /* !important required for extension, because CSS injection method (and hence order) differs from addon */\n  height: 1.5rem;\n\n  /* Change Scratch default styles */\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n  padding-left: 0.4em;\n}\n\n.sa-find-input:focus {\n  /* Change Scratch default styles */\n  box-shadow: none;\n}\n\n.sa-find-dropdown {\n  display: none;\n  position: relative;\n  padding: 0.2em 0;\n  font-size: 0.75rem;\n  line-height: 1;\n  overflow-y: auto;\n  min-height: 128px;\n  max-height: 65vh;\n  user-select: none;\n  max-width: 100%;\n  margin-top: 6px;\n  border: none;\n}\n\n.sa-find-dropdown-out.visible > .sa-find-dropdown {\n  display: block;\n}\n\n.sa-find-dropdown > li {\n  display: block;\n  padding: 0.5em 0.3em;\n  white-space: nowrap;\n  margin: 0;\n  font-weight: bold;\n  text-overflow: ellipsis;\n  overflow: hidden;\n}\n\n.sa-find-dropdown > li > b {\n  background-color: #aaffaa;\n  color: black;\n}\n\n/* Drop down items */\n.sa-find-dropdown > li:hover,\n.sa-find-dropdown > li.sel {\n  color: var(--sa-block-text-on-bright-background);\n  cursor: pointer;\n}\n\n.sa-find-dropdown > li::before {\n  content: \"\\25CF   \"; /* ● */\n}\n\n.sa-find-flag {\n  color: #4cbf56;\n}\n/* .sa-find-dropdown added for specificity */\n.sa-find-dropdown > .sa-find-flag:hover,\n.sa-find-dropdown > .sa-find-flag.sel {\n  background-color: #4cbf56;\n  color: white;\n}\n\n.sa-find-dropdown .sa-block-color {\n  color: var(--sa-block-colored-text);\n}\n.sa-find-dropdown .sa-block-color:hover,\n.sa-find-dropdown .sa-block-color.sel {\n  background-color: var(--sa-block-bright-background);\n}\n\n.sa-find-carousel {\n  font-weight: normal;\n  position: absolute;\n  right: 0;\n  white-space: nowrap;\n  background-color: inherit;\n  z-index: 1;\n  padding: 0;\n}\n\n.sa-find-carousel-control {\n  padding: 0 6px;\n}\n\n.sa-find-carousel-control:hover {\n  color: #ffff80;\n}\n", ""]);
+exports.push([module.i, ".sa-find-bar {\n  display: flex;\n  align-items: center;\n  white-space: nowrap;\n  font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n  width: 100%;\n  height: 100%;\n  margin-left: 1em;\n}\n.sa-find-bar[hidden] {\n  /* !important to override displayNoneWhileDisabled */\n  display: none !important;\n}\n.sa-find-bar-float {\n  position: absolute !important;\n  z-index: 999;\n  top: 50px;\n  left: 10px;\n  width: auto !important;\n  max-width: 300px;\n  height: auto !important;\n  background-color: var(--ui-modal-background);\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  box-shadow: 0px 0px 8px 1px rgba(0, 0, 0, 0.3);\n}\n.sa-find-bar-button{\n  margin: 5px 0 !important;\n  border: 0;\n  background-color: #00000000;\n  width: 100%;\n  margin: 5px;\n}\n.sa-find-bar-button-text{\n  width: 25px;\n}\n.sa-find-bar-button[hidden] {\n  /* !important to override displayNoneWhileDisabled */\n  display: none !important;\n}\n.sa-find-wrapper {\n  overflow: visible;\n  position: relative;\n  height: 2rem;\n  width: 100%;\n  max-width: 16em;\n}\n.sa-find-bar-float .sa-find-wrapper {\n  width: auto;\n  max-width: 250px;\n}\n\n.sa-find-dropdown-out {\n  display: block;\n  top: -6px;\n  z-index: 100;\n  width: 100%;\n  max-width: 16em;\n  position: relative;\n  padding: 4px;\n  border: none;\n  border-radius: 4px;\n  margin-top: 6px;\n  transition: width 0.2s ease;\n}\n\n.sa-find-dropdown-out.visible {\n  width: 16em;\n  box-shadow: 0px 0px 8px 1px rgba(0, 0, 0, 0.3);\n  background-color: var(--ui-modal-background);\n  outline: 1px solid var(--ui-black-transparent);\n}\n\n.sa-find-bar-float .sa-find-dropdown-out {\n  width: auto;\n  max-width: 250px;\n}\n.sa-find-bar-float .sa-find-dropdown-out.visible {\n  width: auto;\n  box-shadow: none;\n  background-color: var(--ui-modal-background);\n  outline: none;\n}\n\n/* We need to modify Scratch styles so that the place where the find bar is injected */\n/* has actually correct size information, which is used to make the find bar not cover up controls */\n[class*=\"gui_tab-list_\"] {\n  width: 100%;\n}\n[class*=\"gui_tab_\"] {\n  flex-grow: 0;\n}\n\n.sa-find-input {\n  width: 100%;\n  box-sizing: border-box !important;\n  /* !important required for extension, because CSS injection method (and hence order) differs from addon */\n  height: 1.5rem;\n\n  /* Change Scratch default styles */\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n  padding-left: 0.4em;\n}\n\n.sa-find-input:focus {\n  /* Change Scratch default styles */\n  box-shadow: none;\n}\n\n.sa-find-dropdown {\n  display: none;\n  position: relative;\n  padding: 0.2em 0;\n  font-size: 0.75rem;\n  line-height: 1;\n  overflow-y: auto;\n  max-height: 65vh;\n  user-select: none;\n  max-width: 100%;\n  margin-top: 6px;\n  border: none;\n}\n\n.sa-find-dropdown-out.visible > .sa-find-dropdown {\n  display: block;\n}\n\n.sa-find-dropdown > li {\n  display: block;\n  padding: 0.5em 0.3em;\n  white-space: nowrap;\n  margin: 0;\n  font-weight: bold;\n  text-overflow: ellipsis;\n  overflow: hidden;\n}\n\n.sa-find-dropdown > li > b {\n  background-color: #aaffaa;\n  color: black;\n}\n\n/* Drop down items */\n.sa-find-dropdown > li:hover,\n.sa-find-dropdown > li.sel {\n  color: var(--sa-block-text-on-bright-background);\n  cursor: pointer;\n}\n\n.sa-find-dropdown > li::before {\n  content: \"\\25CF   \"; /* ● */\n}\n\n.sa-find-flag {\n  color: #4cbf56;\n}\n/* .sa-find-dropdown added for specificity */\n.sa-find-dropdown > .sa-find-flag:hover,\n.sa-find-dropdown > .sa-find-flag.sel {\n  background-color: #4cbf56;\n  color: white;\n}\n\n.sa-find-dropdown .sa-block-color {\n  color: var(--sa-block-colored-text);\n}\n.sa-find-dropdown .sa-block-color:hover,\n.sa-find-dropdown .sa-block-color.sel {\n  background-color: var(--sa-block-bright-background);\n}\n\n.sa-find-carousel {\n  font-weight: normal;\n  position: absolute;\n  right: 0;\n  white-space: nowrap;\n  background-color: inherit;\n  z-index: 1;\n  padding: 0;\n}\n\n.sa-find-carousel-control {\n  padding: 0 6px;\n}\n\n.sa-find-carousel-control:hover {\n  color: #ffff80;\n}\n", ""]);
 
 // exports
 
@@ -2929,11 +2929,10 @@ __webpack_require__.r(__webpack_exports__);
     }
   }
   function getMenuItemMessage(message) {
-    var _searchBar;
     // Format used internally by Scratch:
     // [human readable name, internal name]
     return [msg(message, {
-      name: ((_searchBar = searchBar) === null || _searchBar === void 0 ? void 0 : _searchBar.value.trim()) || ""
+      name: searchBar && searchBar.value.trim() || ""
     }), message];
   }
 });
@@ -3022,6 +3021,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _blockly_BlockItem_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./blockly/BlockItem.js */ "./src/addons/addons/find-bar/blockly/BlockItem.js");
 /* harmony import */ var _blockly_BlockInstance_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./blockly/BlockInstance.js */ "./src/addons/addons/find-bar/blockly/BlockInstance.js");
 /* harmony import */ var _blockly_Utils_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./blockly/Utils.js */ "./src/addons/addons/find-bar/blockly/Utils.js");
+/* harmony import */ var _lib_tw_recolor_build_icon_svg__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../lib/tw-recolor/build!./icon.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/find-bar/icon.svg");
+
 
 
 
@@ -3032,6 +3033,12 @@ __webpack_require__.r(__webpack_exports__);
     console
   } = _ref;
   const Blockly = await addon.tab.traps.getBlockly();
+  let VSCodeLayout;
+  try {
+    VSCodeLayout = JSON.parse(localStorage.getItem('AESettings')).EnableVSCodeLayout;
+  } catch (e) {
+    VSCodeLayout = false;
+  }
   class FindBar {
     constructor() {
       this.utils = new _blockly_Utils_js__WEBPACK_IMPORTED_MODULE_2__["default"](addon);
@@ -3067,6 +3074,29 @@ __webpack_require__.r(__webpack_exports__);
       this.findInput.placeholder = msg("find-placeholder");
       this.findInput.autocomplete = "off";
       this.dropdownOut.appendChild(this.dropdown.createDom());
+
+      // 在 VSCode 布局下，搜索栏默认隐藏并使用绝对定位
+      if (VSCodeLayout) {
+        this.findBarOuter.classList.add("sa-find-bar-float");
+        this.findBarOuter.style.display = "none";
+      }
+      this.findBarButton = document.createElement("Button");
+      this.findBarButtonText = document.createElement("img");
+      this.findBarButtonText.className = "sa-find-bar-button-text";
+      this.findBarButtonText.src = Object(_lib_tw_recolor_build_icon_svg__WEBPACK_IMPORTED_MODULE_3__["default"])();
+      this.findBarButtonText.style.filter = "grayscale(100%)";
+      this.findBarButton.appendChild(this.findBarButtonText);
+      this.findBarButton.className = "sa-find-bar-button";
+      this.findBarButton.addEventListener("click", () => {
+        if (VSCodeLayout) {
+          // VSCode 布局下，点击按钮显示搜索栏
+          this.findBarOuter.style.display = "flex";
+          this.findInput.focus();
+        } else {
+          this.findInput.focus();
+        }
+      });
+      if (VSCodeLayout) root.appendChild(this.findBarButton);
       this.bindEvents();
       this.tabChanged();
     }
@@ -3074,7 +3104,13 @@ __webpack_require__.r(__webpack_exports__);
       this.findInput.addEventListener("focus", () => this.inputChange());
       this.findInput.addEventListener("keydown", e => this.inputKeyDown(e));
       this.findInput.addEventListener("keyup", () => this.inputChange());
-      this.findInput.addEventListener("focusout", () => this.hideDropDown());
+      this.findInput.addEventListener("focusout", () => {
+        this.hideDropDown();
+        // 在 VSCode 布局下，失去焦点时隐藏搜索栏
+        if (VSCodeLayout) {
+          this.findBarOuter.style.display = "none";
+        }
+      });
     }
     tabChanged() {
       if (!this.findBarOuter) {
@@ -3083,6 +3119,10 @@ __webpack_require__.r(__webpack_exports__);
       const tab = addon.tab.redux.state.scratchGui.editorTab.activeTabIndex;
       const visible = tab === 0 || tab === 1 || tab === 2;
       this.findBarOuter.hidden = !visible;
+      // 在 VSCode 布局下，标签切换时隐藏搜索栏
+      if (VSCodeLayout) {
+        this.findBarOuter.style.display = "none";
+      }
     }
     inputChange() {
       this.showDropDown();
@@ -3137,6 +3177,10 @@ __webpack_require__.r(__webpack_exports__);
         } else {
           this.findInput.blur();
         }
+        // 在 VSCode 布局下，按下 Escape 键时隐藏搜索栏
+        if (VSCodeLayout) {
+          this.findBarOuter.style.display = "none";
+        }
         e.preventDefault();
         return;
       }
@@ -3146,6 +3190,10 @@ __webpack_require__.r(__webpack_exports__);
       let ctrlKey = e.ctrlKey || e.metaKey;
       if (e.key.toLowerCase() === "f" && ctrlKey && !e.shiftKey) {
         // Ctrl + F (Override default Ctrl+F find)
+        // 在 VSCode 布局下，按下 Ctrl+F 时显示搜索栏
+        if (VSCodeLayout) {
+          this.findBarOuter.style.display = "flex";
+        }
         this.findInput.focus();
         this.findInput.select();
         e.cancelBubble = true;
@@ -3753,7 +3801,8 @@ __webpack_require__.r(__webpack_exports__);
     }
   });
   while (true) {
-    const root = await addon.tab.waitForElement("ul[class*=gui_tab-list_]", {
+    const root = await addon.tab.waitForElement("div[class*=findBar]", {
+      //改了匹配路径让它能到readme的左边
       markAsSeen: true,
       reduxEvents: ["scratch-gui/mode/SET_PLAYER", "fontsLoaded/SET_FONTS_LOADED", "scratch-gui/locales/SELECT_LOCALE"],
       reduxCondition: state => !state.scratchGui.mode.isPlayerOnly
@@ -7469,7 +7518,6 @@ __webpack_require__.r(__webpack_exports__);
     queryPreviews.length = 0;
     let y = 0;
     for (let resultIdx = 0; resultIdx < blockList.length; resultIdx++) {
-      var _result$autocompleteF;
       const result = blockList[resultIdx];
       const mouseMoveListener = () => {
         updateSelection(resultIdx);
@@ -7497,7 +7545,7 @@ __webpack_require__.r(__webpack_exports__);
       const renderedBlock = Object(_BlockRenderer_js__WEBPACK_IMPORTED_MODULE_1__["default"])(result.block, svgBlock);
       queryPreviews.push({
         block: result.block,
-        autocompleteFactory: (_result$autocompleteF = result.autocompleteFactory) !== null && _result$autocompleteF !== void 0 ? _result$autocompleteF : null,
+        autocompleteFactory: result.autocompleteFactory !== undefined && result.autocompleteFactory !== null ? result.autocompleteFactory : null,
         renderedBlock,
         svgBlock,
         svgBackground
@@ -9449,6 +9497,30 @@ class RateLimiter {
     }, this.wait);
   }
 }
+
+/***/ }),
+
+/***/ "./src/lib/tw-recolor/build.js!./src/addons/addons/find-bar/icon.svg":
+/*!***************************************************************************!*\
+  !*** ./src/lib/tw-recolor/build.js!./src/addons/addons/find-bar/icon.svg ***!
+  \***************************************************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+
+    const original = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg width=\"37mm\" height=\"39mm\" viewBox=\"0 0 3700 3900\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" stroke-width=\"28.222\" stroke-linejoin=\"round\" xml:space=\"preserve\">\n <path fill=\"none\" stroke=\"#855cd6\" stroke-width=\"353\" stroke-linejoin=\"round\" d=\"M 2784,1481 C 2784,1709 2724,1934 2609,2132 2495,2330 2330,2495 2132,2609 1934,2724 1709,2784 1481,2784 1252,2784 1027,2724 829,2609 631,2495 466,2330 352,2132 237,1934 177,1709 177,1481 177,1252 237,1027 352,829 466,631 631,466 829,352 1027,237 1252,177 1480,177 1709,177 1934,237 2132,352 2330,466 2495,631 2609,829 2724,1027 2784,1252 2784,1480 L 2784,1481 Z \"/>\n <path fill=\"#855cd6\" stroke=\"none\" d=\"M 2199,2391 L 2200,2391 C 2173,2417 2154,2450 2145,2486 2135,2522 2135,2560 2145,2596 2154,2632 2173,2665 2200,2692 L 3320,3812 3320,3812 C 3347,3839 3380,3858 3416,3867 3452,3877 3490,3877 3526,3867 3562,3858 3595,3839 3621,3812 L 3621,3813 3621,3812 C 3647,3786 3666,3753 3676,3717 3686,3681 3686,3643 3676,3607 3666,3571 3647,3538 3621,3512 L 2500,2391 2500,2391 2500,2391 C 2474,2365 2441,2346 2405,2336 2369,2326 2331,2326 2295,2336 2259,2346 2226,2365 2200,2391 L 2199,2391 Z \"/>\n</svg>";
+
+    const getSRC = () => {
+        const recolored = typeof Recolor === 'object' ? (
+            original.replace(/#855cd6/gi, Recolor.primary)
+        ) : original;
+        return 'data:image/svg+xml;,' + encodeURIComponent(recolored);
+    };
+
+    /* harmony default export */ __webpack_exports__["default"] = (getSRC);
+
 
 /***/ })
 

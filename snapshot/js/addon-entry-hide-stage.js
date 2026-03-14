@@ -133,6 +133,16 @@ __webpack_require__.r(__webpack_exports__);
     if (stageControls) stageControls.insertBefore(hideStageButton, smallStageButton);
   });
   while (true) {
+    const storedSettings = localStorage.getItem('AESettings');
+    let hideButton = false;
+    try {
+      hideButton = JSON.parse(storedSettings).EnableMobileLayout;
+    } catch (e) {
+      hideButton = false;
+    }
+    if (hideButton) {
+      break;
+    }
     const stageControls = await addon.tab.waitForElement("[class*='stage-header_stage-size-toggle-group_'] > [class*='toggle-buttons_row_']", {
       markAsSeen: true,
       reduxCondition: state => !state.scratchGui.mode.isPlayerOnly

@@ -283,11 +283,14 @@ __webpack_require__.r(__webpack_exports__);
         disposeRecorder();
       } else {
         recorder.onstop = () => {
-          var _addon$tab$redux$stat, _addon$tab$redux$stat2, _addon$tab$redux$stat3;
           const blob = new Blob(recordBuffer, {
             type: mimeType
           });
-          Object(_libraries_common_cs_download_blob_js__WEBPACK_IMPORTED_MODULE_0__["default"])("".concat(((_addon$tab$redux$stat = addon.tab.redux.state) === null || _addon$tab$redux$stat === void 0 ? void 0 : (_addon$tab$redux$stat2 = _addon$tab$redux$stat.preview) === null || _addon$tab$redux$stat2 === void 0 ? void 0 : (_addon$tab$redux$stat3 = _addon$tab$redux$stat2.projectInfo) === null || _addon$tab$redux$stat3 === void 0 ? void 0 : _addon$tab$redux$stat3.title) || "video", ".").concat(fileExtension), blob);
+          const reduxState = addon.tab.redux.state;
+          const preview = reduxState && reduxState.preview;
+          const projectInfo = preview && preview.projectInfo;
+          const title = projectInfo && projectInfo.title;
+          Object(_libraries_common_cs_download_blob_js__WEBPACK_IMPORTED_MODULE_0__["default"])("".concat(title || "video", ".").concat(fileExtension), blob);
           disposeRecorder();
         };
         recorder.stop();

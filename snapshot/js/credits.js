@@ -168,7 +168,7 @@ exports = module.exports = __webpack_require__(/*! ../../../node_modules/css-loa
 
 
 // module
-exports.push([module.i, "/* overridden by src/lib/themes/guiHelpers.js */\n\n/* This is for overriding some styles that don't really \"belong\" to any existing stylesheets */\n\n/* Try to use this sparingly, otherwise this will become unmaintainable again... */\n\n:root {\n    color-scheme: var(--color-scheme);\n}\n\n/* popover is used by gui and paint */\n\n/* some of these are duplicated over there too; !important makes sure these win */\n\n.Popover {\n    color-scheme: light !important;\n}\n\n.Popover-body {\n    color: var(--text-primary) !important;\n    background: var(--popover-background) !important;\n    border: 1px solid var(--ui-black-transparent) !important;\n    box-shadow: 0px 0px 8px 1px var(--shadow) !important;\n}\n\n.Popover-tipShape {\n    fill: var(--popover-background) !important;\n    stroke: var(--ui-black-transparent) !important;\n}\n\n/* ScratchAdddons editor-dark-mode compatibility */\n\n:root {\n    --editorDarkMode-primary: var(--looks-secondary);\n    --editorDarkMode-primary-transparent35: var(--looks-transparent);\n    --editorDarkMode-primary-variant: var(--looks-secondary-dark);\n    --editorDarkMode-border: var(--ui-black-transparent);\n    --editorDarkMode-accent: var(--ui-modal-background);\n    --editorDarkMode-categoryMenu-text: var(--text-primary);\n    --editorDarkMode-accent-text: var(--text-primary);\n    --editorDarkMode-page: var(--ui-primary);\n    --editorDarkMode-highlightText: var(--looks-secondary);\n}\n", ""]);
+exports.push([module.i, "/* overridden by src/lib/themes/guiHelpers.js */\n\n/* This is for overriding some styles that don't really \"belong\" to any existing stylesheets */\n\n/* Try to use this sparingly, otherwise this will become unmaintainable again... */\n\n:root {\n    color-scheme: var(--color-scheme);\n}\n\n/* popover is used by gui and paint */\n\n/* some of these are duplicated over there too; !important makes sure these win */\n\n.Popover {\n    color-scheme: light !important;\n}\n\n.Popover-body {\n    color: var(--text-primary) !important;\n    background: var(--popover-background) !important;\n    border: 1px solid var(--ui-black-transparent) !important;\n    box-shadow: 0px 0px 8px 1px var(--shadow) !important;\n}\n\n.Popover-tipShape {\n    fill: var(--popover-background) !important;\n    stroke: var(--ui-black-transparent) !important;\n}\n\n/* ScratchAdddons editor-dark-mode compatibility */\n\n:root {\n    --editorDarkMode-primary: var(--looks-secondary);\n    --editorDarkMode-primary-transparent35: var(--looks-transparent);\n    --editorDarkMode-primary-variant: var(--looks-secondary-dark);\n    --editorDarkMode-border: var(--ui-black-transparent);\n    --editorDarkMode-accent: var(--ui-modal-background);\n    --editorDarkMode-categoryMenu-text: var(--text-primary);\n    --editorDarkMode-accent-text: var(--text-primary);\n    --editorDarkMode-page: var(--ui-primary);\n    --editorDarkMode-highlightText: var(--looks-secondary);\n}\n\n:root{\n    --editor-menu-background: var(--menu-bar-background)\n}", ""]);
 
 // exports
 
@@ -187,7 +187,7 @@ exports = module.exports = __webpack_require__(/*! ../../../node_modules/css-loa
 
 
 // module
-exports.push([module.i, "/* overridden by src/lib/themes/guiHelpers.js */\n\n* {\n    box-sizing: border-box;\n}\n\nbody {\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    margin: 0;\n    padding: 0;\n    background: var(--page-background);\n    color: var(--page-foreground);\n}\n\na {\n    color: var(--link-color);\n}\n\n.credits_main_1Rb15 section {\n    max-width: 900px;\n    margin: auto;\n    margin-bottom: 30px;\n}\n\n.credits_header-container_10IXn {\n    color: white;\n    background-color: var(--looks-secondary);\n    padding: 20px 0;\n    text-align: center;\n    margin-bottom: 30px;\n}\n\n.credits_header-text_2vWAl {\n\n}\n\n.credits_users_2AuwB {\n    display: flex;\n    flex-direction: row;\n    flex-wrap: wrap;\n}\n\n.credits_user-image_2rw9X {\n    margin-right: 12px;\n}\n\n.credits_user_2nYLS {\n    display: flex;\n    align-items: center;\n    width: 300px;\n    padding: 4px;\n    border-radius: 4px;\n    font-size: 1.25rem;\n    color: inherit !important;\n    text-decoration: none;\n    transition: background .2s;\n}\n\n.credits_user_2nYLS:link:hover {\n    background: var(--ui-black-transparent);\n}\n", ""]);
+exports.push([module.i, "/* overridden by src/lib/themes/guiHelpers.js */\n\n* {\n    box-sizing: border-box;\n}\n\nbody {\n    font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    margin: 0;\n    padding: 0;\n    background: var(--page-background);\n    color: var(--page-foreground);\n}\n\na {\n    color: var(--link-color);\n}\n\n.credits_main_1Rb15 section {\n    max-width: 900px;\n    margin: auto;\n    margin-bottom: 30px;\n}\n\n.credits_header-container_10IXn {\n    color: white;\n    background-color: var(--looks-secondary);\n    padding: 20px 0;\n    text-align: center;\n    margin-bottom: 30px;\n}\n\n.credits_header-text_2vWAl {}\n\n.credits_headerContainerTurboWarp_2AlGl {\n    color: white;\n    background-color: #ff4c4c;\n    padding: 20px 0;\n    text-align: center;\n    margin-bottom: 30px;\n}\n\n.credits_users_2AuwB {\n    display: flex;\n    flex-direction: row;\n    flex-wrap: wrap;\n}\n\n.credits_user-image_2rw9X {\n    margin-right: 12px;\n}\n\n.credits_user_2nYLS {\n    display: flex;\n    align-items: center;\n    width: 300px;\n    padding: 4px;\n    border-radius: 4px;\n    font-size: 1.25rem;\n    color: inherit !important;\n    text-decoration: none;\n    transition: background .2s;\n}\n\n.credits_user_2nYLS:link:hover {\n    background: var(--ui-black-transparent);\n}", ""]);
 
 // exports
 exports.locals = {
@@ -196,6 +196,7 @@ exports.locals = {
 	"headerContainer": "credits_header-container_10IXn",
 	"header-text": "credits_header-text_2vWAl",
 	"headerText": "credits_header-text_2vWAl",
+	"headerContainerTurboWarp": "credits_headerContainerTurboWarp_2AlGl",
 	"users": "credits_users_2AuwB",
 	"user-image": "credits_user-image_2rw9X",
 	"userImage": "credits_user-image_2rw9X",
@@ -235,8 +236,41 @@ const AddonHooks = {
 // Legacy export format because this is used by some build-time scripts stuck in the past.
 // eslint-disable-next-line import/no-commonjs
 module.exports = {
-  APP_NAME: 'TurboWarp'
+  APP_NAME: 'AstraEditor'
 };
+
+/***/ }),
+
+/***/ "./src/lib/themes/accent/astraeditor.js":
+/*!**********************************************!*\
+  !*** ./src/lib/themes/accent/astraeditor.js ***!
+  \**********************************************/
+/*! exports provided: guiColors, blockColors */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "guiColors", function() { return guiColors; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "blockColors", function() { return blockColors; });
+const guiColors = {
+  'motion-primary': '#0099ff',
+  'motion-primary-transparent': '#0099ffe6',
+  'motion-tertiary': '#0066ff',
+  'looks-secondary': '#0099ff',
+  'looks-transparent': '#0077aa59',
+  'looks-light-transparent': '#00669926',
+  'looks-secondary-dark': '#4e97b7ff',
+  'extensions-primary': '#5a8ff2ff',
+  'extensions-tertiary': 'hsla(197, 85%, 40%, 1.00)',
+  'extensions-transparent': '#5abdf259',
+  'extensions-light': 'hsla(213, 58%, 85%, 1.00)',
+  'drop-highlight': '#8cd3ffff'
+};
+const blockColors = {
+  checkboxActiveBackground: '#0099ff',
+  checkboxActiveBorder: '#0066ff'
+};
+
 
 /***/ }),
 
@@ -258,6 +292,72 @@ const guiColors = {
   'looks-secondary-dark': 'hsla(215, 60%, 50%, 1)'
 };
 const blockColors = {};
+
+
+/***/ }),
+
+/***/ "./src/lib/themes/accent/ce.js":
+/*!*************************************!*\
+  !*** ./src/lib/themes/accent/ce.js ***!
+  \*************************************/
+/*! exports provided: guiColors, blockColors */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "guiColors", function() { return guiColors; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "blockColors", function() { return blockColors; });
+const guiColors = {
+  'motion-primary': '#ff9b86',
+  'motion-primary-transparent': '#ff9b86e6',
+  'motion-tertiary': '#cc7a69',
+  'looks-secondary': '#ff9b86',
+  'looks-transparent': '#ff9b8659',
+  'looks-light-transparent': '#ff9b8626',
+  'looks-secondary-dark': '#cc7a69',
+  'extensions-primary': '#ff9b86',
+  'extensions-tertiary': '#cc7a69',
+  'extensions-transparent': '#ff9b8659',
+  'extensions-light': '#ffcbbd',
+  'drop-highlight': '#ffccb8'
+};
+const blockColors = {
+  checkboxActiveBackground: '#ff9b86',
+  checkboxActiveBorder: '#cc7a69'
+};
+
+
+/***/ }),
+
+/***/ "./src/lib/themes/accent/miku.js":
+/*!***************************************!*\
+  !*** ./src/lib/themes/accent/miku.js ***!
+  \***************************************/
+/*! exports provided: guiColors, blockColors */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "guiColors", function() { return guiColors; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "blockColors", function() { return blockColors; });
+const guiColors = {
+  'motion-primary': '#39c5bb',
+  'motion-primary-transparent': '#39c5bbe6',
+  'motion-tertiary': '#2c9e96',
+  'looks-secondary': '#39c5bb',
+  'looks-transparent': '#39c5bb59',
+  'looks-light-transparent': '#39c5bb26',
+  'looks-secondary-dark': '#2c9e96',
+  'extensions-primary': '#39c5bb',
+  'extensions-tertiary': '#2c9e96',
+  'extensions-transparent': '#39c5bb59',
+  'extensions-light': '#8ae3d9',
+  'drop-highlight': '#8ae3d9'
+};
+const blockColors = {
+  checkboxActiveBackground: '#39c5bb',
+  checkboxActiveBorder: '#2c9e96'
+};
 
 
 /***/ }),
@@ -350,6 +450,39 @@ const guiColors = {
 const blockColors = {
   checkboxActiveBackground: '#ff4c4c',
   checkboxActiveBorder: '#cc3333'
+};
+
+
+/***/ }),
+
+/***/ "./src/lib/themes/accent/ty.js":
+/*!*************************************!*\
+  !*** ./src/lib/themes/accent/ty.js ***!
+  \*************************************/
+/*! exports provided: guiColors, blockColors */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "guiColors", function() { return guiColors; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "blockColors", function() { return blockColors; });
+const guiColors = {
+  'motion-primary': '#66ccff',
+  'motion-primary-transparent': '#66ccffe6',
+  'motion-tertiary': '#4da3cc',
+  'looks-secondary': '#66ccff',
+  'looks-transparent': '#66ccff59',
+  'looks-light-transparent': '#66ccff26',
+  'looks-secondary-dark': '#4da3cc',
+  'extensions-primary': '#66ccff',
+  'extensions-tertiary': '#4da3cc',
+  'extensions-transparent': '#66ccff59',
+  'extensions-light': '#b3e6ff',
+  'drop-highlight': '#b3e6ff'
+};
+const blockColors = {
+  checkboxActiveBackground: '#66ccff',
+  checkboxActiveBorder: '#4da3cc'
 };
 
 
@@ -829,6 +962,103 @@ const extensions = {};
 
 /***/ }),
 
+/***/ "./src/lib/themes/custom/custom.js":
+/*!*****************************************!*\
+  !*** ./src/lib/themes/custom/custom.js ***!
+  \*****************************************/
+/*! exports provided: guiColors, blockColors, customGUITheme, customBlockColors, setColorTo, getColorOf, saveColors, getAllColor */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "guiColors", function() { return guiColors; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "blockColors", function() { return blockColors; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "customGUITheme", function() { return customGUITheme; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "customBlockColors", function() { return customBlockColors; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "setColorTo", function() { return setColorTo; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getColorOf", function() { return getColorOf; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "saveColors", function() { return saveColors; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getAllColor", function() { return getAllColor; });
+/* harmony import */ var prop_types__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! prop-types */ "./node_modules/prop-types/index.js");
+/* harmony import */ var prop_types__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(prop_types__WEBPACK_IMPORTED_MODULE_0__);
+
+let customGUITheme = localStorage.getItem("constomTheme");
+if (customGUITheme == null || customGUITheme === 'undefined' || customGUITheme === 'null') {
+  customGUITheme = {
+    'motion-primary': '#ff4c4c',
+    'motion-primary-transparent': '#ff4c4ce6',
+    'motion-tertiary': '#cc3333',
+    'looks-secondary': '#ff4c4c',
+    'looks-transparent': '#ff4d4d59',
+    'looks-light-transparent': '#ff4d4d26',
+    'looks-secondary-dark': 'hsla(0, 42%, 51%, 1)',
+    'extensions-primary': 'hsla(10, 85%, 65%, 1)',
+    'extensions-tertiary': 'hsla(10, 85%, 40%, 1)',
+    'extensions-transparent': 'hsla(10, 85%, 65%, 0.35)',
+    'extensions-light': 'hsla(10, 57%, 85%, 1)',
+    'drop-highlight': '#ff8c8c'
+  };
+} else {
+  try {
+    customGUITheme = JSON.parse(customGUITheme);
+  } catch (e) {
+    console.warn('Failed to parse customGUITheme:', e);
+    customGUITheme = {
+      'motion-primary': '#ff4c4c',
+      'motion-primary-transparent': '#ff4c4ce6',
+      'motion-tertiary': '#cc3333',
+      'looks-secondary': '#ff4c4c',
+      'looks-transparent': '#ff4d4d59',
+      'looks-light-transparent': '#ff4d4d26',
+      'looks-secondary-dark': 'hsla(0, 42%, 51%, 1)',
+      'extensions-primary': 'hsla(10, 85%, 65%, 1)',
+      'extensions-tertiary': 'hsla(10, 85%, 40%, 1)',
+      'extensions-transparent': 'hsla(10, 85%, 65%, 0.35)',
+      'extensions-light': 'hsla(10, 57%, 85%, 1)',
+      'drop-highlight': '#ff8c8c'
+    };
+  }
+}
+let customBlockColors = localStorage.getItem("blockColors");
+if (customBlockColors == null || customBlockColors === 'undefined' || customBlockColors === 'null') {
+  customBlockColors = {
+    checkboxActiveBackground: '#ff4c4c',
+    checkboxActiveBorder: '#cc3333'
+  };
+} else {
+  try {
+    customBlockColors = JSON.parse(customBlockColors);
+  } catch (e) {
+    console.warn('Failed to parse customBlockColors:', e);
+    customBlockColors = {
+      checkboxActiveBackground: '#ff4c4c',
+      checkboxActiveBorder: '#cc3333'
+    };
+  }
+}
+const guiColors = customGUITheme;
+const blockColors = customBlockColors;
+const setColorTo = (id, value) => {
+  console.log(value);
+  if (id == "checkboxActiveBackground" || id == "checkboxActiveBorder") customBlockColors[id] = value;else customGUITheme[id] = value;
+};
+const getColorOf = id => {
+  if (id == "checkboxActiveBackground" || id == "checkboxActiveBorder") return customBlockColors[id];else return customGUITheme[id];
+};
+const saveColors = () => {
+  localStorage.setItem("constomTheme", JSON.stringify(customGUITheme));
+  localStorage.setItem("blockColors", JSON.stringify(customBlockColors));
+};
+function getAllColor() {
+  return {
+    guiColors: customGUITheme,
+    blockColors: customBlockColors
+  };
+}
+
+
+/***/ }),
+
 /***/ "./src/lib/themes/global-styles.css":
 /*!******************************************!*\
   !*** ./src/lib/themes/global-styles.css ***!
@@ -1146,7 +1376,7 @@ const applyGuiColors = theme => {
 /*!*********************************!*\
   !*** ./src/lib/themes/index.js ***!
   \*********************************/
-/*! exports provided: Theme, defaultBlockColors, ACCENT_RED, ACCENT_PURPLE, ACCENT_BLUE, ACCENT_RAINBOW, ACCENT_MAP, GUI_LIGHT, GUI_DARK, GUI_MAP, BLOCKS_THREE, BLOCKS_DARK, BLOCKS_HIGH_CONTRAST, BLOCKS_CUSTOM, BLOCKS_MAP */
+/*! exports provided: Theme, defaultBlockColors, ACCENT_RED, ACCENT_PURPLE, ACCENT_BLUE, ACCENT_RAINBOW, ACCENT_MAP, ACCENT_AE, ACCENT_COSTOM, ACCENT_CE, ACCENT_TY, ACCENT_MIKU, GUI_LIGHT, GUI_DARK, GUI_MAP, BLOCKS_THREE, BLOCKS_DARK, BLOCKS_HIGH_CONTRAST, BLOCKS_CUSTOM, BLOCKS_MAP */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1158,6 +1388,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ACCENT_BLUE", function() { return ACCENT_BLUE; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ACCENT_RAINBOW", function() { return ACCENT_RAINBOW; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ACCENT_MAP", function() { return ACCENT_MAP; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ACCENT_AE", function() { return ACCENT_AE; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ACCENT_COSTOM", function() { return ACCENT_COSTOM; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ACCENT_CE", function() { return ACCENT_CE; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ACCENT_TY", function() { return ACCENT_TY; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ACCENT_MIKU", function() { return ACCENT_MIKU; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "GUI_LIGHT", function() { return GUI_LIGHT; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "GUI_DARK", function() { return GUI_DARK; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "GUI_MAP", function() { return GUI_MAP; });
@@ -1172,11 +1407,16 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _accent_blue__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./accent/blue */ "./src/lib/themes/accent/blue.js");
 /* harmony import */ var _accent_red__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./accent/red */ "./src/lib/themes/accent/red.js");
 /* harmony import */ var _accent_rainbow__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./accent/rainbow */ "./src/lib/themes/accent/rainbow.js");
-/* harmony import */ var _gui_light__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./gui/light */ "./src/lib/themes/gui/light.js");
-/* harmony import */ var _gui_dark__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./gui/dark */ "./src/lib/themes/gui/dark.js");
-/* harmony import */ var _blocks_three__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./blocks/three */ "./src/lib/themes/blocks/three.js");
-/* harmony import */ var _blocks_high_contrast__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./blocks/high-contrast */ "./src/lib/themes/blocks/high-contrast.js");
-/* harmony import */ var _blocks_dark__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./blocks/dark */ "./src/lib/themes/blocks/dark.js");
+/* harmony import */ var _accent_astraeditor__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./accent/astraeditor */ "./src/lib/themes/accent/astraeditor.js");
+/* harmony import */ var _custom_custom__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./custom/custom */ "./src/lib/themes/custom/custom.js");
+/* harmony import */ var _accent_ce__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./accent/ce */ "./src/lib/themes/accent/ce.js");
+/* harmony import */ var _accent_ty__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./accent/ty */ "./src/lib/themes/accent/ty.js");
+/* harmony import */ var _accent_miku__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./accent/miku */ "./src/lib/themes/accent/miku.js");
+/* harmony import */ var _gui_light__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./gui/light */ "./src/lib/themes/gui/light.js");
+/* harmony import */ var _gui_dark__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./gui/dark */ "./src/lib/themes/gui/dark.js");
+/* harmony import */ var _blocks_three__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ./blocks/three */ "./src/lib/themes/blocks/three.js");
+/* harmony import */ var _blocks_high_contrast__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ./blocks/high-contrast */ "./src/lib/themes/blocks/high-contrast.js");
+/* harmony import */ var _blocks_dark__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ./blocks/dark */ "./src/lib/themes/blocks/dark.js");
 var _Theme;
 function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
 function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == typeof i ? i : i + ""; }
@@ -1191,56 +1431,71 @@ function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = 
 
 
 
+
+
+
+
+
 const ACCENT_PURPLE = 'purple';
 const ACCENT_BLUE = 'blue';
 const ACCENT_RED = 'red';
 const ACCENT_RAINBOW = 'rainbow';
+const ACCENT_AE = 'astraeditor';
+const ACCENT_COSTOM = 'custom';
+const ACCENT_CE = 'ce';
+const ACCENT_TY = 'ty';
+const ACCENT_MIKU = 'miku';
 const ACCENT_MAP = {
   [ACCENT_PURPLE]: _accent_purple__WEBPACK_IMPORTED_MODULE_1__,
   [ACCENT_BLUE]: _accent_blue__WEBPACK_IMPORTED_MODULE_2__,
   [ACCENT_RED]: _accent_red__WEBPACK_IMPORTED_MODULE_3__,
-  [ACCENT_RAINBOW]: _accent_rainbow__WEBPACK_IMPORTED_MODULE_4__
+  [ACCENT_RAINBOW]: _accent_rainbow__WEBPACK_IMPORTED_MODULE_4__,
+  [ACCENT_AE]: _accent_astraeditor__WEBPACK_IMPORTED_MODULE_5__,
+  [ACCENT_COSTOM]: _custom_custom__WEBPACK_IMPORTED_MODULE_6__["getAllColor"](),
+  [ACCENT_CE]: _accent_ce__WEBPACK_IMPORTED_MODULE_7__,
+  [ACCENT_TY]: _accent_ty__WEBPACK_IMPORTED_MODULE_8__,
+  [ACCENT_MIKU]: _accent_miku__WEBPACK_IMPORTED_MODULE_9__
 };
-const ACCENT_DEFAULT = ACCENT_RED;
+const ACCENT_DEFAULT = ACCENT_AE;
 const GUI_LIGHT = 'light';
 const GUI_DARK = 'dark';
 const GUI_MAP = {
-  [GUI_LIGHT]: _gui_light__WEBPACK_IMPORTED_MODULE_5__,
-  [GUI_DARK]: _gui_dark__WEBPACK_IMPORTED_MODULE_6__
+  [GUI_LIGHT]: _gui_light__WEBPACK_IMPORTED_MODULE_10__,
+  [GUI_DARK]: _gui_dark__WEBPACK_IMPORTED_MODULE_11__
 };
-const GUI_DEFAULT = GUI_LIGHT;
+const GUI_DEFAULT = GUI_DARK;
 const BLOCKS_THREE = 'three';
 const BLOCKS_DARK = 'dark';
 const BLOCKS_HIGH_CONTRAST = 'high-contrast';
 const BLOCKS_CUSTOM = 'custom';
 const BLOCKS_DEFAULT = BLOCKS_THREE;
-const defaultBlockColors = _blocks_three__WEBPACK_IMPORTED_MODULE_7__["blockColors"];
+const defaultBlockColors = _blocks_three__WEBPACK_IMPORTED_MODULE_12__["blockColors"];
 const BLOCKS_MAP = {
   [BLOCKS_THREE]: {
     blocksMediaFolder: 'blocks-media/default',
-    colors: _blocks_three__WEBPACK_IMPORTED_MODULE_7__["blockColors"],
-    extensions: _blocks_three__WEBPACK_IMPORTED_MODULE_7__["extensions"],
+    colors: _blocks_three__WEBPACK_IMPORTED_MODULE_12__["blockColors"],
+    extensions: _blocks_three__WEBPACK_IMPORTED_MODULE_12__["extensions"],
     customExtensionColors: {},
     useForStage: true
   },
   [BLOCKS_HIGH_CONTRAST]: {
     blocksMediaFolder: 'blocks-media/high-contrast',
-    colors: lodash_defaultsdeep__WEBPACK_IMPORTED_MODULE_0___default()({}, _blocks_high_contrast__WEBPACK_IMPORTED_MODULE_8__["blockColors"], defaultBlockColors),
-    extensions: _blocks_high_contrast__WEBPACK_IMPORTED_MODULE_8__["extensions"],
-    customExtensionColors: _blocks_high_contrast__WEBPACK_IMPORTED_MODULE_8__["customExtensionColors"],
+    colors: lodash_defaultsdeep__WEBPACK_IMPORTED_MODULE_0___default()({}, _blocks_high_contrast__WEBPACK_IMPORTED_MODULE_13__["blockColors"], defaultBlockColors),
+    extensions: _blocks_high_contrast__WEBPACK_IMPORTED_MODULE_13__["extensions"],
+    customExtensionColors: _blocks_high_contrast__WEBPACK_IMPORTED_MODULE_13__["customExtensionColors"],
     useForStage: true
   },
   [BLOCKS_DARK]: {
     blocksMediaFolder: 'blocks-media/default',
-    colors: lodash_defaultsdeep__WEBPACK_IMPORTED_MODULE_0___default()({}, _blocks_dark__WEBPACK_IMPORTED_MODULE_9__["blockColors"], defaultBlockColors),
-    extensions: _blocks_dark__WEBPACK_IMPORTED_MODULE_9__["extensions"],
-    customExtensionColors: _blocks_dark__WEBPACK_IMPORTED_MODULE_9__["customExtensionColors"],
+    colors: lodash_defaultsdeep__WEBPACK_IMPORTED_MODULE_0___default()({}, _blocks_dark__WEBPACK_IMPORTED_MODULE_14__["blockColors"], defaultBlockColors),
+    extensions: _blocks_dark__WEBPACK_IMPORTED_MODULE_14__["extensions"],
+    customExtensionColors: _blocks_dark__WEBPACK_IMPORTED_MODULE_14__["customExtensionColors"],
     useForStage: false
   },
   [BLOCKS_CUSTOM]: {
     // to be filled by editor-theme3 addon
     blocksMediaFolder: 'blocks-media/default',
-    colors: _blocks_three__WEBPACK_IMPORTED_MODULE_7__["blockColors"],
+    colors: _blocks_three__WEBPACK_IMPORTED_MODULE_12__["blockColors"],
     extensions: {},
     customExtensionColors: {},
     useForStage: false
@@ -1273,7 +1528,7 @@ class Theme {
     return BLOCKS_MAP[this.blocks].blocksMediaFolder;
   }
   getGuiColors() {
-    return lodash_defaultsdeep__WEBPACK_IMPORTED_MODULE_0___default()({}, ACCENT_MAP[this.accent].guiColors, GUI_MAP[this.gui].guiColors, _gui_light__WEBPACK_IMPORTED_MODULE_5__["guiColors"]);
+    return lodash_defaultsdeep__WEBPACK_IMPORTED_MODULE_0___default()({}, ACCENT_MAP[this.accent].guiColors, GUI_MAP[this.gui].guiColors, _gui_light__WEBPACK_IMPORTED_MODULE_10__["guiColors"]);
   }
   getBlockColors() {
     return lodash_defaultsdeep__WEBPACK_IMPORTED_MODULE_0___default()({}, ACCENT_MAP[this.accent].blockColors, GUI_MAP[this.gui].blockColors, BLOCKS_MAP[this.blocks].colors);
@@ -1328,10 +1583,8 @@ const systemPreferencesTheme = () => {
   if (PREFERS_HIGH_CONTRAST_QUERY && PREFERS_HIGH_CONTRAST_QUERY.matches) {
     return ___WEBPACK_IMPORTED_MODULE_0__["Theme"].highContrast;
   }
-  if (PREFERS_DARK_QUERY && PREFERS_DARK_QUERY.matches) {
-    return ___WEBPACK_IMPORTED_MODULE_0__["Theme"].dark;
-  }
-  return ___WEBPACK_IMPORTED_MODULE_0__["Theme"].light;
+  // 默认使用深色主题 (GUI_DARK)，不再根据系统浅色模式返回 Theme.light
+  return ___WEBPACK_IMPORTED_MODULE_0__["Theme"].dark;
 };
 
 /**
@@ -1404,6 +1657,13 @@ const persistTheme = theme => {
     } catch (e) {
       // ignore
     }
+  }
+
+  // 触发自定义事件，通知组件主题已更改
+  try {
+    window.dispatchEvent(new Event('tw:theme-changed'));
+  } catch (e) {
+    // ignore
   }
 };
 
@@ -1572,6 +1832,179 @@ const render = children => {
 
 /***/ }),
 
+/***/ "./src/playground/credits/AE_images/a_sean_says.jpg":
+/*!**********************************************************!*\
+  !*** ./src/playground/credits/AE_images/a_sean_says.jpg ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "static/assets/2a740522f2ae6259c958c2931b636613.jpg";
+
+/***/ }),
+
+/***/ "./src/playground/credits/AE_images/cat.jpg":
+/*!**************************************************!*\
+  !*** ./src/playground/credits/AE_images/cat.jpg ***!
+  \**************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "static/assets/7c201b5d9da7a4f431f28a33344b17e0.jpg";
+
+/***/ }),
+
+/***/ "./src/playground/credits/AE_images/cyberexplorer.jpg":
+/*!************************************************************!*\
+  !*** ./src/playground/credits/AE_images/cyberexplorer.jpg ***!
+  \************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "static/assets/69d828348881ffff3e075895bf356560.jpg";
+
+/***/ }),
+
+/***/ "./src/playground/credits/AE_images/koshino.jpg":
+/*!******************************************************!*\
+  !*** ./src/playground/credits/AE_images/koshino.jpg ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "static/assets/718122d795d5c55b3065d163c0a0b9d5.jpg";
+
+/***/ }),
+
+/***/ "./src/playground/credits/AE_images/luotianyi.jpg":
+/*!********************************************************!*\
+  !*** ./src/playground/credits/AE_images/luotianyi.jpg ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "static/assets/eb3c93271ba52122775930fb479489c3.jpg";
+
+/***/ }),
+
+/***/ "./src/playground/credits/AE_images/msw.jpg":
+/*!**************************************************!*\
+  !*** ./src/playground/credits/AE_images/msw.jpg ***!
+  \**************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "static/assets/33c4d6d43b39ce5c53ccffbcb55590c9.jpg";
+
+/***/ }),
+
+/***/ "./src/playground/credits/AE_images/nangua.jpg":
+/*!*****************************************************!*\
+  !*** ./src/playground/credits/AE_images/nangua.jpg ***!
+  \*****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "static/assets/76f16f2d28f27fc6a0e60d90b4f990f4.jpg";
+
+/***/ }),
+
+/***/ "./src/playground/credits/AE_images/np.jpg":
+/*!*************************************************!*\
+  !*** ./src/playground/credits/AE_images/np.jpg ***!
+  \*************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__.p + "static/assets/ce808e940547918fe04e3e7069fa67a0.jpg";
+
+/***/ }),
+
+/***/ "./src/playground/credits/ae-users.js":
+/*!********************************************!*\
+  !*** ./src/playground/credits/ae-users.js ***!
+  \********************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _AE_images_koshino_jpg__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./AE_images/koshino.jpg */ "./src/playground/credits/AE_images/koshino.jpg");
+/* harmony import */ var _AE_images_koshino_jpg__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_AE_images_koshino_jpg__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _AE_images_a_sean_says_jpg__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./AE_images/a_sean_says.jpg */ "./src/playground/credits/AE_images/a_sean_says.jpg");
+/* harmony import */ var _AE_images_a_sean_says_jpg__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_AE_images_a_sean_says_jpg__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _AE_images_cyberexplorer_jpg__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./AE_images/cyberexplorer.jpg */ "./src/playground/credits/AE_images/cyberexplorer.jpg");
+/* harmony import */ var _AE_images_cyberexplorer_jpg__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_AE_images_cyberexplorer_jpg__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _AE_images_luotianyi_jpg__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./AE_images/luotianyi.jpg */ "./src/playground/credits/AE_images/luotianyi.jpg");
+/* harmony import */ var _AE_images_luotianyi_jpg__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_AE_images_luotianyi_jpg__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony import */ var _AE_images_np_jpg__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./AE_images/np.jpg */ "./src/playground/credits/AE_images/np.jpg");
+/* harmony import */ var _AE_images_np_jpg__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_AE_images_np_jpg__WEBPACK_IMPORTED_MODULE_4__);
+/* harmony import */ var _AE_images_msw_jpg__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./AE_images/msw.jpg */ "./src/playground/credits/AE_images/msw.jpg");
+/* harmony import */ var _AE_images_msw_jpg__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_AE_images_msw_jpg__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var _AE_images_cat_jpg__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./AE_images/cat.jpg */ "./src/playground/credits/AE_images/cat.jpg");
+/* harmony import */ var _AE_images_cat_jpg__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(_AE_images_cat_jpg__WEBPACK_IMPORTED_MODULE_6__);
+/* harmony import */ var _AE_images_nangua_jpg__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./AE_images/nangua.jpg */ "./src/playground/credits/AE_images/nangua.jpg");
+/* harmony import */ var _AE_images_nangua_jpg__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(_AE_images_nangua_jpg__WEBPACK_IMPORTED_MODULE_7__);
+
+
+
+
+
+
+
+
+const shuffle = list => {
+  for (let i = list.length - 1; i > 0; i--) {
+    const random = Math.floor(Math.random() * (i + 1));
+    const tmp = list[i];
+    list[i] = list[random];
+    list[random] = tmp;
+  }
+  return list;
+};
+const contributors = [{
+  image: _AE_images_koshino_jpg__WEBPACK_IMPORTED_MODULE_0___default.a,
+  text: "KOSHINO",
+  href: "https://github.com/KOSHINOawa"
+}, {
+  image: _AE_images_cyberexplorer_jpg__WEBPACK_IMPORTED_MODULE_2___default.a,
+  text: "Cyberexplorer",
+  href: "https://github.com/LanwyWriteXU"
+}, {
+  image: _AE_images_a_sean_says_jpg__WEBPACK_IMPORTED_MODULE_1___default.a,
+  text: "A Sean Says",
+  href: "https://github.com/SeanShaoJX"
+}, {
+  image: _AE_images_luotianyi_jpg__WEBPACK_IMPORTED_MODULE_3___default.a,
+  text: "LuoTianyi Arm64",
+  href: "https://github.com/LuoTianyi-arm64"
+}, {
+  image: _AE_images_np_jpg__WEBPACK_IMPORTED_MODULE_4___default.a,
+  text: "NeuronPulse",
+  href: "https://github.com/NeuronPulse"
+}];
+const logo = [{
+  image: _AE_images_msw_jpg__WEBPACK_IMPORTED_MODULE_5___default.a,
+  text: "𝑚𝑠𝑤饿饿的",
+  href: ""
+}];
+const website = [{
+  image: _AE_images_cat_jpg__WEBPACK_IMPORTED_MODULE_6___default.a,
+  text: "世界第一可爱傲娇汉堡小猫",
+  href: ""
+}, {
+  image: _AE_images_nangua_jpg__WEBPACK_IMPORTED_MODULE_7___default.a,
+  text: "Itz_NanGua",
+  href: "https://github.com/NanGua-QWQ"
+}];
+/* harmony default export */ __webpack_exports__["default"] = ({
+  contributors: shuffle(contributors),
+  logo: shuffle(logo),
+  website: shuffle(website)
+});
+
+/***/ }),
+
 /***/ "./src/playground/credits/credits.css":
 /*!********************************************!*\
   !*** ./src/playground/credits/credits.css ***!
@@ -1623,6 +2056,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _lib_themes_guiHelpers__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../lib/themes/guiHelpers */ "./src/lib/themes/guiHelpers.js");
 /* harmony import */ var _lib_themes_themePersistance__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../lib/themes/themePersistance */ "./src/lib/themes/themePersistance.js");
 /* harmony import */ var _users__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./users */ "./src/playground/credits/users.js");
+/* harmony import */ var _ae_users__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./ae-users */ "./src/playground/credits/ae-users.js");
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 
 
@@ -1685,9 +2119,23 @@ const Credits = () => /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.
 }, _lib_brand__WEBPACK_IMPORTED_MODULE_4__["APP_NAME"], " Credits")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, "The ", _lib_brand__WEBPACK_IMPORTED_MODULE_4__["APP_NAME"], " project is made possible by the work of many volunteers.")), _lib_brand__WEBPACK_IMPORTED_MODULE_4__["APP_NAME"] !== 'TurboWarp' &&
 /*#__PURE__*/
 // Be kind and considerate. Don't remove this :)
-react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "TurboWarp"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, _lib_brand__WEBPACK_IMPORTED_MODULE_4__["APP_NAME"], " is based on ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("a", {
+react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "About"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, _lib_brand__WEBPACK_IMPORTED_MODULE_4__["APP_NAME"], " is based on ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("a", {
   href: "https://turbowarp.org/"
-}, "TurboWarp"), ".")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "Scratch"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, _lib_brand__WEBPACK_IMPORTED_MODULE_4__["APP_NAME"], " is based on the work of the ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("a", {
+}, "TurboWarp"), ".")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, "AstraEditor is a modified project based on TurboWarp, but it is not affiliated with other derivative editors or TurboWarp. We extend our sincere gratitude to GarboMuffin, the creator of TurboWarp, and all the volunteers for their outstanding contributions to TurboWarp.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "Contributors"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(UserList, {
+  users: _ae_users__WEBPACK_IMPORTED_MODULE_8__["default"].contributors
+})), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "Logo"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(UserList, {
+  users: _ae_users__WEBPACK_IMPORTED_MODULE_8__["default"].logo
+})), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "Website"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(UserList, {
+  users: _ae_users__WEBPACK_IMPORTED_MODULE_8__["default"].website
+})), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h4", {
+  style: {
+    textAlign: "center"
+  }
+}, "The creation of some functions also relies on the collaboration of artificial intelligence(AI)!"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("header", {
+  className: _credits_css__WEBPACK_IMPORTED_MODULE_3___default.a.headerContainerTurboWarp
+}, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h1", {
+  className: _credits_css__WEBPACK_IMPORTED_MODULE_3___default.a.headerText
+}, "TurboWarp Credits")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, "The TurboWarp project is made possible by the work of many volunteers.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "Scratch"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, "TurboWarp is based on the work of the ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("a", {
   href: "https://scratch.mit.edu/credits"
 }, "Scratch contributors"), " but is not endorsed by Scratch in any way."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("a", {
   href: "https://scratch.mit.edu/donate"
@@ -1699,7 +2147,7 @@ react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#_
   users: _users__WEBPACK_IMPORTED_MODULE_7__["default"].extensionDevelopers
 })), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "Documentation"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(UserList, {
   users: _users__WEBPACK_IMPORTED_MODULE_7__["default"].docs
-})), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "Translators"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, "More than 100 people have helped translate ", _lib_brand__WEBPACK_IMPORTED_MODULE_4__["APP_NAME"], " and its addons into many languages \u2014 far more than we could hope to list here.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("i", null, "Individual contributors are listed in no particular order. The order is randomized each visit."))));
+})), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("h2", null, "Translators"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, "More than 100 people have helped translate TurboWarp and its addons into many languages \u2014 far more than we could hope to list here.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("section", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("i", null, "Individual contributors are listed in no particular order. The order is randomized each visit."))));
 Object(_app_target__WEBPACK_IMPORTED_MODULE_2__["default"])(/*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(Credits, null));
 
 /***/ }),

@@ -106,12 +106,28 @@ const createTranslate = __webpack_require__(/*! ./tw-l10n */ "./node_modules/scr
 const translate = createTranslate(null);
 const loadScripts = url => {
   if (isWorker) {
-    importScripts(url);
+    // In Worker, importScripts is synchronous and throws on error
+    try {
+      importScripts(url);
+      return Promise.resolve();
+    } catch (e) {
+      return Promise.reject(new Error("Failed to load extension script: ".concat(e.message)));
+    }
   } else {
+    // In iframe, use dynamic script loading with timeout
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.onload = () => resolve();
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Extension script loading timeout: ".concat(url)));
+      }, 10000); // 10 second timeout
+
+      script.onload = () => {
+        clearTimeout(timeoutId);
+        // Add a small delay to allow the script to execute and register
+        setTimeout(resolve, 100);
+      };
       script.onerror = () => {
+        clearTimeout(timeoutId);
         reject(new Error("Error in sandboxed script: ".concat(url, ". Check the console for more information.")));
       };
       script.src = url;
@@ -131,8 +147,14 @@ class ExtensionWorker {
         const [id, extension] = x;
         this.workerId = id;
         try {
+          // Add timeout for registration - if extension doesn't register within 5 seconds, fail
+          const registrationTimeout = new Promise((_, reject) => {
+            setTimeout(() => {
+              reject(new Error('Extension did not call Scratch.extensions.register() within 15 seconds. The script may have crashed or contains syntax errors.'));
+            }, 15000);
+          });
           await loadScripts(extension);
-          await this.firstRegistrationPromise;
+          await Promise.race([this.firstRegistrationPromise, registrationTimeout]);
           const initialRegistrations = this.initialRegistrations;
           this.initialRegistrations = null;
           Promise.all(initialRegistrations).then(() => dispatch.call('extensions', 'onWorkerInit', id));
@@ -1913,39 +1935,32 @@ module.exports = function lookupClosestLocale (locale/*: string | string[] | voi
 
 // only use colors in non-browser environments
 const addColors = typeof document === 'undefined';
-
 const RESET = addColors ? '\u001b[0m' : '';
 const GRAY = addColors ? '\u001b[90m' : '';
 const BLUE = addColors ? '\u001b[34m' : '';
 const CYAN = addColors ? '\u001b[36m' : '';
 const YELLOW = addColors ? '\u001b[33m' : '';
 const RED = addColors ? '\u001b[31m' : '';
-
-const DEBUG = `${BLUE}debug${RESET}`;
-const INFO = `${CYAN}info${RESET}`;
-const WARN = `${YELLOW}warn${RESET}`;
-const ERROR = `${RED}error${RESET}`;
-
-const createLog = (namespace = '') => {
-    const log = (childNamespace) => createLog(namespace ? `${namespace} ${childNamespace}` : childNamespace);
-
-    const formattedNamespace = namespace ? [`${GRAY}${namespace}${RESET}`] : [];
-
-    log.debug = log.log = console.debug.bind(console, ...formattedNamespace, DEBUG);
-    log.info = console.log.bind(console, ...formattedNamespace, INFO)
-    log.warn = log.warning = console.warn.bind(console, ...formattedNamespace, WARN)
-    log.error = console.error.bind(console, ...formattedNamespace, ERROR);
-
-    return log;
+const DEBUG = "".concat(BLUE, "debug").concat(RESET);
+const INFO = "".concat(CYAN, "info").concat(RESET);
+const WARN = "".concat(YELLOW, "warn").concat(RESET);
+const ERROR = "".concat(RED, "error").concat(RESET);
+const _createLog = function createLog() {
+  let namespace = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+  const log = childNamespace => _createLog(namespace ? "".concat(namespace, " ").concat(childNamespace) : childNamespace);
+  const formattedNamespace = namespace ? ["".concat(GRAY).concat(namespace).concat(RESET)] : [];
+  log.debug = log.log = console.debug.bind(console, ...formattedNamespace, DEBUG);
+  log.info = console.log.bind(console, ...formattedNamespace, INFO);
+  log.warn = log.warning = console.warn.bind(console, ...formattedNamespace, WARN);
+  log.error = console.error.bind(console, ...formattedNamespace, ERROR);
+  return log;
 };
 
 /**
  * @deprecated does nothing
  */
-createLog.enable = createLog.disable = () => {};
-
-module.exports = createLog;
-
+_createLog.enable = _createLog.disable = () => {};
+module.exports = _createLog;
 
 /***/ }),
 
@@ -3527,4 +3542,4 @@ module.exports = g;
 /***/ })
 
 /******/ });
-//# sourceMappingURL=extension-worker.00dfd6bd5dd1209d4d8b.js.map
+//# sourceMappingURL=extension-worker.e1bba004c89fee546205.js.map

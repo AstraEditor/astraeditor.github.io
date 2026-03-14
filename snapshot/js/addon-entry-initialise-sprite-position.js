@@ -35,11 +35,10 @@ __webpack_require__.r(__webpack_exports__);
   const vm = addon.tab.traps.vm;
   const oldAddSprite = vm.constructor.prototype.addSprite;
   vm.constructor.prototype.addSprite = function (input) {
-    var _spriteObj$costumes, _spriteObj$costumes$;
     let spriteObj,
       stringify = true;
     if (typeof input === "object") [spriteObj, stringify] = [input, false];else spriteObj = JSON.parse(input);
-    const isEmpty = ((_spriteObj$costumes = spriteObj.costumes) === null || _spriteObj$costumes === void 0 ? void 0 : (_spriteObj$costumes$ = _spriteObj$costumes[0]) === null || _spriteObj$costumes$ === void 0 ? void 0 : _spriteObj$costumes$.baseLayerMD5) === "cd21514d0531fdffb22204e0ec5ed84a.svg";
+    const isEmpty = spriteObj.costumes && spriteObj.costumes[0] && spriteObj.costumes[0].baseLayerMD5 === "cd21514d0531fdffb22204e0ec5ed84a.svg";
     if (!addon.self.disabled && (isEmpty || !spriteObj.tags || !addon.settings.get("library"))) {
       if (spriteObj.scratchX) {
         spriteObj.scratchX = addon.settings.get("x");

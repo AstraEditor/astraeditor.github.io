@@ -173,8 +173,7 @@ __webpack_require__.r(__webpack_exports__);
         inputMap.delete(e.target);
       } else {
         setTimeout(() => {
-          var _inputMap$get;
-          if (((_inputMap$get = inputMap.get(e.target)) === null || _inputMap$get === void 0 ? void 0 : _inputMap$get.time) === currentTime) {
+          if (inputMap.get(e.target) && inputMap.get(e.target).time === currentTime) {
             flushInput();
             inputMap.delete(e.target);
           }

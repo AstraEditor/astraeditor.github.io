@@ -245,11 +245,10 @@ __webpack_require__.r(__webpack_exports__);
     const blocksWrapper = document.querySelector('[class^="gui_blocks-wrapper_"]');
     let internalNode = blocksWrapper[addon.tab.traps.getInternalKey(blocksWrapper)];
     while (true) {
-      var _internalNode$stateNo, _internalNode$stateNo2;
       if (!internalNode) {
         return false;
       }
-      const canUseCloud = (_internalNode$stateNo = internalNode.stateNode) === null || _internalNode$stateNo === void 0 ? void 0 : (_internalNode$stateNo2 = _internalNode$stateNo.props) === null || _internalNode$stateNo2 === void 0 ? void 0 : _internalNode$stateNo2.canUseCloud;
+      const canUseCloud = internalNode.stateNode && internalNode.stateNode.props && internalNode.stateNode.props.canUseCloud;
       if (typeof canUseCloud === "boolean") {
         return canUseCloud;
       }
