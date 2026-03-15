@@ -11879,7 +11879,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _lib_tw_recolor_build_icon_sounds_svg__WEBPACK_IMPORTED_MODULE_54__ = __webpack_require__(/*! ../../lib/tw-recolor/build!./icon--sounds.svg */ "./src/lib/tw-recolor/build.js!./src/components/gui/icon--sounds.svg");
 /* harmony import */ var _lib_tw_recolor_build_readme_svg__WEBPACK_IMPORTED_MODULE_55__ = __webpack_require__(/*! ../../lib/tw-recolor/build!./readme.svg */ "./src/lib/tw-recolor/build.js!./src/components/gui/readme.svg");
 /* harmony import */ var _lib_settings_js__WEBPACK_IMPORTED_MODULE_56__ = __webpack_require__(/*! ../../lib/settings.js */ "./src/lib/settings.js");
-const _excluded = ["accountNavOpen", "activeTabIndex", "alertsVisible", "authorId", "authorThumbnailUrl", "authorUsername", "basePath", "backdropLibraryVisible", "backpackHost", "backpackVisible", "blocksId", "blocksTabVisible", "cardsVisible", "canChangeLanguage", "canChangeTheme", "canCreateNew", "canEditTitle", "canManageFiles", "canRemix", "canSave", "canCreateCopy", "canShare", "canUseCloud", "children", "connectionModalVisible", "costumeLibraryVisible", "costumesTabVisible", "customStageSize", "enableCommunity", "intl", "isCreating", "isEmbedded", "isFullScreen", "isPlayerOnly", "isRtl", "isShared", "isWindowFullScreen", "isTelemetryEnabled", "isTotallyNormal", "loading", "logo", "renderLogin", "onClickAbout", "onClickAccountNav", "onCloseAccountNav", "onClickAddonSettings", "onClickDesktopSettings", "onClickNewWindow", "onClickPackager", "onLogOut", "onOpenRegistration", "onToggleLoginOpen", "onActivateCostumesTab", "onActivateSoundsTab", "onActivateTab", "onClickLogo", "onExtensionButtonClick", "onOpenCustomExtensionModal", "onProjectTelemetryEvent", "onRequestCloseBackdropLibrary", "onRequestCloseCostumeLibrary", "onRequestCloseTelemetryModal", "onSeeCommunity", "onShare", "onShowPrivacyPolicy", "onStartSelectingFileUpload", "onTelemetryModalCancel", "onTelemetryModalOptIn", "onTelemetryModalOptOut", "securityManager", "showComingSoon", "showOpenFilePicker", "showSaveFilePicker", "soundsTabVisible", "stageSizeMode", "targetIsStage", "telemetryModalVisible", "theme", "tipsLibraryVisible", "usernameModalVisible", "settingsModalVisible", "customExtensionModalVisible", "fontsModalVisible", "unknownPlatformModalVisible", "invalidProjectModalVisible", "vm", "customThemeVisible", "readmeModalVisible", "onOpenReadme", "extensionManagerVisible", "onRequestCloseExtensionManager", "onOpenExtensionLibrary", "previewExtVisible", "dispatch", "aeFeaturesModalVisible"];
+const _excluded = ["accountNavOpen", "activeTabIndex", "alertsVisible", "authorId", "authorThumbnailUrl", "authorUsername", "basePath", "backdropLibraryVisible", "backpackHost", "backpackVisible", "blocksId", "blocksTabVisible", "cardsVisible", "canChangeLanguage", "canChangeTheme", "canCreateNew", "canEditTitle", "canManageFiles", "canRemix", "canSave", "canCreateCopy", "canShare", "canUseCloud", "children", "connectionModalVisible", "costumeLibraryVisible", "costumesTabVisible", "customStageSize", "enableCommunity", "intl", "isCreating", "isEmbedded", "isFullScreen", "isPlayerOnly", "isRtl", "isShared", "isWindowFullScreen", "isTelemetryEnabled", "isTotallyNormal", "loading", "logo", "renderLogin", "onClickAbout", "onClickAccountNav", "onCloseAccountNav", "onClickAddonSettings", "onClickDesktopSettings", "onClickNewWindow", "onClickPackager", "onLogOut", "onOpenRegistration", "onToggleLoginOpen", "onActivateCostumesTab", "onActivateSoundsTab", "onActivateTab", "onClickLogo", "onExtensionButtonClick", "onOpenExtensionEditor", "onOpenCustomExtensionModal", "onProjectTelemetryEvent", "onRequestCloseBackdropLibrary", "onRequestCloseCostumeLibrary", "onRequestCloseTelemetryModal", "onSeeCommunity", "onShare", "onShowPrivacyPolicy", "onStartSelectingFileUpload", "onTelemetryModalCancel", "onTelemetryModalOptIn", "onTelemetryModalOptOut", "securityManager", "showComingSoon", "showOpenFilePicker", "showSaveFilePicker", "soundsTabVisible", "stageSizeMode", "targetIsStage", "telemetryModalVisible", "theme", "tipsLibraryVisible", "usernameModalVisible", "settingsModalVisible", "customExtensionModalVisible", "fontsModalVisible", "unknownPlatformModalVisible", "invalidProjectModalVisible", "vm", "customThemeVisible", "readmeModalVisible", "onOpenReadme", "extensionManagerVisible", "onRequestCloseExtensionManager", "onOpenExtensionLibrary", "previewExtVisible", "dispatch", "aeFeaturesModalVisible"];
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 function _objectWithoutProperties(e, t) { if (null == e) return {}; var o, r, i = _objectWithoutPropertiesLoose(e, t); if (Object.getOwnPropertySymbols) { var n = Object.getOwnPropertySymbols(e); for (r = 0; r < n.length; r++) o = n[r], -1 === t.indexOf(o) && {}.propertyIsEnumerable.call(e, o) && (i[o] = e[o]); } return i; }
 function _objectWithoutPropertiesLoose(r, e) { if (null == r) return {}; var t = {}; for (var n in r) if ({}.hasOwnProperty.call(r, n)) { if (-1 !== e.indexOf(n)) continue; t[n] = r[n]; } return t; }
@@ -12025,6 +12025,7 @@ const GUIComponent = props => {
       onActivateTab,
       onClickLogo,
       onExtensionButtonClick,
+      onOpenExtensionEditor,
       onOpenCustomExtensionModal,
       onProjectTelemetryEvent,
       onRequestCloseBackdropLibrary,
@@ -12286,7 +12287,8 @@ const GUIComponent = props => {
       onSeeCommunity: onSeeCommunity,
       onShare: onShare,
       onStartSelectingFileUpload: onStartSelectingFileUpload,
-      onToggleLoginOpen: onToggleLoginOpen
+      onToggleLoginOpen: onToggleLoginOpen,
+      onOpenExtensionEditor: onOpenExtensionEditor
     }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement(_box_box_jsx__WEBPACK_IMPORTED_MODULE_16__["default"], {
       className: _gui_css__WEBPACK_IMPORTED_MODULE_50___default.a.bodyWrapper
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement(_box_box_jsx__WEBPACK_IMPORTED_MODULE_16__["default"], {
@@ -12478,6 +12480,7 @@ GUIComponent.propTypes = {
   onClickLogo: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func,
   onCloseAccountNav: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func,
   onExtensionButtonClick: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func,
+  onOpenExtensionEditor: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func,
   onOpenCustomExtensionModal: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func,
   onLogOut: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func,
   onOpenRegistration: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func,
@@ -14913,6 +14916,11 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_7___default.a.Component {
       ,
 
       id: "tw.menuBar.package"
+    }))), this.props.onOpenExtensionEditor && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_7___default.a.createElement(_menu_menu_jsx__WEBPACK_IMPORTED_MODULE_19__["MenuSection"], null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_7___default.a.createElement(_menu_menu_jsx__WEBPACK_IMPORTED_MODULE_19__["MenuItem"], {
+      onClick: this.props.onOpenExtensionEditor
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_7___default.a.createElement(react_intl__WEBPACK_IMPORTED_MODULE_3__["FormattedMessage"], {
+      defaultMessage: "Extension Editor",
+      id: "tw.menuBar.extensionEditor"
     }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_7___default.a.createElement(_menu_menu_jsx__WEBPACK_IMPORTED_MODULE_19__["MenuSection"], null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_7___default.a.createElement(_menu_menu_jsx__WEBPACK_IMPORTED_MODULE_19__["MenuItem"], {
       onClick: this.handleClickRestorePoints
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_7___default.a.createElement(react_intl__WEBPACK_IMPORTED_MODULE_3__["FormattedMessage"], {
@@ -31456,10 +31464,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _lib_isScratchDesktop_js__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ../lib/isScratchDesktop.js */ "./src/lib/isScratchDesktop.js");
 /* harmony import */ var _lib_tw_fullscreen_resizer_hoc_jsx__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ../lib/tw-fullscreen-resizer-hoc.jsx */ "./src/lib/tw-fullscreen-resizer-hoc.jsx");
 /* harmony import */ var _tw_theme_manager_hoc_jsx__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! ./tw-theme-manager-hoc.jsx */ "./src/containers/tw-theme-manager-hoc.jsx");
+/* harmony import */ var _lib_tw_extension_editor_hot_reload_jsx__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! ../lib/tw-extension-editor-hot-reload.jsx */ "./src/lib/tw-extension-editor-hot-reload.jsx");
 const _excluded = ["assetHost", "cloudHost", "error", "isError", "isScratchDesktop", "isShowingProject", "onProjectLoaded", "onStorageInit", "onUpdateProjectId", "onVmInit", "projectHost", "projectId", "children", "fetchingProject", "isLoading", "loadingStateVisible"];
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 function _objectWithoutProperties(e, t) { if (null == e) return {}; var o, r, i = _objectWithoutPropertiesLoose(e, t); if (Object.getOwnPropertySymbols) { var n = Object.getOwnPropertySymbols(e); for (r = 0; r < n.length; r++) o = n[r], -1 === t.indexOf(o) && {}.propertyIsEnumerable.call(e, o) && (i[o] = e[o]); } return i; }
 function _objectWithoutPropertiesLoose(r, e) { if (null == r) return {}; var t = {}; for (var n in r) if ({}.hasOwnProperty.call(r, n)) { if (-1 !== e.indexOf(n)) continue; t[n] = r[n]; } return t; }
+
 
 
 
@@ -31638,7 +31648,7 @@ const WrappedGui = Object(redux__WEBPACK_IMPORTED_MODULE_2__["compose"])(_lib_lo
 // componentDidUpdate() needs to run very early for icons to update immediately
 _lib_tw_fullscreen_resizer_hoc_jsx__WEBPACK_IMPORTED_MODULE_23__["default"], _lib_font_loader_hoc_jsx__WEBPACK_IMPORTED_MODULE_11__["default"],
 // QueryParserHOC, // tw: HOC is unused
-_lib_project_fetcher_hoc_jsx__WEBPACK_IMPORTED_MODULE_14__["default"], _lib_titled_hoc_jsx__WEBPACK_IMPORTED_MODULE_15__["default"], _lib_project_saver_hoc_jsx__WEBPACK_IMPORTED_MODULE_16__["default"], _lib_vm_listener_hoc_jsx__WEBPACK_IMPORTED_MODULE_18__["default"], _lib_vm_manager_hoc_jsx__WEBPACK_IMPORTED_MODULE_19__["default"], _lib_sb_file_uploader_hoc_jsx__WEBPACK_IMPORTED_MODULE_13__["default"], _lib_cloud_manager_hoc_jsx__WEBPACK_IMPORTED_MODULE_20__["default"])(ConnectedGUI);
+_lib_project_fetcher_hoc_jsx__WEBPACK_IMPORTED_MODULE_14__["default"], _lib_titled_hoc_jsx__WEBPACK_IMPORTED_MODULE_15__["default"], _lib_project_saver_hoc_jsx__WEBPACK_IMPORTED_MODULE_16__["default"], _lib_vm_listener_hoc_jsx__WEBPACK_IMPORTED_MODULE_18__["default"], _lib_vm_manager_hoc_jsx__WEBPACK_IMPORTED_MODULE_19__["default"], _lib_sb_file_uploader_hoc_jsx__WEBPACK_IMPORTED_MODULE_13__["default"], _lib_cloud_manager_hoc_jsx__WEBPACK_IMPORTED_MODULE_20__["default"], _lib_tw_extension_editor_hot_reload_jsx__WEBPACK_IMPORTED_MODULE_25__["default"])(ConnectedGUI);
 WrappedGui.setAppElement = react_modal__WEBPACK_IMPORTED_MODULE_4___default.a.setAppElement;
 /* harmony default export */ __webpack_exports__["default"] = (WrappedGui);
 
@@ -48379,6 +48389,144 @@ const findIncompatibleUserscripts = () => {
   return errors;
 };
 const isBrowserSupported = () => isNewFunctionSupported() && isRendererSupported() && findIncompatibleUserscripts().length === 0;
+
+/***/ }),
+
+/***/ "./src/lib/tw-extension-editor-hot-reload.jsx":
+/*!****************************************************!*\
+  !*** ./src/lib/tw-extension-editor-hot-reload.jsx ***!
+  \****************************************************/
+/*! exports provided: default, HOT_RELOAD_MESSAGE_TYPE, EXTENSION_EDITOR_URL */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return ExtensionEditorHotReloadHOC; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "HOT_RELOAD_MESSAGE_TYPE", function() { return HOT_RELOAD_MESSAGE_TYPE; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "EXTENSION_EDITOR_URL", function() { return EXTENSION_EDITOR_URL; });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var react_redux__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react-redux */ "./node_modules/react-redux/es/index.js");
+/* harmony import */ var prop_types__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! prop-types */ "./node_modules/prop-types/index.js");
+/* harmony import */ var prop_types__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(prop_types__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _log__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./log */ "./src/lib/log.js");
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
+/**
+ * 扩展编辑器热重载集成
+ * 
+ * 监听来自 scratch-extension-editor 窗口的热重载消息，
+ * 卸载旧扩展并加载新扩展
+ */
+
+
+
+
+
+const EXTENSION_EDITOR_URL = 'https://editors.astras.top/scratch-extension-editor/';
+// const EXTENSION_EDITOR_URL = 'http://192.168.1.7:3000/';
+
+const HOT_RELOAD_MESSAGE_TYPE = 'astra-extension-hot-reload';
+const ExtensionEditorHotReloadHOC = function ExtensionEditorHotReloadHOC(WrappedComponent) {
+  class ExtensionEditorHotReloadComponent extends react__WEBPACK_IMPORTED_MODULE_0___default.a.Component {
+    constructor(props) {
+      super(props);
+      this.handleOpenExtensionEditor = this.handleOpenExtensionEditor.bind(this);
+      this.handleMessage = this.handleMessage.bind(this);
+      this.extensionEditorWindow = null;
+    }
+    componentDidMount() {
+      window.addEventListener('message', this.handleMessage);
+    }
+    componentWillUnmount() {
+      window.removeEventListener('message', this.handleMessage);
+    }
+    handleOpenExtensionEditor() {
+      // 打开扩展编辑器窗口
+      this.extensionEditorWindow = window.open(EXTENSION_EDITOR_URL, 'astra-extension-editor', 'width=1400,height=900,menubar=no,toolbar=no,location=no,status=no');
+    }
+    async handleMessage(e) {
+      // 安全检查：确保消息来自预期的源
+      // 在生产环境中应该检查 e.origin
+
+      const data = e.data;
+
+      // 检查消息类型
+      if (data.type !== HOT_RELOAD_MESSAGE_TYPE) {
+        return;
+      }
+      const {
+        extensionId,
+        code
+      } = data;
+      if (!extensionId || !code) {
+        _log__WEBPACK_IMPORTED_MODULE_3__["default"].error('Hot reload: missing extensionId or code');
+        return;
+      }
+      try {
+        _log__WEBPACK_IMPORTED_MODULE_3__["default"].log("Hot reload: reloading extension ".concat(extensionId));
+
+        // 卸载旧扩展（如果存在），保留积木用于热重载
+        if (this.props.vm.extensionManager.isExtensionLoaded(extensionId)) {
+          this.props.vm.extensionManager.unloadExtension(extensionId, {
+            preserveBlocks: true,
+            // 保留积木，不删除工作区中的积木
+            skipConfirm: true // 跳过确认对话框
+          });
+        }
+
+        // 创建 data URL 加载扩展
+        const dataUrl = "data:application/javascript,".concat(encodeURIComponent(code));
+
+        // 加载新扩展（true 表示信任此扩展）
+        await this.props.vm.extensionManager.loadExtensionURL(dataUrl, true);
+
+        // 刷新工作区以更新积木定义
+        this.props.vm.emitWorkspaceUpdate();
+        _log__WEBPACK_IMPORTED_MODULE_3__["default"].log("Hot reload: extension ".concat(extensionId, " loaded successfully"));
+
+        // 通知扩展编辑器窗口加载成功
+        if (this.extensionEditorWindow && !this.extensionEditorWindow.closed) {
+          this.extensionEditorWindow.postMessage({
+            type: 'astra-extension-hot-reload-result',
+            success: true
+          }, '*');
+        }
+      } catch (error) {
+        _log__WEBPACK_IMPORTED_MODULE_3__["default"].error('Hot reload failed:', error);
+
+        // 通知扩展编辑器窗口加载失败
+        if (this.extensionEditorWindow && !this.extensionEditorWindow.closed) {
+          this.extensionEditorWindow.postMessage({
+            type: 'astra-extension-hot-reload-result',
+            success: false,
+            error: error.message
+          }, '*');
+        }
+      }
+    }
+    render() {
+      return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement(WrappedComponent, _extends({
+        onOpenExtensionEditor: this.handleOpenExtensionEditor
+      }, this.props));
+    }
+  }
+  ExtensionEditorHotReloadComponent.propTypes = {
+    vm: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.shape({
+      extensionManager: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.shape({
+        isExtensionLoaded: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func,
+        unloadExtension: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func,
+        loadExtensionURL: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func
+      }),
+      emitWorkspaceUpdate: prop_types__WEBPACK_IMPORTED_MODULE_2___default.a.func
+    })
+  };
+  const mapStateToProps = state => ({
+    vm: state.scratchGui.vm
+  });
+  const mapDispatchToProps = () => ({});
+  return Object(react_redux__WEBPACK_IMPORTED_MODULE_1__["connect"])(mapStateToProps, mapDispatchToProps)(ExtensionEditorHotReloadComponent);
+};
+
 
 /***/ }),
 
