@@ -45865,6 +45865,9 @@ const isUndefined = a => typeof a === 'undefined';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react_intl__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react-intl */ "./node_modules/react-intl/lib/index.es.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
+
 
 const messages = Object(react_intl__WEBPACK_IMPORTED_MODULE_0__["defineMessages"])({
   motion_direction: {
@@ -46134,13 +46137,13 @@ class OpcodeLabels {
    * @private
   */
   _colorbox(Hex) {
-    return /*#__PURE__*/React.createElement("svg", {
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("svg", {
       style: {
         width: '25px',
         height: '1px',
         transform: 'translate(5px, -10px)'
       }
-    }, /*#__PURE__*/React.createElement("path", {
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("path", {
       stroke: "#FFFFFF",
       fill: Hex,
       "fill-opacity": "1",
@@ -46196,10 +46199,10 @@ class OpcodeLabels {
       }
     };
     this._opcodeMap.sensing_touchingcolor.labelFn = params => {
-      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, this._translator(messages.sensing_touchingcolor)), this._colorbox(params.COLOR));
+      return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_1___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("span", null, this._translator(messages.sensing_touchingcolor)), this._colorbox(params.COLOR));
     };
     this._opcodeMap.sensing_coloristouchingcolor.labelFn = params => {
-      return /*#__PURE__*/React.createElement(React.Fragment, null, this._colorbox(params.COLOR), /*#__PURE__*/React.createElement("span", null, this._translator(messages.sensing_coloristouchingcolor)), this._colorbox(params.COLOR2), "?");
+      return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_1___default.a.Fragment, null, this._colorbox(params.COLOR), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default.a.createElement("span", null, this._translator(messages.sensing_coloristouchingcolor)), this._colorbox(params.COLOR2), "?");
     };
     this._opcodeMap.sensing_distanceto.labelFn = params => {
       switch (params.DISTANCETOMENU) {
