@@ -1,6 +1,137 @@
 (function() {
     'use strict';
 
+    // i18n 翻译
+    const i18n = {
+        'zh-CN': {
+            // 标题栏
+            'download': '下载',
+            'changelog': '更新日志',
+            'repo': '仓库',
+            'feedback': '反馈',
+            // 头部
+            'slogan': '锤子, 而不是花束',
+            'tryOnline': '在线体验',
+            'getDesktop': '获取桌面端',
+            'snapshot': '快照版',
+            'release': '正式版',
+            // 介绍
+            'fastAsLightning': '闪电般迅速',
+            'introText': 'AstraEditor 加入了更多功能, 使您的编程速度"快如闪电"',
+            'betterCostumeEditor': '更好的造型编辑器',
+            'moreAddons': '更多插件',
+            'customTheme': '自定义主题',
+            // 下载
+            'bornForYou': '为你而生',
+            'downloadNow': '即刻下载 AstraEditor',
+            'downloadWindows': '下载 Windows 版本',
+            'downloadMacOS': '下载 macOS 版本',
+            'downloadLinux': '下载 Linux 版本',
+            'otherPlatforms': '其他平台:',
+            'selectDistro': '选择您的 Linux 发行版',
+            'archLinux': 'Arch Linux (AUR)',
+            'debianUbuntu': 'Debian / Ubuntu (.deb)',
+            'appImage': 'AppImage (通用)',
+            // 更新日志
+            'changelogTitle': '更新日志',
+            'changelogIntro': '查看 AstraEditor 的最新变化',
+            'loadFailed': '无法加载更新日志',
+            'noLogs': '暂无更新日志',
+            // 页脚
+            'fromTeam': '来自 AstraEditor 项目组',
+            'projectNote': '本项目基于 TurboWarp 构建，但与 TurboWarp 项目组无关系。<br>所有更新的功能均为自制，如有雷同，纯属巧合',
+            'moreLinks': '更多链接',
+            'copyright': '©2026 AstraEditor项目组。保留所有权利。'
+        },
+        'en': {
+            // Title bar
+            'download': 'Download',
+            'changelog': 'Changelog',
+            'repo': 'Repo',
+            'feedback': 'Feedback',
+            'release': 'Release',
+            // Header
+            'slogan': 'Hammer, not bouquet',
+            'tryOnline': 'Try Online',
+            'getDesktop': 'Get Desktop',
+            'snapshot': 'Snapshot',
+            // Intro
+            'fastAsLightning': 'Lightning Fast',
+            'introText': 'AstraEditor includes more features to make your coding speed "Lightning Fast"',
+            'betterCostumeEditor': 'Better Costume Editor',
+            'moreAddons': 'More Addons',
+            'customTheme': 'Custom Theme',
+            // Download
+            'bornForYou': 'Born for You',
+            'downloadNow': 'Download AstraEditor Now',
+            'downloadWindows': 'Download for Windows',
+            'downloadMacOS': 'Download for macOS',
+            'downloadLinux': 'Download for Linux',
+            'otherPlatforms': 'Other platforms:',
+            'selectDistro': 'Select your Linux distribution',
+            'archLinux': 'Arch Linux (AUR)',
+            'debianUbuntu': 'Debian / Ubuntu (.deb)',
+            'appImage': 'AppImage (Universal)',
+            // Changelog
+            'changelogTitle': 'Changelog',
+            'changelogIntro': 'See what\'s new in AstraEditor',
+            'loadFailed': 'Failed to load changelog',
+            'noLogs': 'No changelog available',
+            // Footer
+            'fromTeam': 'From AstraEditor Team',
+            'projectNote': 'This project is built on TurboWarp but is not affiliated with the TurboWarp team.<br>All new features are homemade, any similarities are purely coincidental',
+            'moreLinks': 'More Links',
+            'copyright': '©2026 AstraEditor Team. All rights reserved.'
+        }
+    };
+
+    let currentLang = 'zh-CN';
+
+    function t(key) {
+        return i18n[currentLang][key] || i18n['zh-CN'][key] || key;
+    }
+
+    function initI18n() {
+        // 从 localStorage 读取语言设置
+        const savedLang = localStorage.getItem('lang');
+        if (savedLang && i18n[savedLang]) {
+            currentLang = savedLang;
+        } else {
+            // 检测浏览器语言
+            const browserLang = navigator.language;
+            if (browserLang.startsWith('zh')) {
+                currentLang = 'zh-CN';
+            } else {
+                currentLang = 'en';
+            }
+        }
+
+        updateAllText();
+    }
+
+    function updateAllText() {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.dataset.i18n;
+            el.textContent = t(key);
+        });
+        document.querySelectorAll('[data-i18n-html]').forEach(el => {
+            const key = el.dataset.i18nHtml;
+            el.innerHTML = t(key);
+        });
+    }
+
+    function setLanguage(lang) {
+        if (i18n[lang]) {
+            currentLang = lang;
+            localStorage.setItem('lang', lang);
+            updateAllText();
+            // 更新下载按钮
+            initDownloadButton();
+            // 更新更新日志
+            initUpdateLogs();
+        }
+    }
+
     function initCollapsibleTabs() {
         const tabsContainer = document.querySelector('.titleBar-Tabs');
         const moreContainer = document.querySelector('.titleBar-MoreContainer');
@@ -472,12 +603,18 @@
         }
 
         // 创建下载按钮 HTML
+        const downloadTextMap = {
+            windows: t('downloadWindows'),
+            macos: t('downloadMacOS'),
+            linux: t('downloadLinux')
+        };
         downloadButton.innerHTML = `
             <button class="download-btn download-btn-primary" data-platform="${detectedPlatform}">
-                <span class="download-btn-text">下载 ${platformName} 版本</span>
+                <span class="download-btn-text">${downloadTextMap[detectedPlatform] || `${t('downloadLinux')}`}</span>
                 <img class="download-btn-icon" src="${platformIcon}" alt="${platformName}">
             </button>
             <div class="download-other-platforms">
+                <span class="download-other-label">${t('otherPlatforms')}</span>
                 <button class="download-btn download-btn-secondary" data-platform="windows">
                     <img src="./images/windows.svg" alt="Windows"> Windows
                 </button>
@@ -485,7 +622,7 @@
                     <img src="./images/apple.svg" alt="macOS"> macOS
                 </button>
                 <button class="download-btn download-btn-secondary" data-platform="linux">
-                    <img src="./images/debian.svg" alt="Linux"> Linux
+                    <img src="./images/linux.svg" alt="Linux"> Linux
                 </button>
             </div>
         `;
@@ -511,21 +648,21 @@
                 <div class="download-modal-backdrop"></div>
                 <div class="download-modal-content">
                     <div class="download-modal-header">
-                        <span>选择您的 Linux 发行版</span>
+                        <span>${t('selectDistro')}</span>
                         <button class="download-modal-close">&times;</button>
                     </div>
                     <div class="download-modal-body">
                         <a class="download-distro-btn" href="https://aur.archlinux.org/packages/astraeditor-bin" target="_blank">
                             <img src="./images/archlinux.svg" alt="Arch Linux">
-                            <span>Arch Linux (AUR)</span>
+                            <span>${t('archLinux')}</span>
                         </a>
                         <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.deb.x64)}">
                             <img src="./images/debian.svg" alt="Debian">
-                            <span>Debian / Ubuntu (.deb)</span>
+                            <span>${t('debianUbuntu')}</span>
                         </a>
                         <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.appimage.x64)}">
                             <img src="./images/linux.svg" alt="AppImage">
-                            <span>AppImage (通用)</span>
+                            <span>${t('appImage')}</span>
                         </a>
                     </div>
                 </div>
@@ -593,12 +730,12 @@
             }
         } catch (e) {
             console.warn('获取更新日志失败', e);
-            changelogContent.innerHTML = '<div class="changelog-error">无法加载更新日志</div>';
+            changelogContent.innerHTML = `<div class="changelog-error">${t('loadFailed')}</div>`;
             return;
         }
 
         if (!logs || logs.length === 0) {
-            changelogContent.innerHTML = '<div class="changelog-empty">暂无更新日志</div>';
+            changelogContent.innerHTML = `<div class="changelog-empty">${t('noLogs')}</div>`;
             return;
         }
 
@@ -615,7 +752,53 @@
             </div>
         `).join('');
     }
+
+    function initThemeToggle() {
+        const themeToggle = document.querySelector('.theme-toggle');
+        if (!themeToggle) return;
+
+        // 从localStorage读取保存的主题
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+
+        // 点击切换主题
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+    }
+
+    function initLangToggle() {
+        const langToggle = document.querySelector('.lang-toggle');
+        const langText = document.querySelector('.lang-text');
+        if (!langToggle || !langText) return;
+
+        // 更新按钮文字
+        function updateLangText() {
+            langText.textContent = currentLang === 'zh-CN' ? 'EN' : '中文';
+        }
+
+        updateLangText();
+
+        langToggle.addEventListener('click', () => {
+            const newLang = currentLang === 'zh-CN' ? 'en' : 'zh-CN';
+            setLanguage(newLang);
+            updateLangText();
+        });
+    }
+
+    // 暴露给全局
+    window.setLanguage = setLanguage;
+    window.t = t;
+
     document.addEventListener('DOMContentLoaded', () => {
+        initI18n();
         initCollapsibleTabs();
         init3DEffect();
         initScrollAnimation();
@@ -624,5 +807,7 @@
         initIntroVideoCarousel();
         initDownloadButton();
         initUpdateLogs();
+        initThemeToggle();
+        initLangToggle();
     });
 })();

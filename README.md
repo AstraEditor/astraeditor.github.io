@@ -1,6 +1,5 @@
 # astraeditor.github.io
 
-> Main Page is only support **Chinese**, Maybe you need *translator*?
 ## Introduce
 
 This repository is for the **online editor of AstraEditor**.

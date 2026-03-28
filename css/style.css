@@ -1,11 +1,39 @@
 :root {
     --bg-color: #111;
     --title-color: #222;
+    --lf-color: #eee;
     --button-color: #333;
     --button-color-highLight: #444;
     --text-color: #fafafa;
     --transition-fast: 0.3s;
     --theme-color: #0099ff;
+    --scrollbar-bg: #111;
+    --scrollbar-thumb: #666;
+    --scrollbar-thumb-hover: #777;
+    --scrollbar-thumb-active: #555;
+    --footer-bg: #222;
+    --footer-text: #eee;
+    --intro-title-bg: #fff;
+    --text-shadow-color: #111;
+    --ae-color:rgba(255, 255, 255, 0.15)
+}
+
+[data-theme="light"] {
+    --bg-color: #f5f5f5;
+    --title-color: #ffffff;
+    --button-color: #e0e0e0;
+    --button-color-highLight: #d0d0d0;
+    --text-color: #1a1a1a;
+    --theme-color: #66ccff;
+    --scrollbar-bg: #f5f5f5;
+    --scrollbar-thumb: #c0c0c0;
+    --scrollbar-thumb-hover: #a0a0a0;
+    --scrollbar-thumb-active: #909090;
+    --footer-bg: #e8e8e8;
+    --footer-text: #333;
+    --intro-title-bg: #1a1a1a;
+    --text-shadow-color: #fff;
+    --ae-color:rgba(0, 0, 0, 0.15)
 }
 
 html {
@@ -41,7 +69,6 @@ body {
 }
 
 .titleBar-LogoText {
-    color: var(--text-color);
     margin-left: 7px;
     width: 125px;
 }
@@ -49,6 +76,16 @@ body {
 .titleBar-LogoImg {
     width: 35px;
     height: auto;
+}
+
+[data-theme="light"] .titleBar-LogoImg {
+    filter: brightness(0);
+}
+[data-theme="dark"] .titleBar-LogoText{
+    filter: brightness(0);
+}
+[data-theme="light"] .iconLink{
+    filter: brightness(0);
 }
 
 .titleBar-Tabs {
@@ -173,8 +210,8 @@ button{
     font-size: 900px;
     font-weight: 900;
     color: transparent;
-    -webkit-text-stroke: 3px rgba(255, 255, 255, 0.15);
-    text-stroke: 3px rgba(255, 255, 255, 0.15);
+    -webkit-text-stroke: 3px var(--ae-color);
+    text-stroke: 3px var(--ae-color);
     z-index: -1;
     pointer-events: none;
     font-family: Arial, Helvetica, sans-serif;
@@ -203,6 +240,7 @@ button{
 
 .head-Title {
     opacity: 0;
+    color: #e8e8e8;
     animation: head-LogoText-in 5s cubic-bezier(0, 0, 0, 1) forwards;
     animation-delay: 0.2s;
     transform-style: preserve-3d;
@@ -269,7 +307,7 @@ button{
 .intro-title{
     font-size: 64px;
     font-weight: 900;
-    color: #fff;
+    color: var(--lf-color);
     display: inline-block;
     position: relative;
     padding: 0 8px;
@@ -282,7 +320,7 @@ button{
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: #fff;
+    background-color: var(--intro-title-bg);
     mix-blend-mode: difference;
     transform: translateZ(0) scaleX(0);
     transform-origin: left center;
@@ -369,7 +407,7 @@ button{
     font-size: x-large;
     margin-top: -60px;
     margin-right: 20px;
-    text-shadow: 0px 0px 5px #111;
+    text-shadow: 0px 0px 5px var(--text-shadow-color);
 }
 .intro-show-text.animate {
     animation: intro-show-text-in 1.5s cubic-bezier(0, 0, 0, 1) forwards;
@@ -413,18 +451,35 @@ button{
     flex-direction: column;
     align-items: center;
 }
-.head-link-online,.head-link-desktop{
+.head-link-desktop{
     padding: 10px 20px !important;
     font-size: larger;
     width: auto !important;
     backdrop-filter: blur(10px);
     transition: filter 0.4s ease, transform 0.4s ease;
 }
-.head-link-online:active,.head-link-desktop:active{
+.head-link-online{
+    padding: 10px 20px !important;
+    font-size: larger;
+    width: auto !important;
+    backdrop-filter: blur(10px);
+}
+.head-link-release,.head-link-snapshot{
+    transition: filter 0.4s ease, transform 0.4s ease;
+}
+.head-link-release:active,.head-link-snapshot:active{
     filter: blur(1px) brightness(0.8) !important;
     transform: scale(0.8) !important;
 }
-.head-link-online:hover,.head-link-desktop:hover{
+.head-link-release:hover,.head-link-snapshot:hover{
+    filter: brightness(1.2);
+    transform: scale(1.1);
+}
+.head-link-desktop:active{
+    filter: blur(1px) brightness(0.8) !important;
+    transform: scale(0.8) !important;
+}
+.head-link-desktop:hover{
     filter: brightness(1.2);
     transform: scale(1.1);
 }
@@ -438,9 +493,6 @@ button{
     margin-top: 20px;
     opacity: 0;
     animation: head-LogoText-in 5s cubic-bezier(0, 0, 0, 1) forwards 0.3s;
-}
-.download-video{
-    
 }
 
 @keyframes intro-show-text-in {
@@ -523,10 +575,18 @@ button{
     filter: brightness(0) invert(1);
 }
 
+[data-theme="light"] .download-btn-primary .download-btn-icon {
+    filter: none;
+}
+
 .download-btn-secondary img {
     width: 20px;
     height: 20px;
     filter: brightness(0) invert(1);
+}
+
+[data-theme="light"] .download-btn-secondary img {
+    filter: none;
 }
 
 .download-btn-secondary {
@@ -535,6 +595,12 @@ button{
     gap: 8px;
     width: 100%;
     margin-bottom: 10px;
+}
+
+.download-other-label {
+    font-size: 14px;
+    color: color-mix(in srgb, var(--text-color), transparent 50%);
+    margin-bottom: 8px;
 }
 
 /* Linux 发行版选择弹窗 */
@@ -618,6 +684,10 @@ button{
     width: 32px;
     height: 32px;
     filter: brightness(0) invert(1);
+}
+
+[data-theme="light"] .download-distro-btn img {
+    filter: none;
 }
 
 .download-distro-btn span {
@@ -710,7 +780,7 @@ button{
 }
 
 .introend {
-    color: #eee;
+    color: var(--footer-text);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: small;
 }
@@ -721,19 +791,19 @@ button{
 }
 
 .endby {
-    color: #eee;
+    color: var(--footer-text);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: x-large;
 }
 
 .link {
-    color: #eee;
+    color: var(--footer-text);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: x-large;
 }
 
 small {
-    color: #eee;
+    color: var(--footer-text);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     display: flex;
     justify-content: right;
@@ -750,12 +820,12 @@ small {
 }
 
 .footer {
-    background-color: #222;
+    background-color: var(--footer-bg);
     left: 0;
     bottom: 0;
     width: 100%;
     padding: 10px;
-    color: #eee;
+    color: var(--footer-text);
     display: flex;
     justify-content: center;
     position: relative;
@@ -767,11 +837,76 @@ small {
 .head-link-snapshot,.head-link-release{
     color: var(--text-color);
     padding: 6px;
-    border-radius: 0 0 5px 5px;
+    border-radius: 5px;
     margin: 0 0 0 10px;
     width: 70px;
     background-color: var(--theme-color);
     border: none;
     cursor: pointer;
     text-decoration: none;
+}
+
+
+::-webkit-scrollbar{
+    background-color: var(--scrollbar-bg);
+}
+::-webkit-scrollbar-thumb{
+    background-color: var(--scrollbar-thumb);
+}
+::-webkit-scrollbar-thumb:hover{
+    background-color: var(--scrollbar-thumb-hover);
+}
+::-webkit-scrollbar-thumb:active{
+    background-color: var(--scrollbar-thumb-active);
+}
+
+/* 主题切换按钮 */
+.theme-toggle {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.theme-toggle:hover {
+    color: var(--theme-color);
+}
+
+.theme-icon-light {
+    display: none;
+}
+
+[data-theme="light"] .theme-icon-dark {
+    display: none;
+}
+
+[data-theme="light"] .theme-icon-light {
+    display: block;
+}
+
+/* 语言切换按钮 */
+.lang-toggle {
+    background: transparent;
+    border: 1px solid var(--text-color);
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.lang-toggle:hover {
+    background: var(--theme-color);
+    border-color: var(--theme-color);
+    color: var(--text-color);
+}
+
+.lang-text {
+    min-width: 20px;
+    text-align: center;
 }
