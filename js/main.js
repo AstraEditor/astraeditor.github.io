@@ -706,8 +706,6 @@
                 const platform = btn.dataset.platform;
                 if (platform === 'linux') {
                     showLinuxDistroModal();
-                } else {
-                    alert(`即将下载 ${platform} 版本（功能开发中）`);
                 }
             });
         });
