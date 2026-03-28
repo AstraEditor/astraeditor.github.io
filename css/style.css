@@ -1,484 +1,709 @@
 :root {
-    background-color: #111;
-    font-family: 'Courier New', Courier, monospace;
+    --bg-color: #111;
+    --title-color: #222;
+    --button-color: #333;
+    --button-color-highLight: #444;
+    --text-color: #fafafa;
+    --transition-fast: 0.3s;
+    --theme-color: #0099ff;
 }
-::-webkit-scrollbar{
-    background-color: #111;
+
+html {
+    background-color: var(--bg-color);
+    display: flex;
+    font-family: Arial, Helvetica, sans-serif;
+    user-select: none;
 }
-::-webkit-scrollbar-thumb{
-    background-color: #666;
+
+body {
+    margin: 0;
+    width: 100vw;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
-::-webkit-scrollbar-thumb:hover{
-    background-color: #777;
+
+.titleBar {
+    background-color: var(--title-color);
+    width: calc(100% - 30px);
+    height: 60px;
+    display: flex;
+    align-items: center;
+    position: absolute;
+    justify-content: space-between;
+    padding: 0 15px;
+    z-index: 20;
 }
-::-webkit-scrollbar-thumb:active{
-    background-color: #555;
+
+.titleBar-Logo {
+    display: flex;
+    align-items: center;
 }
-/* 全局响应式设计规则 */
-* {
+
+.titleBar-LogoText {
+    color: var(--text-color);
+    margin-left: 7px;
+    width: 125px;
+}
+
+.titleBar-LogoImg {
+    width: 35px;
+    height: auto;
+}
+
+.titleBar-Tabs {
+    display: flex;
+    align-items: center;
+    position: relative;
+    flex-wrap: nowrap;
+    overflow: visible;
+}
+button{
+    color: var(--text-color);
+    padding: 6px;
+    border-radius: 5px;
+    margin: 0 5px;
+    width: 70px;
+    background-color: var(--button-color);
+    border: none;
+    cursor: pointer;
+}
+.titleBar-TabButton {
+    color: var(--text-color);
+    padding: 6px;
+    border-radius: 5px;
+    margin: 0 5px;
+    width: 70px;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.titleBar-TabButton:hover {
+    background-color: var(--button-color-highLight);
+}
+
+.titleBar-MoreContainer {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.titleBar-MoreButton {
+    display: none;
+    color: var(--text-color);
+    padding: 6px;
+    border-radius: 5px;
+    margin: 0 5px;
+    width: 40px;
+    height: 32px;
+    background-color: var(--button-color);
+    border: none;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--transition-fast);
+}
+
+.titleBar-MoreButton:hover {
+    background-color: var(--button-color-highLight);
+}
+
+.titleBar-MoreButton svg {
+    fill: currentColor;
+}
+
+.titleBar-MoreDropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: var(--title-color);
+    border-radius: 5px;
+    min-width: 120px;
+    z-index: 100;
+    padding: 5px 0;
+}
+
+.titleBar-MoreDropdown .titleBar-TabButton {
+    display: block;
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+    text-align: left;
+    padding: 8px 12px;
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.titleBar-MoreDropdown .titleBar-TabButton:last-child {
+    border-bottom: none;
+}
+
+.titleBar-MoreDropdown .titleBar-TabButton:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.content {
+    position: relative;
+    color: var(--text-color);
+    width: 100vw;
+    min-height: 100vh;
+    z-index: 1;
+}
+
+.head {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    perspective: 1000px;
+    flex-direction: column;
+    position: relative;
+}
+
+.head-BackgroundAE {
+    position: fixed;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%) translateY(-30%);
+    font-size: 900px;
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 3px rgba(255, 255, 255, 0.15);
+    text-stroke: 3px rgba(255, 255, 255, 0.15);
+    z-index: -1;
+    pointer-events: none;
+    font-family: Arial, Helvetica, sans-serif;
+    white-space: nowrap;
+    opacity: 0;
+}
+
+.head-BackgroundAE.transition-ready {
+    transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+}
+
+.head-BackgroundAE.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-75%);
+}
+
+.head-LogoText {
+    width: 702px;
+    animation: head-LogoText-in 5s cubic-bezier(0, 0, 0, 1) forwards;
+    transform-style: preserve-3d;
+    transform-origin: center center;
+    transition: transform var(--transition-fast) ease-out, opacity var(--transition-fast) ease;
+    position: relative;
+    z-index: 2;
+}
+
+.head-Title {
+    opacity: 0;
+    animation: head-LogoText-in 5s cubic-bezier(0, 0, 0, 1) forwards;
+    animation-delay: 0.2s;
+    transform-style: preserve-3d;
+    transform-origin: bottom center;
+    transition: opacity var(--transition-fast) ease;
+    z-index: 2;
+    margin-top: 20px;
+    font-size: large;
+    position: relative;
+}
+
+.intro-section, .download {
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    padding: 100px 50px;
     box-sizing: border-box;
 }
 
-img {
-    max-width: 100%;
-    height: auto;
-}
-.page-updateVersion{
-    font-weight: bolder;
-    font-size:xx-large;
-}
-.page-updateDate{
-    font-size:large;
-    color: #eeeeee88;
-}
-/* 蓝图背景效果 */
-body {
-    position: relative;
-    overflow-x: hidden;
-}
-
-.blueprint-bg {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -100;
-    background:
-        linear-gradient(90deg, #12181c11 10px, transparent 10px),
-        linear-gradient(#12181c11 10px, transparent 10px);
-    background-size: 50px 50px;
-    animation: blueprintMove 20s linear infinite;
-}
-
-@keyframes blueprintMove {
+@keyframes head-LogoText-in {
     0% {
-        background-position: 0 0;
+        opacity: 0;
+        transform: perspective(1000px) rotateX(90deg) translateY(140px);
+        filter: blur(5px);
     }
-
+    6% {
+        opacity: 0;
+    }
+    20% {
+        opacity: 1;
+        transform: perspective(1000px) rotateX(0deg);
+        filter: blur(0px);
+    }
     100% {
-        background-position: 50px 50px;
+        opacity: 1;
     }
 }
 
-/* 打字机效果 */
-.slogan {
-    color: #fff;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    font-size: 70px;
-    font-weight: bold;
-    text-shadow: 10px 10px 20px #111;
-    white-space: nowrap;
-    border-right: 3px solid #0099ff;
-    display: inline-block;
-    animation: blink-caret 0.75s step-end infinite;
-    width: 0;
+.images {
     overflow: hidden;
-    will-change: width;
-    transition: width 1.6s cubic-bezier(0.76, 0, 0.42, 0.99), border-right 0.3s ease;
-}
-
-.slogan span {
-    display: inline-block;
-}
-
-.slogan.typing-done {
-    border-right: none;
-}
-
-@keyframes blink-caret {
-    from,
-    to {
-        border-color: transparent
-    }
-    50% {
-        border-color: #0099ff
-    }
-}
-
-.tab {
+    position: absolute;
     display: flex;
-    position: fixed;
-    background-color: #222;
-    width: 100%;
-    margin: 0;
-    left: 0;
-    top: 0;
-    height: 50px;
-    padding: 10px 0;
-    justify-content: space-between;
-    z-index: 1000;
-    animation: slideDown 0.6s ease-out;
-}
-
-
-
-@keyframes slideDown {
-    from {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-/* 页面容器 */
-.page {
-    min-height: calc(100vh - 50px);
-    padding-top: 50px;
-    animation: fadeIn 0.4s ease-out;
-    width: 100%;
-    overflow-x: hidden; /* 防止水平滚动条 */
-}
-
-
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-
-}
-
-/* 页面标题 */
-.page-title {
-    color: #fff;
-    font-size: 48px;
-    font-weight: bold;
-    text-align: center;
-    margin: 60px 0 30px;
-    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-
-}
-
-.page-placeholder {
-    color: #aaa;
-    font-size: 24px;
-    text-align: center;
-    padding: 40px;
-}
-
-/* 日志页面 */
-.changelog-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-/* 下载页面 */
-.download-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-
-
-/* 仓库页面 */
-
-.repository-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-#tabLogo {
-    height: 40px;
-    margin-top: auto;
-    margin-bottom: auto;
-    margin-left: 30px;
-}
-
-.tabButtonTab {
-    margin-top: auto;
-    margin-bottom: auto;
-    margin-right: 40px;
-    height: 100%;
-}
-
-.tabButton {
-    background-color: #00000000;
-    color: #eee;
-    border: 0;
-    height: 100%;
-    width: 50px;
-    border-radius: 10px;
-    transition: background-color 0.3s ease;
-}
-
-.tabButton:hover {
-    background-color: #333;
-}
-
-.titleShow {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
     align-items: center;
-    text-align: center;
-    padding-top: 100px;
-    padding-bottom: 50px;
-    height: 1000px;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    animation: head-LogoText-in 5s cubic-bezier(0, 0, 0, 1) forwards;
+    animation-delay: 0.2s;
 }
 
-.LogoTitle {
-    margin-top: 160px;
-    width: 400px;
-    max-width: 90%;
-    height: auto;
-}
-
-
-
-.TitleShowPho {
+.images-title {
+    top: 140px;
+    position: absolute;
+    z-index: 0;
     width: 70%;
-    max-width: 100%;
-    height: auto;
-    position: relative;
-    left: 0;
-    transform: rotateX(10deg) translateZ(-20px);
     transform-style: preserve-3d;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-    transition: transform 0.1s ease-out, left 0.3s ease, width 0.3s ease, opacity 0.3s ease;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
-    border-radius: 12px;
+    transition: transform 0.1s ease-out;
     will-change: transform;
-    object-fit: contain;
 }
 
-.TitleShowPho:hover {
-    transform: rotateX(15deg) translateZ(-10px);
+.intro-title{
+    font-size: 64px;
+    font-weight: 900;
+    color: #fff;
+    display: inline-block;
+    position: relative;
+    padding: 0 8px;
 }
 
-.p3d {
-    z-index: -1;
+.intro-title::before {
+    content: '';
     position: absolute;
-    perspective: 1200px;
-    width: 80%;
-    max-width: 100%;
-    height: 600px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 200px;
-    transition: width 0.3s ease, padding-top 0.6s ease;
-}
-
-.titleF {
-    color: #eee;
-    display: flex;
-    justify-content: right;
-    font-size: xx-large;
-    font-weight: bold;
-    margin-right: 40px;
-}
-
-.titleFintor {
-    color: #eee;
-    display: flex;
-    justify-content: right;
-    font-size: large;
-    margin-right: 80px;
-}
-
-.features {
-    height: 800px;
-}
-
-.backgroundF {
-    background-color: #00000055;
-    z-index: -10;
+    top: 0;
+    left: 0;
     width: 100%;
-    height: 880px;
-    margin-top: -80px;
-    position: absolute;
-}
-
-.featureCards {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    margin-top: 50px;
-    padding: 0 40px;
-    position: relative;
-}
-
-.featureCard {
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
-    background-color: #222;
-    border-radius: 15px;
-    padding: 30px;
-    width: 30%;
-    height: 10px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: flex-end;
-    transition: all 0.3s ease;
-    cursor: pointer;
-    overflow: hidden;
-    position: relative;
-    margin-bottom: 10px;
-    word-wrap: break-word; /* 防止文字溢出 */
-    word-break: break-word; /* 防止长单词溢出 */
-}
-
-.featureCard:hover {
-    width: 30%;
-    height: 200px;
-    transform: translateY(-10px);
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
-    background-color: #2a2a2a;
-    z-index: 10;
-}
-
-.featureTitle {
-    color: #eee;
-    font-size: large;
-    font-weight: bold;
-    transition: all 0.3s ease;
-    z-index: 1;
-    text-align: right;
-    position: absolute;
-    right: 30px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.featureCard:hover .featureTitle {
-    top: 20px;
-    transform: translateY(0);
-}
-
-.featureDesc {
-    color: #aaa;
-    font-size: medium;
-    text-align: left;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: all 0.3s ease;
-    margin-top: 20px;
+    height: 100%;
+    background-color: #fff;
+    mix-blend-mode: difference;
+    transform: translateZ(0) scaleX(0);
+    transform-origin: left center;
+    will-change: transform;
     pointer-events: none;
 }
 
-.featureCard:hover .featureDesc {
+.intro-title.animate::before {
+    animation: highlight-reveal 1.5s cubic-bezier(0, 0, 0, 1) forwards;
+}
+
+.intro-text{
+    display: flex;
+    flex-direction: column;
+    transform: translateX(-30px);
+    opacity: 0;
+}
+
+.intro-text.animate {
+    animation: intro-text-in 1.5s cubic-bezier(0, 0, 0, 1) forwards;
+}
+
+.intro-intro{
+    font-size: large;
+    margin-top: 1rem;
+}
+
+.intro-show-video{
+    width: 60vw;
+    opacity: 0;
+}
+
+@keyframes intro-text-in {
+    from{
+        transform: translateX(-30px);
+        opacity: 0;
+    }
+    to{
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+@keyframes highlight-reveal {
+    to {
+        transform: translateZ(0) scaleX(1);
+    }
+}
+
+
+.intro-show{
+    position: relative;
+    width: 60vw;
+}
+
+.intro-show-videos{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    width: 100%;
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    transform: translateX(50px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    pointer-events: none;
+}
+
+.intro-show-videos.active{
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
+    height: auto;
+    overflow: visible;
     pointer-events: auto;
 }
 
-.OnlineButton,
-.DesktopButton {
-    width: 120px;
-    border: 0;
-    height: 40px;
-    font-size: large;
-    margin: 10px;
-    margin-top: 20px;
-    border-radius: 10px;
-    transition: filter 0.3s ease;
-    min-height: 44px; /* 确保触摸目标足够大 */
+.intro-show-videos.exit{
+    opacity: 0;
+    transform: translateX(-50px);
+    height: 0;
 }
 
-.OnlineButton {
-    background-color: #0099ff;
-    color: #eee;
+.intro-show-text{
+    font-weight: 900;
+    font-size: x-large;
+    margin-top: -60px;
+    margin-right: 20px;
+    text-shadow: 0px 0px 5px #111;
+}
+.intro-show-text.animate {
+    animation: intro-show-text-in 1.5s cubic-bezier(0, 0, 0, 1) forwards;
+}
+.intro-show-video.animate {
+    animation: intro-show-text-in 1.5s cubic-bezier(0, 0, 0, 1) forwards 0.2s;
 }
 
-.OnlineButton:hover,
-.DesktopButton:hover {
-    filter: brightness(1.2);
-}
-
-.OnlineButton:active,
-.DesktopButton:active {
-    filter: brightness(0.8);
-}
-
-.DesktopButton {
-    background-color: #111;
-    color: #eee;
-}
-.page-updateList{
-    color: #eee;
-}
-.Update {
-    margin-top: 200px;
-    margin-bottom: 500px;
-}
-
-.updateT {
-    color: #eee;
+.function{
     display: flex;
-    justify-content: center;
-    font-size: xx-large;
-    font-weight: bold;
+    min-height: 100vh;
 }
-
-.updateTIn {
-    color: #eee;
-    display: flex;
-    justify-content: center;
-    font-size: large;
+.download-title-small, .download-title{
+    transition: all 0.5s cubic-bezier(0, 0, 0, 1);
 }
-
-.UpdateC {
+.download-title{
+    font-size: 128px;
+    font-weight: 900;
+    color: var(--text-color);
+    display: inline-block;
     position: relative;
-    background-color: #000000bb;
-    border-radius: 10px;
-    color: #eee;
-    justify-content: center;
-    width: 60%;
-    margin: 20px auto;
-    padding-top: 10px;
-    padding-bottom: 10px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 0 8px;
+    opacity: 0;
 }
-.updatelist{
-    margin: 0 30px;
+.download-title-small{
+    font-size: 64px;
+    font-weight: 900;
+    color: var(--text-color);
+    display: inline-block;
+    position: relative;
+    padding: 0 8px;
 }
-.ubgd {
-    width: 100%;
-    margin: 30px auto;
-    display: flex;
+.download{
     justify-content: center;
-    position: absolute;
-    z-index: -1;
+    text-align: center;
+    flex-direction: column;
 }
 
-.ubg {
-    width: auto;
+.head-titles{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.head-link-online,.head-link-desktop{
+    padding: 10px 20px !important;
+    font-size: larger;
+    width: auto !important;
+    backdrop-filter: blur(10px);
+    transition: filter 0.4s ease, transform 0.4s ease;
+}
+.head-link-online:active,.head-link-desktop:active{
+    filter: blur(1px) brightness(0.8) !important;
+    transform: scale(0.8) !important;
+}
+.head-link-online:hover,.head-link-desktop:hover{
+    filter: brightness(1.2);
+    transform: scale(1.1);
+}
+.head-link-online{
+    background-color: color-mix(in srgb, var(--theme-color), transparent 10%);
+}
+.head-link-desktop{
+    background-color: color-mix(in srgb, var(--button-color), transparent 10%);
+}
+.head-link{
+    margin-top: 20px;
+    opacity: 0;
+    animation: head-LogoText-in 5s cubic-bezier(0, 0, 0, 1) forwards 0.3s;
+}
+.download-video{
+    
+}
+
+@keyframes intro-show-text-in {
+    from{
+        transform: translateX(30px);
+        opacity: 0;
+    }
+    to{
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+@media screen and (max-width: 768px) {
+    .titleBar-LogoText {
+        font-size: 18px;
+    }
+
+    .titleBar-LogoImg {
+        width: 30px;
+    }
+
+    .titleBar-TabButton {
+        width: 70px;
+        padding: 4px;
+        font-size: 14px;
+    }
+
+    .images{
+        top: 200px !important;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .titleBar {
+        height: 50px;
+    }
+
+    .titleBar-LogoText {
+        font-size: 16px;
+    }
+
+    .titleBar-LogoImg {
+        width: 25px;
+    }
+
+    .titleBar-TabButton {
+        width: 70px;
+        padding: 3px;
+        font-size: 13px;
+        margin: 0 3px;
+    }
+
+    .images{
+        top: 200px !important;
+    }
+}
+
+/* 下载按钮样式 */
+.download-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin-top: 20px;
+}
+.download-btn-primary{
+    width: 300px;
+    height: 100px;
+    font-size: x-large;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+}
+
+/* 下载按钮图标 */
+.download-btn-primary .download-btn-icon {
+    width: 48px;
+    height: 48px;
+    filter: brightness(0) invert(1);
+}
+
+.download-btn-secondary img {
+    width: 20px;
+    height: 20px;
+    filter: brightness(0) invert(1);
+}
+
+.download-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+/* Linux 发行版选择弹窗 */
+.download-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
     height: 100%;
-    margin-top: -200px;
-    filter: blur(2px);
-    opacity: 0.8;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.download-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.download-modal-content {
+    position: relative;
+    background: var(--title-color);
+    border: 1px solid var(--button-color);
+    border-radius: 8px;
+    padding: 24px;
+    width: 300px;
+}
+
+.download-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.download-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 10px !important;
+    line-height: 1;
+}
+
+.download-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.download-distro-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--button-color);
+    border: 1px solid var(--button-color);
+    border-radius: 8px;
+    color: var(--text-color);
+    font-size: 16px;
+    width: 90% !important;
+    cursor: pointer;
+}
+
+.download-distro-btn:hover {
+    background: var(--button-color-highLight);
+    border-color: var(--text-color);
+}
+
+.download-distro-btn img {
+    width: 32px;
+    height: 32px;
+    filter: brightness(0) invert(1);
+}
+
+.download-distro-btn span {
+    font-weight: 500;
+}
+
+.changelog {
+    padding: 60px 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.changelog-titles {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.changelog-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-bottom: 8px;
+}
+
+.changelog-intro {
+    font-size: 16px;
+    color: color-mix(in srgb, var(--text-color), transparent 40%);
+}
+
+.changelog-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.changelog-item {
+    padding: 20px;
+}
+
+.changelog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--button-color);
+}
+
+.changelog-version {
+    font-size: 64px;
+}
+
+.changelog-date {
+    font-size: 14px;
+    color: color-mix(in srgb, var(--text-color), transparent 50%);
+}
+
+.changelog-notes {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-color);
+    line-height: 1.8;
+}
+
+.changelog-notes li {
+    margin-bottom: 8px;
+}
+
+.changelog-error,
+.changelog-empty {
+    text-align: center;
+    padding: 40px;
+    color: color-mix(in srgb, var(--text-color), transparent 50%);
 }
 
 .end {
     padding: 60px;
     margin: 0;
     margin-top: 100px;
-    background-color: #222;
+    background-color: var(--title-color);
     left: 0;
-    width: 100%;
     min-height: 100px;
     top: 0;
+    z-index: 2;
+    position: relative;
 }
-
-body {
-    margin: 0 !important;
-}
-
 .endlogo {
     width: 200px;
     height: auto;
@@ -490,7 +715,7 @@ body {
     font-size: small;
 }
 
-.end {
+.end{
     display: flex;
     justify-content: space-between;
 }
@@ -533,376 +758,20 @@ small {
     color: #eee;
     display: flex;
     justify-content: center;
+    position: relative;
+    z-index: 2;
 }
 .footerT{
     font-size: small;
 }
-
-@media (max-width: 1200px) {
-    .LogoTitle {
-        width: 300px;
-    }
-
-    .featureCard {
-        width: 40%;
-    }
-
-    .featureCard:hover {
-        width: 40%;
-    }
-}
-
-@media (max-width: 1024px) {
-    .LogoTitle {
-        width: 250px;
-    }
-
-    .slogan {
-        font-size: 50px;
-    }
-
-    .featureCards {
-        padding: 0 20px;
-    }
-
-    .featureCard {
-        width: 45%;
-    }
-
-    .featureCard:hover {
-        width: 45%;
-    }
-
-    .titleF {
-        font-size: x-large;
-        margin-right: 20px;
-    }
-
-    .titleFintor {
-        margin-right: 40px;
-    }
-
-    .updateTL {
-        margin-left: 30%;
-        margin-right: 30%;
-    }
-}
-
-@media (max-width: 768px) {
-    #tabLogo {
-        height: 30px;
-        margin-top: auto;
-        margin-bottom: auto;
-        margin-left: 20px;
-    }
-
-    .tabButtonTab {
-        margin-right: 20px;
-    }
-
-    .tabButton {
-        width: auto;
-        min-width: 60px;
-        font-size: 14px;
-        padding: 0 8px;
-    }
-    //Fuck 换行给我等着
-    .slogan {
-        font-size: 36px;
-        width: 100%;
-        text-align: center;
-        margin: 20px 0;
-        word-wrap: break-word;
-    }
-
-    .slogan span {
-        display: inline-block;
-    }
-
-    .LogoTitle {
-        width: 200px;
-        margin-top: 100px;
-    }
-
-    .p3d {
-        width: 90%;
-        margin-top: 100px;
-        height: 400px;
-    }
-
-    .TitleShowPho {
-        width: 100%;
-        height: auto;
-    }
-
-    .titleShow {
-        padding-top: 50px;
-        height: 700px;
-    }
-
-    .OnlineButton,
-    .DesktopButton {
-        width: 100px;
-        font-size: 16px;
-    }
-
-    .features {
-        height: auto;
-        min-height: 600px;
-    }
-
-    .backgroundF {
-        height: 700px;
-        margin-top: -40px;
-    }
-
-    .featureCards {
-        align-items: center;
-    }
-
-    .featureCard {
-        width: 80%;
-        margin: 10px 0;
-    }
-
-    .featureCard:hover {
-        width: 80%;
-        height: auto;
-        min-height: 200px;
-    }
-
-    .featureTitle {
-        transform: none;
-        text-align: center;
-        top: 20px;
-    }
-
-    .featureCard:hover .featureTitle {
-        position: static;
-        top: auto;
-        transform: none;
-    }
-
-    .featureDesc {
-        text-align: center;
-        padding: 0 10px;
-    }
-
-    .titleF {
-        font-size: large;
-        justify-content: center;
-        margin-right: 0;
-    }
-
-    .titleFintor {
-        font-size: medium;
-        justify-content: center;
-        margin-right: 0;
-    }
-
-    .Update {
-        margin-top: 100px;
-        height: auto;
-        min-height: 500px;
-    }
-
-    .updateT {
-        font-size: x-large;
-    }
-
-    .updateTIn {
-        font-size: medium;
-    }
-
-    .updateTL {
-        margin-left: 10%;
-        margin-right: 10%;
-    }
-
-    .ubg {
-        width: 100%;
-        height: auto;
-        max-height: 400px;
-        margin-top: -100px;
-    }
-
-    .end {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        height: auto;
-        padding: 40px 20px;
-    }
-
-    .endlogo {
-        width: 150px;
-    }
-
-    .link {
-        margin-top: 20px;
-    }
-
-    small {
-        justify-content: center;
-        margin-right: 0;
-    }
-}
-
-@media (max-width: 480px) {
-    .tab {
-        padding: 5px 0;
-        height: 45px;
-    }
-
-    .tabButtonTab {
-        margin-right: 10px;
-    }
-
-    .tabButton {
-        min-width: 50px;
-        font-size: 12px;
-        padding: 0 5px;
-        width: auto;
-    }
-
-    .slogan {
-        font-size: 24px;
-        line-height: 1.4;
-        text-shadow: 5px 5px 10px #111; /* 在小屏幕上减小阴影 */
-    }
-
-    .LogoTitle {
-        width: 150px;
-        margin-top: 60px;
-    }
-
-    .p3d {
-        margin-top: 80px;
-        height: 300px;
-    }
-
-    .titleShow {
-        padding-top: 30px;
-        height: 600px;
-        padding-bottom: 20px;
-    }
-
-    .OnlineButton,
-    .DesktopButton {
-        width: 120px;
-        height: 35px;
-        font-size: 14px;
-        margin: 5px;
-    }
-
-    .featureCard {
-        width: 90%;
-        padding: 20px;
-    }
-
-    .featureCard:hover {
-        width: 90%;
-        height: auto;
-        min-height: 150px;
-    }
-
-    .titleF {
-        font-size: medium;
-        padding: 0 10px;
-    }
-
-    .titleFintor {
-        font-size: small;
-        padding: 0 10px;
-    }
-
-    .backgroundF {
-        height: 600px;
-        margin-top: -20px;
-    }
-
-    .features {
-        min-height: 500px;
-    }
-
-    .page-title {
-        font-size: 28px; /* 进一步减小标题字体 */
-        margin: 40px 0 20px;
-        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-    }
-
-    .page-placeholder {
-        font-size: 18px;
-        padding: 20px;
-    }
-
-    .updateT {
-        font-size: large;
-    }
-
-    .updateTIn {
-        font-size: small;
-    }
-
-    .updateTL {
-        margin-left: 5%;
-        margin-right: 5%;
-        font-size: 14px;
-        padding-top: 5px;
-        padding-bottom: 5px;
-    }
-
-    .ubg {
-        margin-top: -80px;
-    }
-
-    .end {
-        padding: 30px 15px;
-    }
-
-    .endlogo {
-        width: 120px;
-    }
-
-    .endby {
-        font-size: medium;
-    }
-
-    .link {
-        font-size: medium;
-    }
-
-    .introend {
-        font-size: 11px; /* 进一步减小文字 */
-        line-height: 1.5;
-    }
-
-    .footerT {
-        font-size: 9px; /* 进一步减小 */
-    }
-}
-
-/* 超小屏幕优化 */
-@media (max-width: 320px) {
-    .slogan {
-        font-size: 20px;
-    }
-    
-    .LogoTitle {
-        width: 120px;
-    }
-    
-    .OnlineButton,
-    .DesktopButton {
-        width: 100px;
-        font-size: 12px;
-    }
-    
-    .featureCard {
-        width: 95%;
-    }
-    
-    .featureCard:hover {
-        width: 95%;
-    }
+.head-link-snapshot,.head-link-release{
+    color: var(--text-color);
+    padding: 6px;
+    border-radius: 0 0 5px 5px;
+    margin: 0 0 0 10px;
+    width: 70px;
+    background-color: var(--theme-color);
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
 }

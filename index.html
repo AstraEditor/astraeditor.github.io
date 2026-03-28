@@ -1,328 +1,133 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta charset="utf-8">
 	<title>AstraEditor - 实用无上限</title>
-	<link rel="stylesheet" href="css/style.css">
-	<link rel="icon" href="./Logo.png" type="image/x-icon">
+	<link rel="icon" href="./favicon.ico">
+	<link rel="stylesheet" href="./css/style.css">
 </head>
 
 <body>
-	<div class="blueprint-bg"></div>
-	<div class="tab">
-		<img src="./fulllogo.png" alt="logo" id="tabLogo">
-		<div class="tabButtonTab">
-			<button type="button" class="tabButton" data-page="home">首页</button>
-			<button type="button" class="tabButton" data-page="changelog">日志</button>
-			<!--data-page="download"-->
-			<button type="button" class="tabButton" onclick="onlinkDesktop()">下载</button>
-			<!--data-page="repository" -->
-			<button type="button" class="tabButton" onclick="onlinkO()">仓库</button>
-		</div>
-	</div>
-	<div class="content">
-		<!-- 首页 -->
-		<div class="page" id="page-home" data-page="home">
-			<div class="titleShow">
-				<img src="./fulllogo.png" alt="errorImageLoad" class="LogoTitle"></img><br />
-				<span class="slogan">锤子，而不是玫瑰。</span>
-				<div class="p3d">
-					<img src="./show.jpeg" alt="errorImageLoad" class="TitleShowPho">
-				</div>
-				<div>
-					<script>
-						function onlinkLink() {
-							window.location.href = './online/editor.html'
-						}
-						function onlinkDesktop() {
-							window.location.href = 'https://github.com/AstraEditor/Desktop/releases'
-						}
-						function onlinkO() {
-							window.location.href = 'https://github.com/AstraEditor'
-						}
-					</script>
-					<button type="button" class="OnlineButton" onclick="onlinkLink()">在线使用</button>
-					<button type="button" class="DesktopButton" onclick="onlinkDesktop()">下载桌面端</button>
-				</div>
+	<main>
+		<div class="titleBar">
+			<div class="titleBar-Logo">
+				<img class="titleBar-LogoImg" src="./images/logo-white.svg" alt="">
+				<img class="titleBar-LogoText" src="./images/Text.svg" alt="AstraEditor">
 			</div>
-
-			<div class="features">
-				<div class="backgroundF"></div>
-				<span class="titleF">我们更好的TurboWarp二创编辑器。</span>
-				<span class="titleFintor">AstraEditor 为TurboWarp增加了更多不曾有的新功能</span>
-
-				<div class="featureCards">
-					<div class="featureCard" id="readme">
-						<div class="featureTitle">README</div>
-						<div class="featureDesc">
-							<p>
-								你可以在一个新注释内以“#README”开头，并也可通过以空格为分割追加“#[标题]”
-								来控制README窗口显示的标题。添加成功后，上方会自动出现一个“README”按钮。
-								<br><br>
-								你还可以将角色名改为“README”，AstraEditor可在加载项目后自动跳出这个角色的README
-							</p>
-						</div>
-					</div>
-					<div class="featureCard" id="ext">
-						<div class="featureTitle">扩展管理器</div>
-						<div class="featureDesc">
-							<p>
-								它可以显示现在已加载的所有扩展，并可以进行“预览” “删除” “导出”操作。<br>
-								预览——你将可以查看这个扩展包含的积木，这在“加载自定义扩展”内同样拥有。<br>
-								删除——你可以删除这个扩展，若作品使用了这个扩展，它会警告您是否删除，若同意，它会删除掉所有使用扩展的积木并删除扩展。<br>
-								导出——你可以导出这个扩展，以便在别的项目使用。<br>
-							</p>
-						</div>
-					</div>
-					<div class="featureCard" id="flyout">
-						<div class="featureTitle">Flyout</div>
-						<div class="featureDesc">
-							<p>
-								如果扩展的积木过长，让你感到困惑，你可以拖动flyout的边缘修改它的宽度<br>
-							</p>
-						</div>
-					</div>
-					<div class="featureCard" id="theme">
-						<div class="featureTitle">主题色</div>
-						<div class="featureDesc">
-							<p>
-								是否厌烦了那几个预设的颜色，想使用自己喜欢的颜色？
-								此功能可以满足你的需求！
-							</p>
-						</div>
-					</div>
-					<div class="featureCard" id="addon">
-						<div class="featureTitle">更多插件</div>
-						<div class="featureDesc">
-							<p>
-								我们制作了更多插件，来优化您的使用体验。
-							</p>
-						</div>
-					</div>
-				</div>
-			</div>
-			<div class="Update">
-				<div class="ubgd">
-					<img src="./updatelist.jpeg" alt="updateBG" class="ubg">
-				</div>
-				<div class="UpdateC">
-					<span class="updateT">更新进行时</span>
-					<span class="updateTIn">AstraEditor在持续更新，未来将会加入更多功能。<!-- <br />我们暂不透露未来的更新计划。以下是我们为TurboWarp增加的新功能： -->
-					</span>
-					<!-- <pre class="updatelist">
-插件：
-    [/] 调试器（含新标签页）
-            |- 改为可拉伸
-            |- 增加“变量”标签页
-            |- 适配主题色
-    [+] MD注释编辑器
-    [+] SPA简易作品分析器
-    [+] 隐藏工具栏
-    [+] 显示FPS
-    [+] 拖动调整工具箱分类(来自PMOD)
-    [+] 固定积木(来自PMOD)
-功能：
-    [+] 自定义主题色
-    [+] README注释显示
-    [+] 扩展编辑器
-            |- 积木预览
-            |- 实时加载
-    [+] 扩展管理器
-            |- 删除扩展
-            |    |- 删除作品里的扩展积木
-            |- 预览扩展
-            |- 导出扩展
-    [+] 跳过自定义扩展警告
-    [+] 工具
-         |- 导出项目图片
-                |- 转换格式为PNG
-    [+] VSCODE 布局
-    [+] 打开非Scratch官网项目URL
-    [/] 造型编辑
-           |- 扩展边界
-           |- 布尔运算
-           |    |- 结合
-           |    |- 相交
-           |    |- 剪除
-           |    |- 拆分
-           |- 圆角矩形
-           |    |- 修改半径
-           |-拖拽体验
-    [+] 隐藏的积木
-           |- ForEach
-           |- 计数器
-           |- 当该角色遇到xxx
-    [+] 错误积木
-    [/] 让更多积木值可显示在舞台上
-           |- 碰到xxx
-           |- 碰到颜色xxx
-           |- 颜色xxx碰到颜色xxx
-           |- 到xxx的距离
-           |- 按下xx键
-    [/] 让显示在舞台上的积木值的背景颜色跟随亮暗模式改变
-    [/] 跟进TW增加“在线”积木
-    [/] 为“在作品中保留设置”的文本加入翻译
-    [/] 可拉伸的 Flyout
-修复：
-    自定义扩展的TextArea编码问题
-
-
-					</pre> -->
-				</div>
-				<!-- <ul class="updateTL">
-					<li>作品分析</li>
-					<li>更棒的造型编辑</li>
-					<li>更棒的声音编辑</li>
-					<li>渲染优化</li>
-					<li>造型声音的拖拽</li>
-					<li>联机？</li>
-				</ul> -->
-
-			</div>
-		</div>
-
-		<!-- 日志页面 -->
-		<div class="page" id="page-changelog" data-page="changelog" style="display: none;">
-			<div class="changelog-container">
-				<h1 class="page-title">更新日志</h1>
-				<div class="page-updateList">
-					<div>
-						<div class="page-updateVersion">v1.1.3</div>
-						<div class="page-updateDate">2026/2/24</div>
-						<ul>
-							<li>调整“隐藏工具栏”插件的触发面积并改为默认禁用</li>
-							<li>修改“调试器”中收藏功能的图标</li>
-							<li>增加“AstraEditor特性”和“基础设置”</li>
-							<li>修复部分情况下的主题色错误</li>
-							<li>修复 AstraEditor 的默认设置为“undefined”的错误</li>
-							<li>修复对于过老版本的更新链接还是TurboWarp的问题</li>
-							<li>修复“循环计时器”默认关闭的问题</li>
-							<li>为README功能增加显示HTML支持，这需要启用“启用HTML支持”设置</li>
-							<li>修复关于布尔运算的一些问题</li>
-							<li>让扩展库加载失败的时候也能显示其它的扩展库</li>
-							<li>增加“AstraEditor”扩展库按钮</li>
-							<li>删除“扩展编辑器”功能，我们计划重新制作它</li>
-							<li>优化扩展删除&加载</li>
-							<li>来自AE扩展库的部分扩展可以显示扩展图了</li>
-
-						</ul>
-					</div>
-					<div>
-						<div class="page-updateVersion">v1.1.2</div>
-						<div class="page-updateDate">2026/2/14</div>
-						<ul>
-							<li>修改部分功能的观感</li>
-							<li>修改CSP让桌面端能正确获取更新</li>
-							<li>修复画板会错误的拉伸问题</li>
-							<li>修复隐藏菜单栏插件不能正确更新blockly积木区</li>
-							<li>优化扩展编辑器</li>
-							<li>增加“Astras Copilot”插件（测试中）</li>
-							<li>同步更新扩展</li>
-							<li>修复积木拖动时的的图层问题</li>
-						</ul>
-					</div>
-					<div>
-						<div class="page-updateVersion">v1.1.1</div>
-						<div class="page-updateDate">2026/2/14</div>
-						<ul>Aur测试</ul>
-					</div>
-					<div>
-						<div class="page-updateVersion">v1.1.0</div>
-						<div class="page-updateDate">2026/2/13</div>
-						<ul>
-							<li>将桌面版的来自AstraEditor扩展库的扩展改为离线缓存</li>
-							<li>修改导出插件设置的文件名</li>
-							<li>修改扩展编辑器的模板开头</li>
-							<li>修改Windows安装程序的完成侧边图</li>
-							<li>修正MacOS应用体验</li>
-							<li>修复扩展管理器的“+”图标可以被选中的问题</li>
-							<li>修复搜索栏可能会消失的问题</li>
-							<li>增加“自制积木+”插件</li>
-							<li>在扩展管理器增加总加载扩展数</li>
-							<li>在扩展管理器增加自定义扩展入口</li>
-							<li>在画板加了一个角度指示器告诉你旋转了多少度</li>
-							<li>翻转手机布局的界面位置</li>
-							<li>优化画板的布尔运算</li>
-							<li>现在加载项目不会保留上一个项目的设置了！（我们不打算移除扩展，因为这可以用于更新扩展）</li>
-							<li>优化“隐藏菜单栏”插件</li>
-							<li>优化VSCODE界面的样式</li>
-							<li>修复一些问题</li>
-						</ul>
-
-					</div>
-					<div>
-						<div class="page-updateVersion">v1.0.1</div>
-						<div class="page-updateDate">2026/2/9</div>
-						<ul>
-							<li>修复关于扩展编辑器资源丢失的问题</li>
-							<li> 修复“上传扩展”无法打开的问题</li>
-							<li> 修正部分情况下关于界面的翻译问题</li>
-						</ul>
-					</div>
-					<div>
-						<div class="page-updateVersion">v1.0.0</div>
-						<div class="page-updateDate">2026/2/8</div>
-						<ul>
-							<li>自定义主题颜色</li>
-							<li> 完整可用的“README”功能</li>
-							<li> 制作“AstraEditor Settings”（管理新功能）</li>
-							<li> 制作“一次性同意自定义扩展请求”</li>
-							<li> 修复“自定义扩展的TextArea编码问题”</li>
-							<li> 优化“积木错误的举措”</li>
-							<li> 修复插件"整理＋"（开发者工具）的翻译缺失</li>
-							<li> “扩展管理器”＆扩展预览</li>
-							<li> 修改默认项目 (随机的Title！)</li>
-							<li> 更多新插件：调试器（含新标签页）、MD注释编辑器、SPA简易作品分析器、隐藏工具栏、显示FPS、拖动调整工具箱分类(来自PMOD)、固定积木(来自PMOD)</li>
-							<li> 隐藏的积木</li>
-							<li> 错误积木</li>
-							<li> 让更多积木值可显示在舞台上</li>
-							<li> 让显示在舞台上的积木值的背景颜色跟随亮暗模式改变</li>
-							<li> 为“在作品中保留设置”的文本加入翻译</li>
-							<li> 可拉伸的 Flyout</li>
-							<li> 造型编辑-布尔运算</li>
-						</ul>
-					</div>
+			<div class="titleBar-Tabs">
+				<button class="titleBar-TabButton">下载</button>
+				<button class="titleBar-TabButton" id="update">更新日志</button>
+				<button class="titleBar-TabButton" id="repo">仓库</button>
+				<button class="titleBar-TabButton" id="report">反馈</button>
+				<script>
+					document.querySelector('#repo').addEventListener('click', () => {
+						window.open('https://github.com/AstraEditor', '_blank');
+					});
+					document.querySelector('#report').addEventListener('click', () => {
+						window.open('https://github.com/AstraEditor/scratch-gui/issues/new', '_blank');
+					});
+				</script>
+				<div class="titleBar-MoreContainer">
+					<button class="titleBar-MoreButton" aria-label="更多选项">
+						<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+							<circle cx="8" cy="3" r="1.5"></circle>
+							<circle cx="8" cy="8" r="1.5"></circle>
+							<circle cx="8" cy="13" r="1.5"></circle>
+						</svg>
+					</button>
+					<div class="titleBar-MoreDropdown"></div>
 				</div>
 			</div>
 		</div>
 
-		<!-- 下载页面 -->
-		<div class="page" id="page-download" data-page="download" style="display: none;">
-			<div class="download-container">
-				<h1 class="page-title">下载</h1>
-				<p class="page-placeholder">下载内容待添加...</p>
+		<div class="content">
+			<div class="images">
+				<img class="images-title" src="./images/show.png" alt="">
 			</div>
+			<section class="head">
+				<div class="head-titles">
+					<img class="head-LogoText" src="./images/Text.svg" alt="AstraEditor">
+					<span class="head-Title">锤子, 而不是花束</span>
+				</div>
+				<div class="head-link">
+					<button class="head-link-online">在线体验
+						<a class="head-link-release" href="./online/index.html">快照版
+						</a>
+						<a class="head-link-snapshot" href="./snapshot/index.html">快照版
+						</a>
+					</button>
+					<button class="head-link-desktop">获取桌面端</button><br>
+				</div>
+			</section>
+			<section class="intro-section">
+				<div class="intro-text">
+					<span class="intro-title">闪电般迅速</span>
+					<span class="intro-intro">AstraEditor 加入了更多功能, 使您的编程速度"快如闪电"</span>
+				</div>
+				<div class="intro-show">
+					<div class="intro-show-videos" id="paint">
+						<video class="intro-show-video" src="./images/paint.webm" muted>PAINT SHOW VIDEO</video>
+						<span class="intro-show-text">更好的造型编辑器</span>
+					</div>
+					<div class="intro-show-videos" id="addons">
+						<video class="intro-show-video" src="./images/addons.webm" muted>PAINT SHOW VIDEO</video>
+						<span class="intro-show-text">更多插件</span>
+					</div>
+					<div class="intro-show-videos" id="custom">
+						<video class="intro-show-video" src="./images/custom.webm" muted>PAINT SHOW VIDEO</video>
+						<span class="intro-show-text">自定义主题</span>
+					</div>
+				</div>
+			</section>
+			<section class="download">
+				<div class="download-titles">
+					<div class="download-title">为你而生</div>
+					<div class="download-intro">即刻下载 AstraEditor</div>
+				</div>
+				<div class="download-button"></div>
+			</section>
+			<section class="changelog">
+				<div class="changelog-titles">
+					<div class="changelog-title">更新日志</div>
+					<div class="changelog-intro">查看 AstraEditor 的最新变化</div>
+				</div>
+				<div class="changelog-content"></div>
+			</section>
+
+			<div class="head-BackgroundAE">Æ</div>
 		</div>
 
-	</div>
-	<div class="end">
-		<div>
-			<img src="./fulllogo.png" alt="updateBG" class="endlogo"><br>
-			<span class="endby">来自 AstraEditor 项目组</span><br>
-			<span class="introend">
-				本项目基于 TurboWarp 构建，但与 TurboWarp 项目组无关系。<br>
-				所有更新的功能均为自制，如有雷同，纯属巧合
+		<div class="end">
+			<div>
+				<div class="titleBar-Logo">
+					<img class="titleBar-LogoImg" src="./images/logo-white.svg" alt="">
+					<img class="titleBar-LogoText" src="./images/Text.svg" alt="AstraEditor">
+				</div><br>
+				<span class="endby">来自 AstraEditor 项目组</span><br>
+				<span class="introend">
+					本项目基于 TurboWarp 构建，但与 TurboWarp 项目组无关系。<br>
+					所有更新的功能均为自制，如有雷同，纯属巧合
 
-			</span>
-		</div>
-		<div>
-			<span class="link">更多链接</span><br>
-			<div style="display: flex;margin: 10px;">
-				<a class="iconLinkB" href="https://space.bilibili.com/3691007061264515">
-					<img class="iconLink" src="./bilibili.svg" alt="bilibili">
-				</a>
-				<a class="iconLinkB" href="https://qm.qq.com/q/ynYzV85oHY">
-					<img class="iconLink" src="./qq.png" alt="qq">
-				</a>
+				</span>
+			</div>
+			<div>
+				<span class="link">更多链接</span><br>
+				<div style="display: flex;margin: 10px;">
+					<a class="iconLinkB" href="https://space.bilibili.com/3691007061264515">
+						<img class="iconLink" src="./bilibili.svg" alt="bilibili">
+					</a>
+					<a class="iconLinkB" href="https://qm.qq.com/q/ynYzV85oHY">
+						<img class="iconLink" src="./qq.png" alt="qq">
+					</a>
+				</div>
 			</div>
 		</div>
-	</div>
-	<footer class="footer">
-		<span class="footerT">©2026 AstraEditor项目组。保留所有权利。</span>
-	</footer>
+		<footer class="footer">
+			<span class="footerT">©2026 AstraEditor项目组。保留所有权利。</span>
+		</footer>
+	</main>
+	<script src="./js/main.js"></script>
 </body>
-<script src="js/main.js"></script>
 
 </html>
