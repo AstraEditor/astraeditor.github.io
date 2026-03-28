@@ -81,7 +81,7 @@ body {
 [data-theme="light"] .titleBar-LogoImg {
     filter: brightness(0);
 }
-[data-theme="dark"] .titleBar-LogoText{
+[data-theme="light"] .titleBar-LogoText{
     filter: brightness(0);
 }
 [data-theme="light"] .iconLink{
