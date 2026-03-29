@@ -680,7 +680,7 @@
                             <span>${t('debianUbuntu')}</span>
                         </a>
                         <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.rpm.x64)}">
-                            <img src="./images/linux.svg" alt="rpm">
+                            <img src="./images/redhat.svg" alt="rpm">
                             <span>${t('rpm')}</span>
                         </a>
                         <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.appimage.x64)}">
