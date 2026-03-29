@@ -29,9 +29,11 @@
             'downloadLinux': '下载 Linux 版本',
             'otherPlatforms': '其他平台:',
             'selectDistro': '选择您的 Linux 发行版',
-            'archLinux': 'Arch Linux (AUR)',
+            'pacman': 'Arch Linux (.pkg.tar.zst)',
             'debianUbuntu': 'Debian / Ubuntu (.deb)',
-            'appImage': 'AppImage (通用)',
+            'tarball': '.tar.gz (通用)',
+            'appimage': 'Appimage',
+            'rpm': 'Cent OS/Fedora (.rpm)',
             // 更新日志
             'changelogTitle': '更新日志',
             'changelogIntro': '查看 AstraEditor 的最新变化',
@@ -69,9 +71,11 @@
             'downloadLinux': 'Download for Linux',
             'otherPlatforms': 'Other platforms:',
             'selectDistro': 'Select your Linux distribution',
-            'archLinux': 'Arch Linux (AUR)',
+            'pacman': 'Arch Linux (.pkg.tar.zst)',
             'debianUbuntu': 'Debian / Ubuntu (.deb)',
-            'appImage': 'AppImage (Universal)',
+            'tarball': '.tar.gz (Universal)',
+            'appimage': 'Appimage',
+            'rpm': 'Cent OS/Fedora (.rpm)',
             // Changelog
             'changelogTitle': 'Changelog',
             'changelogIntro': 'See what\'s new in AstraEditor',
@@ -564,6 +568,21 @@
                     x64: 'AstraEditor-linux-x86_64-{version}.AppImage',
                     arm64: 'AstraEditor-linux-arm64-{version}.AppImage',
                     armv7l: 'AstraEditor-linux-armv7l-{version}.AppImage'
+                },
+                tarball: {
+                    x64: 'AstraEditor-linux-x64-{version}.tar.gz',
+                    arm64: 'AstraEditor-linux-arm64-{version}.tar.gz',
+                    armv7l: 'AstraEditor-linux-armv7l-{version}.tar.gz'
+                },
+                rpm: {
+                    x64: 'AstraEditor-linux-x86_64-{version}.rpm',
+                    arm64: 'AstraEditor-linux-aarch64-{version}.rpm',
+                    armv7l: 'AstraEditor-linux-armv7l-{version}.rpm'
+                },
+                pacman: {
+                    x64: 'AstraEditor-linux-x64-{version}.pkg.tar.zst',
+                    arm64: 'AstraEditor-linux-aarch64-{version}.pkg.tar.zst',
+                    armv7l: 'AstraEditor-linux-armv7l-{version}.pkg.tar.zst'
                 }
             }
         };
@@ -652,7 +671,7 @@
                         <button class="download-modal-close">&times;</button>
                     </div>
                     <div class="download-modal-body">
-                        <a class="download-distro-btn" href="https://aur.archlinux.org/packages/astraeditor-bin" target="_blank">
+                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.pacman.x64)}" target="_blank">
                             <img src="./images/archlinux.svg" alt="Arch Linux">
                             <span>${t('archLinux')}</span>
                         </a>
@@ -660,9 +679,17 @@
                             <img src="./images/debian.svg" alt="Debian">
                             <span>${t('debianUbuntu')}</span>
                         </a>
+                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.rpm.x64)}">
+                            <img src="./images/linux.svg" alt="rpm">
+                            <span>${t('rpm')}</span>
+                        </a>
                         <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.appimage.x64)}">
                             <img src="./images/linux.svg" alt="AppImage">
                             <span>${t('appImage')}</span>
+                        </a>
+                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.tarball.x64)}">
+                            <img src="./images/linux.svg" alt="tarball">
+                            <span>${t('tarball')}</span>
                         </a>
                     </div>
                 </div>
