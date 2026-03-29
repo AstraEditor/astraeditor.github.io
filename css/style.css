@@ -758,6 +758,7 @@ button{
 
 .changelog-version {
     font-size: 64px;
+    font-family: "JetBrains Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", "Consolas", "Courier New", monospace;
 }
 
 .changelog-date {
