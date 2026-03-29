@@ -34,6 +34,7 @@
             'tarball': '.tar.gz (通用)',
             'appimage': 'Appimage',
             'rpm': 'Cent OS/Fedora (.rpm)',
+            'Other download sites': '其他下载站',
             // 更新日志
             'changelogTitle': '更新日志',
             'changelogIntro': '查看 AstraEditor 的最新变化',
@@ -644,6 +645,17 @@
                     <img src="./images/linux.svg" alt="Linux"> Linux
                 </button>
             </div>
+
+            <h4>
+                <span>${t('Other download sites')}</span>
+            </h4>
+            <a class="download-distro-btn" href="https://astras.ct.ws/">
+                <span>https://astras.ct.ws/</span>
+            </a>
+            <a class="download-distro-btn" href="https://download.astras.eu.cc/">
+                <span>https://download.astras.eu.cc/</span>
+            </a>
+
         `;
 
         // 点击"获取桌面端"按钮滚动到下载区域
