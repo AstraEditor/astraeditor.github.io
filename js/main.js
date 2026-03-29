@@ -1,4 +1,4 @@
-(function() {
+(function () {
     'use strict';
 
     // i18n 翻译
@@ -29,9 +29,9 @@
             'downloadLinux': '下载 Linux 版本',
             'otherPlatforms': '其他平台:',
             'selectDistro': '选择您的 Linux 发行版',
-            'archLinux': 'Arch Linux (AUR)',
+            'archLinux': 'Arch Linux (Pacman)',
             'debianUbuntu': 'Debian / Ubuntu (.deb)',
-            'appImage': 'AppImage (通用)',
+            'appImage': 'AppImage',
             // 更新日志
             'changelogTitle': '更新日志',
             'changelogIntro': '查看 AstraEditor 的最新变化',
@@ -69,9 +69,9 @@
             'downloadLinux': 'Download for Linux',
             'otherPlatforms': 'Other platforms:',
             'selectDistro': 'Select your Linux distribution',
-            'archLinux': 'Arch Linux (AUR)',
+            'archLinux': 'Arch Linux (Pacman)',
             'debianUbuntu': 'Debian / Ubuntu (.deb)',
-            'appImage': 'AppImage (Universal)',
+            'appImage': 'AppImage',
             // Changelog
             'changelogTitle': 'Changelog',
             'changelogIntro': 'See what\'s new in AstraEditor',
@@ -273,7 +273,7 @@
         const perspectiveSection = document.querySelector('.perspective-section');
         const container = document.querySelector('.perspective-container');
         const items = document.querySelectorAll('.perspective-item');
-        
+
         if (!perspectiveSection || !container || items.length === 0) return;
 
         let currentIndex = 0;
@@ -297,14 +297,14 @@
         function animateInertia() {
             const friction = 0.92;
             const snapSpeed = 0.15;
-            
+
             if (!isDragging) {
                 const diff = targetOffset - currentOffset;
-                
+
                 if (Math.abs(diff) > 0.5 || Math.abs(velocity) > 0.5) {
                     currentOffset += diff * snapSpeed + velocity;
                     velocity *= friction;
-                    
+
                     container.style.transform = `translateY(${currentOffset}px)`;
                     animationId = requestAnimationFrame(animateInertia);
                 } else {
@@ -330,25 +330,25 @@
         function handleDragMove(e) {
             if (!isDragging) return;
             e.preventDefault();
-            
+
             const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
             const now = Date.now();
             const dt = now - lastTime;
-            
+
             if (dt > 0) {
                 velocity = (clientY - lastY) / dt * 16;
             }
-            
+
             lastY = clientY;
             lastTime = now;
-            
+
             offsetY = clientY - startY;
             currentOffset = targetOffset + offsetY;
-            
+
             const maxOffset = 0;
             const minOffset = -(items.length - 1) * perspectiveSection.offsetHeight;
             currentOffset = Math.max(minOffset - 100, Math.min(maxOffset + 100, currentOffset));
-            
+
             container.style.transform = `translateY(${currentOffset}px)`;
         }
 
@@ -356,11 +356,11 @@
             if (!isDragging) return;
             isDragging = false;
             perspectiveSection.style.cursor = 'grab';
-            
+
             const itemHeight = perspectiveSection.offsetHeight;
             const threshold = itemHeight * 0.2;
             const velocityThreshold = 5;
-            
+
             if (Math.abs(offsetY) > threshold || Math.abs(velocity) > velocityThreshold) {
                 if (offsetY < 0 && currentIndex < items.length - 1) {
                     currentIndex++;
@@ -372,7 +372,7 @@
                     currentIndex--;
                 }
             }
-            
+
             updatePerspectivePosition();
             animateInertia();
         }
@@ -380,14 +380,14 @@
         perspectiveSection.addEventListener('mousedown', handleDragStart);
         document.addEventListener('mousemove', handleDragMove);
         document.addEventListener('mouseup', handleDragEnd);
-        
+
         perspectiveSection.addEventListener('touchstart', handleDragStart, { passive: false });
         document.addEventListener('touchmove', handleDragMove, { passive: false });
         document.addEventListener('touchend', handleDragEnd);
-        
+
         perspectiveSection.style.cursor = 'grab';
         perspectiveSection.style.userSelect = 'none';
-        
+
         items.forEach(item => {
             item.style.userSelect = 'none';
             item.style.pointerEvents = 'none';
@@ -421,7 +421,7 @@
                         if (introVideoTexts) introVideoTexts.forEach(i => i.classList.add('animate'));
                         if (introVideo) introVideo.forEach(i => i.classList.add('animate'));
                     });
-                    video.play().catch((e) => {console.error(e)});
+                    video.play().catch((e) => { console.error(e) });
                     observer.unobserve(introTitle);
                 }
             });
@@ -461,7 +461,7 @@
                     const vid = video.querySelector('.intro-show-video');
                     if (vid) {
                         vid.currentTime = 0;
-                        vid.play().catch(() => {});
+                        vid.play().catch(() => { });
                     }
                 }
             });
@@ -522,20 +522,36 @@
 
         if (!downloadButton) return;
 
+        // GitHub releases 基础 URL
+        const RELEASES_BASE = 'https://github.com/AstraEditor/Desktop/releases/download';
+
+        const useDefaultUI = () => {
+            downloadButton.innerHTML = `
+            <a class="download-distro-btn" href=${RELEASES_BASE} target="_blank">
+                <img src="./images/github.svg" alt="Github">
+                <span class="download-btn-text">${t('Go to Github to Download')}</span>
+            </a>
+            `;
+        }
+
+        let getSuccess = false;
         // 从远程获取版本号
-        let VERSION = '1.1.4'; // 默认版本
+        let VERSION = '1.1.4';
         try {
             const response = await fetch('https://raw.githubusercontent.com/AstraEditor/Desktop/refs/heads/master/docs/version.json');
             if (response.ok) {
                 const versionData = await response.json();
                 VERSION = versionData.latest || VERSION;
+                getSuccess = true;
+            } else {
+                useDefaultUI();
             }
         } catch (e) {
-            console.warn('获取版本信息失败，使用默认版本', e);
+            useDefaultUI();
         }
 
-        // GitHub releases 基础 URL
-        const RELEASES_BASE = 'https://github.com/AstraEditor/Desktop/releases/download';
+        if (!getSuccess) return;
+
 
         // 下载资源映射
         const downloadAssets = {
@@ -564,6 +580,11 @@
                     x64: 'AstraEditor-linux-x86_64-{version}.AppImage',
                     arm64: 'AstraEditor-linux-arm64-{version}.AppImage',
                     armv7l: 'AstraEditor-linux-armv7l-{version}.AppImage'
+                },
+                arch: {
+                    aarch: 'AstraEditor-linux-aarch64-{version}.deb',
+                    arm64: 'AstraEditor-linux-armv7l-{version}.deb',
+                    amd64: 'AstraEditor-linux-amd64-{version}.deb',
                 }
             }
         };
@@ -652,17 +673,39 @@
                         <button class="download-modal-close">&times;</button>
                     </div>
                     <div class="download-modal-body">
-                        <a class="download-distro-btn" href="https://aur.archlinux.org/packages/astraeditor-bin" target="_blank">
+                        <div class="download-distro-btn">
                             <img src="./images/archlinux.svg" alt="Arch Linux">
                             <span>${t('archLinux')}</span>
-                        </a>
-                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.deb.x64)}">
+                            <a class="download-distro-btn-child" href="https://aur.archlinux.org/packages/astraeditor-git" target="_blank">
+                                <span>${t('gitᵃᵘʳ')}</span>
+                            </a>
+                            <span>${t('or')}</span>
+                            <div class="download-distro-btn-child">
+                                <span>${t('binᵃᵘʳ')}</span>
+                                <span>:</span>
+                                <a class="download-distro-btn-child" href=${getDownloadUrl(downloadAssets.linux.arch.arm64)} target="_blank">
+                                    <span>${t('arm64')}</span>
+                                </a>
+                                <a class="download-distro-btn-child" href=${getDownloadUrl(downloadAssets.linux.arch.aarch)} target="_blank">
+                                    <span>${t('aarch64')}</span>
+                                </a>
+                                <a class="download-distro-btn-child" href=${getDownloadUrl(downloadAssets.linux.arch.amd64)} target="_blank">
+                                    <span>${t('amd64')}</span>
+                                </a>
+                            </div>
+                        </div>
+                        </div>
+                        <div class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.deb.x64)}">
                             <img src="./images/debian.svg" alt="Debian">
                             <span>${t('debianUbuntu')}</span>
-                        </a>
+                        </div>
                         <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.appimage.x64)}">
                             <img src="./images/linux.svg" alt="AppImage">
                             <span>${t('appImage')}</span>
+                        </a>
+                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.appimage.x64)}">
+                            <img src="./images/redhat.svg" alt="RedHat">
+                            <span>${t('RedHat (.rpm)')}</span>
                         </a>
                     </div>
                 </div>
@@ -804,8 +847,9 @@
         initIntroTitleAnimation();
         initIntroVideoCarousel();
         initDownloadButton();
-        initUpdateLogs();
         initThemeToggle();
         initLangToggle();
+        initUpdateLogs();
+
     });
 })();
