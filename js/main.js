@@ -41,10 +41,10 @@
             'loadFailed': '无法加载更新日志',
             'noLogs': '暂无更新日志',
             // 页脚
-            'fromTeam': '来自 AstraEditor 项目组',
+            'fromTeam': '来自 AstrasTeam',
             'projectNote': '本项目基于 TurboWarp 构建，但与 TurboWarp 项目组无关系。<br>所有更新的功能均为自制，如有雷同，纯属巧合',
             'moreLinks': '更多链接',
-            'copyright': '©2026 AstraEditor项目组。保留所有权利。'
+            'copyright': '©2026 AstrasTeam。保留所有权利。'
         },
         'en': {
             // Title bar
@@ -83,10 +83,10 @@
             'loadFailed': 'Failed to load changelog',
             'noLogs': 'No changelog available',
             // Footer
-            'fromTeam': 'From AstraEditor Team',
+            'fromTeam': 'From AstrasTeam',
             'projectNote': 'This project is built on TurboWarp but is not affiliated with the TurboWarp team.<br>All new features are homemade, any similarities are purely coincidental',
             'moreLinks': 'More Links',
-            'copyright': '©2026 AstraEditor Team. All rights reserved.'
+            'copyright': '©2026 AstrasTeam. All rights reserved.'
         }
     };
 
