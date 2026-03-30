@@ -652,8 +652,8 @@
             <a class="download-distro-btn" href="https://astras.ct.ws/">
                 <span>https://astras.ct.ws/</span>
             </a>
-            <a class="download-distro-btn" href="https://download.astras.eu.cc/">
-                <span>https://download.astras.eu.cc/</span>
+            <a class="download-distro-btn" href="https://astraseucc.netlity.com">
+                <span>https://astraseucc.netlity.com</span>
             </a>
 
         `;
