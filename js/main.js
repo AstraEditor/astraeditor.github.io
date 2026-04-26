@@ -29,6 +29,15 @@
             'downloadLinux': '下载 Linux 版本',
             'otherPlatforms': '其他平台:',
             'selectDistro': '选择您的 Linux 发行版',
+            'selectWindowsVersion': '选择 Windows 版本',
+            'selectMacOSVersion': '选择 macOS 版本',
+            'modernWindows': 'Windows 10 或更高版本',
+            'legacyWindows': 'Windows 7/8/8.1',
+            'modernMacOS': 'macOS 12 或更高版本',
+            'macOS11': 'macOS 11',
+            'macOS1015': 'macOS 10.15',
+            'macOS10131014': 'macOS 10.13 - 10.14',
+            'archLinuxBin': 'Arch Linux (AUR)',
             'pacman': 'Arch Linux (.pkg.tar.zst)',
             'debianUbuntu': 'Debian / Ubuntu (.deb)',
             'tarball': '.tar.gz (通用)',
@@ -72,11 +81,21 @@
             'downloadLinux': 'Download for Linux',
             'otherPlatforms': 'Other platforms:',
             'selectDistro': 'Select your Linux distribution',
+            'selectWindowsVersion': 'Select Windows version',
+            'selectMacOSVersion': 'Select macOS version',
+            'modernWindows': 'Windows 10 or later',
+            'legacyWindows': 'Windows 7/8/8.1',
+            'modernMacOS': 'macOS 12 or later',
+            'macOS11': 'macOS 11',
+            'macOS1015': 'macOS 10.15',
+            'macOS10131014': 'macOS 10.13 - 10.14',
+            'archLinuxBin': 'Arch Linux (AUR)',
             'pacman': 'Arch Linux (.pkg.tar.zst)',
             'debianUbuntu': 'Debian / Ubuntu (.deb)',
             'tarball': '.tar.gz (Universal)',
             'appimage': 'Appimage',
             'rpm': 'Cent OS/Fedora (.rpm)',
+            'Other download sites': 'Other download sites',
             // Changelog
             'changelogTitle': 'Changelog',
             'changelogIntro': 'See what\'s new in AstraEditor',
@@ -553,7 +572,9 @@
                 x64: 'AstraEditor-Legacy-Setup-{version}-x64.exe',
                 ia32: 'AstraEditor-Legacy-Setup-{version}-ia32.exe'
             },
-            macos: 'AstraEditor-Setup-{version}.dmg',
+            macos: {
+                universal: 'AstraEditor-Setup-{version}.dmg'
+            },
             macosLegacy: {
                 '11': 'AstraEditor-Legacy-11-Setup-{version}.dmg',
                 '10.15': 'AstraEditor-Legacy-10.15-Setup-{version}.dmg',
@@ -634,16 +655,18 @@
                 <img class="download-btn-icon" src="${platformIcon}" alt="${platformName}">
             </button>
             <div class="download-other-platforms">
-                <span class="download-other-label">${t('otherPlatforms')}</span>
-                <button class="download-btn download-btn-secondary" data-platform="windows">
+                <h4>
+                    <span>${t('otherPlatforms')}</span>
+                </h4>
+                <div class="download-btn download-btn-secondary" data-platform="windows">
                     <img src="./images/windows.svg" alt="Windows"> Windows
-                </button>
-                <button class="download-btn download-btn-secondary" data-platform="macos">
+                </div>
+                <div class="download-btn download-btn-secondary" data-platform="macos">
                     <img src="./images/apple.svg" alt="macOS"> macOS
-                </button>
-                <button class="download-btn download-btn-secondary" data-platform="linux">
+                </div>
+                <div class="download-btn download-btn-secondary" data-platform="linux">
                     <img src="./images/linux.svg" alt="Linux"> Linux
-                </button>
+                </div>
             </div>
 
             <h4>
@@ -652,8 +675,8 @@
             <a class="download-distro-btn" href="https://astras.ct.ws/">
                 <span>https://astras.ct.ws/</span>
             </a>
-            <a class="download-distro-btn" href="https://astraseucc.netlity.com">
-                <span>https://astraseucc.netlity.com</span>
+            <a class="download-distro-btn" href="https://download.astras.cc/">
+                <span>https://download.astras.cc/</span>
             </a>
 
         `;
@@ -683,26 +706,181 @@
                         <button class="download-modal-close">&times;</button>
                     </div>
                     <div class="download-modal-body">
-                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.pacman.x64)}" target="_blank">
+                        <a class="download-distro-btn download-distro-btn-a" href="https://aur.archlinux.org/packages/astraeditor-bin" target="_blank">
                             <img src="./images/archlinux.svg" alt="Arch Linux">
-                            <span>${t('archLinux')}</span>
+                            <span>${t('archLinuxBin')}</span>
                         </a>
-                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.deb.x64)}">
-                            <img src="./images/debian.svg" alt="Debian">
-                            <span>${t('debianUbuntu')}</span>
-                        </a>
-                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.rpm.x64)}">
-                            <img src="./images/redhat.svg" alt="rpm">
-                            <span>${t('rpm')}</span>
-                        </a>
-                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.appimage.x64)}">
-                            <img src="./images/linux.svg" alt="AppImage">
-                            <span>${t('appImage')}</span>
-                        </a>
-                        <a class="download-distro-btn" href="${getDownloadUrl(downloadAssets.linux.tarball.x64)}">
-                            <img src="./images/linux.svg" alt="tarball">
-                            <span>${t('tarball')}</span>
-                        </a>
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/debian.svg" alt="Debian">
+                                    <span>${t('debianUbuntu')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.linux.deb.x64)}">amd64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.deb.arm64)}">arm64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.deb.armv7l)}">armv7l</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/redhat.svg" alt="rpm">
+                                    <span>${t('rpm')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.linux.rpm.x64)}">amd64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.rpm.arm64)}">arm64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.rpm.armv7l)}">armv7l</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/linux.svg" alt="AppImage">
+                                    <span>${t('appimage')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.linux.appimage.x64)}">amd64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.appimage.arm64)}">arm64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.appimage.armv7l)}">armv7l</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/linux.svg" alt="tarball">
+                                    <span>${t('tarball')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.linux.tarball.x64)}">amd64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.tarball.arm64)}">arm64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.tarball.armv7l)}">armv7l</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            const closeModal = () => modal.remove();
+            modal.querySelector('.download-modal-backdrop').addEventListener('click', closeModal);
+            modal.querySelector('.download-modal-close').addEventListener('click', closeModal);
+        }
+
+        // 显示 Windows 版本与架构选择弹窗
+        function showWindowsModal() {
+            const existingModal = document.querySelector('.download-modal');
+            if (existingModal) existingModal.remove();
+
+            const modal = document.createElement('div');
+            modal.className = 'download-modal';
+            modal.innerHTML = `
+                <div class="download-modal-backdrop"></div>
+                <div class="download-modal-content">
+                    <div class="download-modal-header">
+                        <span>${t('selectWindowsVersion')}</span>
+                        <button class="download-modal-close">&times;</button>
+                    </div>
+                    <div class="download-modal-body">
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/windows.svg" alt="Windows">
+                                    <span>${t('modernWindows')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.windows.x64)}">x64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.windows.ia32)}">ia32</a>
+                                    <a href="${getDownloadUrl(downloadAssets.windows.arm64)}">arm64</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/windows.svg" alt="Windows Legacy">
+                                    <span>${t('legacyWindows')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.windowsLegacy.x64)}">x64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.windowsLegacy.ia32)}">ia32</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            const closeModal = () => modal.remove();
+            modal.querySelector('.download-modal-backdrop').addEventListener('click', closeModal);
+            modal.querySelector('.download-modal-close').addEventListener('click', closeModal);
+        }
+
+        // 显示 macOS 系统版本选择弹窗
+        function showMacOSModal() {
+            const existingModal = document.querySelector('.download-modal');
+            if (existingModal) existingModal.remove();
+
+            const modal = document.createElement('div');
+            modal.className = 'download-modal';
+            modal.innerHTML = `
+                <div class="download-modal-backdrop"></div>
+                <div class="download-modal-content">
+                    <div class="download-modal-header">
+                        <span>${t('selectMacOSVersion')}</span>
+                        <button class="download-modal-close">&times;</button>
+                    </div>
+                    <div class="download-modal-body">
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/apple.svg" alt="macOS">
+                                    <span>${t('modernMacOS')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.macos.universal)}">Universal</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/apple.svg" alt="macOS 11">
+                                    <span>${t('macOS11')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.macosLegacy['11'])}">Universal</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/apple.svg" alt="macOS 10.15">
+                                    <span>${t('macOS1015')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.macosLegacy['10.15'])}">Intel</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/apple.svg" alt="macOS 10.13 - 10.14">
+                                    <span>${t('macOS10131014')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.macosLegacy['10.13-10.14'])}">Intel</a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -718,11 +896,11 @@
             let downloadUrl = '';
             switch (platformType) {
                 case 'windows':
-                    downloadUrl = getDownloadUrl(downloadAssets.windows.x64);
-                    break;
+                    showWindowsModal();
+                    return;
                 case 'macos':
-                    downloadUrl = getDownloadUrl(downloadAssets.macos);
-                    break;
+                    showMacOSModal();
+                    return;
                 case 'linux':
                     showLinuxDistroModal();
                     return;
@@ -739,15 +917,6 @@
             });
         });
 
-        // 下载按钮点击事件
-        downloadButton.querySelectorAll('.download-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const platform = btn.dataset.platform;
-                if (platform === 'linux') {
-                    showLinuxDistroModal();
-                }
-            });
-        });
     }
 
     async function initUpdateLogs() {

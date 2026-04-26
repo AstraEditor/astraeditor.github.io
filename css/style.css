@@ -15,7 +15,7 @@
     --footer-text: #eee;
     --intro-title-bg: #fff;
     --text-shadow-color: #111;
-    --ae-color:rgba(255, 255, 255, 0.15)
+    --ae-color: rgba(255, 255, 255, 0.15)
 }
 
 [data-theme="light"] {
@@ -33,7 +33,7 @@
     --footer-text: #333;
     --intro-title-bg: #1a1a1a;
     --text-shadow-color: #fff;
-    --ae-color:rgba(0, 0, 0, 0.15)
+    --ae-color: rgba(0, 0, 0, 0.15)
 }
 
 html {
@@ -81,10 +81,12 @@ body {
 [data-theme="light"] .titleBar-LogoImg {
     filter: brightness(0);
 }
-[data-theme="light"] .titleBar-LogoText{
+
+[data-theme="light"] .titleBar-LogoText {
     filter: brightness(0);
 }
-[data-theme="light"] .iconLink{
+
+[data-theme="light"] .iconLink {
     filter: brightness(0);
 }
 
@@ -95,7 +97,8 @@ body {
     flex-wrap: nowrap;
     overflow: visible;
 }
-button{
+
+button {
     color: var(--text-color);
     padding: 6px;
     border-radius: 5px;
@@ -105,6 +108,7 @@ button{
     border: none;
     cursor: pointer;
 }
+
 .titleBar-TabButton {
     color: var(--text-color);
     padding: 6px;
@@ -252,7 +256,8 @@ button{
     position: relative;
 }
 
-.intro-section, .download {
+.intro-section,
+.download {
     min-height: 100vh;
     width: 100%;
     display: flex;
@@ -269,14 +274,17 @@ button{
         transform: perspective(1000px) rotateX(90deg) translateY(140px);
         filter: blur(5px);
     }
+
     6% {
         opacity: 0;
     }
+
     20% {
         opacity: 1;
         transform: perspective(1000px) rotateX(0deg);
         filter: blur(0px);
     }
+
     100% {
         opacity: 1;
     }
@@ -304,7 +312,7 @@ button{
     will-change: transform;
 }
 
-.intro-title{
+.intro-title {
     font-size: 64px;
     font-weight: 900;
     color: var(--lf-color);
@@ -332,7 +340,7 @@ button{
     animation: highlight-reveal 1.5s cubic-bezier(0, 0, 0, 1) forwards;
 }
 
-.intro-text{
+.intro-text {
     display: flex;
     flex-direction: column;
     transform: translateX(-30px);
@@ -343,26 +351,28 @@ button{
     animation: intro-text-in 1.5s cubic-bezier(0, 0, 0, 1) forwards;
 }
 
-.intro-intro{
+.intro-intro {
     font-size: large;
     margin-top: 1rem;
 }
 
-.intro-show-video{
+.intro-show-video {
     width: 60vw;
     opacity: 0;
 }
 
 @keyframes intro-text-in {
-    from{
+    from {
         transform: translateX(-30px);
         opacity: 0;
     }
-    to{
+
+    to {
         transform: translateX(0);
         opacity: 1;
     }
 }
+
 @keyframes highlight-reveal {
     to {
         transform: translateZ(0) scaleX(1);
@@ -370,12 +380,12 @@ button{
 }
 
 
-.intro-show{
+.intro-show {
     position: relative;
     width: 60vw;
 }
 
-.intro-show-videos{
+.intro-show-videos {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -388,7 +398,7 @@ button{
     pointer-events: none;
 }
 
-.intro-show-videos.active{
+.intro-show-videos.active {
     opacity: 1;
     transform: translateX(0);
     height: auto;
@@ -396,34 +406,39 @@ button{
     pointer-events: auto;
 }
 
-.intro-show-videos.exit{
+.intro-show-videos.exit {
     opacity: 0;
     transform: translateX(-50px);
     height: 0;
 }
 
-.intro-show-text{
+.intro-show-text {
     font-weight: 900;
     font-size: x-large;
     margin-top: -60px;
     margin-right: 20px;
     text-shadow: 0px 0px 5px var(--text-shadow-color);
 }
+
 .intro-show-text.animate {
     animation: intro-show-text-in 1.5s cubic-bezier(0, 0, 0, 1) forwards;
 }
+
 .intro-show-video.animate {
     animation: intro-show-text-in 1.5s cubic-bezier(0, 0, 0, 1) forwards 0.2s;
 }
 
-.function{
+.function {
     display: flex;
     min-height: 100vh;
 }
-.download-title-small, .download-title{
+
+.download-title-small,
+.download-title {
     transition: all 0.5s cubic-bezier(0, 0, 0, 1);
 }
-.download-title{
+
+.download-title {
     font-size: 128px;
     font-weight: 900;
     color: var(--text-color);
@@ -432,7 +447,8 @@ button{
     padding: 0 8px;
     opacity: 0;
 }
-.download-title-small{
+
+.download-title-small {
     font-size: 64px;
     font-weight: 900;
     color: var(--text-color);
@@ -440,71 +456,87 @@ button{
     position: relative;
     padding: 0 8px;
 }
-.download{
+
+.download {
     justify-content: center;
     text-align: center;
     flex-direction: column;
 }
 
-.head-titles{
+.head-titles {
     display: flex;
     flex-direction: column;
     align-items: center;
 }
-.head-link-desktop{
+
+.head-link-desktop {
     padding: 10px 20px !important;
     font-size: larger;
     width: auto !important;
     backdrop-filter: blur(10px);
     transition: filter 0.4s ease, transform 0.4s ease;
 }
-.head-link-online{
+
+.head-link-online {
     padding: 10px 20px !important;
     font-size: larger;
     width: auto !important;
     backdrop-filter: blur(10px);
 }
-.head-link-release,.head-link-snapshot{
+
+.head-link-release,
+.head-link-snapshot {
     transition: filter 0.4s ease, transform 0.4s ease;
 }
-.head-link-release:active,.head-link-snapshot:active{
+
+.head-link-release:active,
+.head-link-snapshot:active {
     filter: blur(1px) brightness(0.8) !important;
     transform: scale(0.8) !important;
 }
-.head-link-release:hover,.head-link-snapshot:hover{
+
+.head-link-release:hover,
+.head-link-snapshot:hover {
     filter: brightness(1.2);
     transform: scale(1.1);
 }
-.head-link-desktop:active{
+
+.head-link-desktop:active {
     filter: blur(1px) brightness(0.8) !important;
     transform: scale(0.8) !important;
 }
-.head-link-desktop:hover{
+
+.head-link-desktop:hover {
     filter: brightness(1.2);
     transform: scale(1.1);
 }
-.head-link-online{
+
+.head-link-online {
     background-color: color-mix(in srgb, var(--theme-color), transparent 10%);
 }
-.head-link-desktop{
+
+.head-link-desktop {
     background-color: color-mix(in srgb, var(--button-color), transparent 10%);
 }
-.head-link{
+
+.head-link {
     margin-top: 20px;
     opacity: 0;
     animation: head-LogoText-in 5s cubic-bezier(0, 0, 0, 1) forwards 0.3s;
 }
 
 @keyframes intro-show-text-in {
-    from{
+    from {
         transform: translateX(30px);
         opacity: 0;
     }
-    to{
+
+    to {
         transform: translateX(0);
         opacity: 1;
     }
 }
+
 @media screen and (max-width: 768px) {
     .titleBar-LogoText {
         font-size: 18px;
@@ -520,7 +552,7 @@ button{
         font-size: 14px;
     }
 
-    .images{
+    .images {
         top: 200px !important;
     }
 }
@@ -545,7 +577,7 @@ button{
         margin: 0 3px;
     }
 
-    .images{
+    .images {
         top: 200px !important;
     }
 }
@@ -558,7 +590,26 @@ button{
     gap: 16px;
     margin-top: 20px;
 }
-.download-btn-primary{
+
+.download-btn {
+    color: var(--text-color);
+    background-color: var(--button-color);
+    border: 1px solid var(--button-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.download-btn:hover {
+    background-color: var(--button-color-highLight);
+    border-color: color-mix(in srgb, var(--text-color), transparent 60%);
+}
+
+.download-btn:active {
+    transform: scale(0.98);
+}
+
+.download-btn-primary {
     width: 300px;
     height: 100px;
     font-size: x-large;
@@ -593,7 +644,9 @@ button{
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    box-sizing: border-box;
     width: 100%;
+    padding: 10px 14px;
     margin-bottom: 10px;
 }
 
@@ -603,7 +656,7 @@ button{
     margin-bottom: 8px;
 }
 
-/* Linux 发行版选择弹窗 */
+/* 下载选项弹窗 */
 .download-modal {
     position: fixed;
     top: 0;
@@ -631,7 +684,9 @@ button{
     border: 1px solid var(--button-color);
     border-radius: 8px;
     padding: 24px;
-    width: 50vw;
+    width: min(640px, calc(100vw - 48px));
+    max-height: calc(100vh - 48px);
+    overflow: auto;
 }
 
 .download-modal-header {
@@ -671,10 +726,16 @@ button{
     border-radius: 8px;
     color: var(--text-color);
     font-size: 16px;
-    width: calc(100% - 40px); /* 减去左右 padding */
+    box-sizing: border-box;
+    width: 100%;
     margin-bottom: 5px;
-    height: 60px;
+    min-height: 60px;
     cursor: pointer;
+}
+
+.download-distro-btn-a {
+    font-style: normal;
+    text-decoration: none;
 }
 
 .download-distro-btn:hover {
@@ -795,6 +856,7 @@ button{
     z-index: 2;
     position: relative;
 }
+
 .endlogo {
     width: 200px;
     height: auto;
@@ -806,7 +868,7 @@ button{
     font-size: small;
 }
 
-.end{
+.end {
     display: flex;
     justify-content: space-between;
 }
@@ -852,10 +914,13 @@ small {
     position: relative;
     z-index: 2;
 }
-.footerT{
+
+.footerT {
     font-size: small;
 }
-.head-link-snapshot,.head-link-release{
+
+.head-link-snapshot,
+.head-link-release {
     color: var(--text-color);
     padding: 6px;
     border-radius: 5px;
@@ -868,16 +933,19 @@ small {
 }
 
 
-::-webkit-scrollbar{
+::-webkit-scrollbar {
     background-color: var(--scrollbar-bg);
 }
-::-webkit-scrollbar-thumb{
+
+::-webkit-scrollbar-thumb {
     background-color: var(--scrollbar-thumb);
 }
-::-webkit-scrollbar-thumb:hover{
+
+::-webkit-scrollbar-thumb:hover {
     background-color: var(--scrollbar-thumb-hover);
 }
-::-webkit-scrollbar-thumb:active{
+
+::-webkit-scrollbar-thumb:active {
     background-color: var(--scrollbar-thumb-active);
 }
 
@@ -930,4 +998,56 @@ small {
 .lang-text {
     min-width: 20px;
     text-align: center;
+}
+
+.download-distro-btn-parts {
+    justify-content: space-between;
+    flex: 1;
+    min-width: 0;
+}
+
+.download-distro-btn-part,
+.download-distro-btn-parts {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.download-distro-btn-part:last-child {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.download-distro-btn-part a {
+    padding: 4px 8px;
+    border-radius: 5px;
+    background-color: var(--button-color-highLight);
+    text-decoration: none;
+    font-style: normal;
+    transition: filter var(--transition-fast);
+    -webkit-transition: filter var(--transition-fast);
+    -moz-transition: filter var(--transition-fast);
+    -ms-transition: filter var(--transition-fast);
+    -o-transition: filter var(--transition-fast);
+}
+
+.download-distro-btn-part a:hover {
+    filter: brightness(1.2);
+    -webkit-filter: brightness(1.2);
+}
+
+a {
+    color: var(--text-color);
+    font-style: italic;
+}
+
+@media screen and (max-width: 640px) {
+    .download-distro-btn-parts {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .download-distro-btn-part:last-child {
+        justify-content: flex-start;
+    }
 }
