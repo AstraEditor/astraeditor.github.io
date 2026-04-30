@@ -19,7 +19,7 @@
         }
 
         .splash-screen[data-theme="dark"] {
-          background-color: #000;
+          background-color: #222;
           color: white;
         }
 
@@ -220,44 +220,55 @@
       }
 
       try {
-        var themeSetting = localStorage.getItem('tw:theme');
+        var themeSetting = JSON.parse(localStorage.getItem('tw:theme'));
+      } catch {
+        // ignore
+      }
+      
+      // dark, accent: ae
+      theme = 'dark';
+      accent = '#0099ff';
+
+      try {
+        theme = themeSetting.gui || 'dark';
+        var parsed = themeSetting.accent;
+        switch (parsed) {
+          case ('purple'):
+            accent = '#855cd6';
+            break
+          case ('blue'):
+            accent = '#4c97ff';
+            break
+          case ('red'):
+            accent = '#ff4c4c';
+            break
+          case ('rainbow'):
+            accent = '#ff4c4c';
+            break
+          case ('ce'):
+            accent = '#ff9b86';
+            break
+          case ('ty'):
+            accent = '#66ccff';
+            break
+          case ('miku'):
+            accent = '#39c5bb';
+            break
+          case ('astraeditor'):
+            accent = '#0099ff';
+            break
+          default:
+            accent = '#0099ff';
+
+        }
+
+        if (parsed.gui === 'dark' || parsed.gui === 'light') {
+          theme = parsed.gui;
+        }
       } catch (e) {
         // ignore
       }
-      if (themeSetting === 'light') {
-        theme = 'light';
-      } else if (themeSetting === 'dark') {
-        theme = 'dark';
-      } else if (themeSetting) {
-        try {
-          theme = 'dark'; // 默认是dark配色
-          var parsed = JSON.parse(themeSetting);
-          if (parsed.accent === 'purple') {
-            accent = '#855cd6';
-          } else if (parsed.accent === 'blue') {
-            accent = '#4c97ff';
-          } else if (parsed.accent === 'red') {
-            accent = '#ff4c4c';
-          } else if (parsed.accent === 'rainbow') {
-            accent = '#ff4c4c';
-          } else if (parsed.accent === 'ce') {
-            accent = '#ff9b86';
-          } else if (parsed.accent === 'ty') {
-            accent = '#66ccff';
-          } else if (parsed.accent === 'miku') {
-            accent = '#39c5bb';
-          } else if (parsed.accent === 'astraeditor') {
-            accent = '#0099ff';
-          } else {
-            accent = '#0099ff';
-          }
-          if (parsed.gui === 'dark' || parsed.gui === 'light') {
-            theme = parsed.gui;
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
+
 
       if (!theme) {
         theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -273,12 +284,10 @@
           logo[element].style.backgroundColor = '#ffffff50';
           logo[element].style.borderColor = '#ffffff10';
         };
-          
-          splash.style.backgroundColor = accent;
-          splash.style.color = 'white';
-          
-       } else {
-        splash.style.backgroundColor = '#000000';
+        splash.style.backgroundColor = accent;
+        splash.style.color = 'white';
+      } else {
+        splash.style.backgroundColor = '#222';
         splash.style.color = 'white';
         for (let element = 0; element < logo.length; element += 1) {
           logo[element].style.backgroundColor = '#ffffff50';
@@ -348,4 +357,4 @@
         splash.hidden = true;
         window.onerror = null;
       };
-    })();</script><div id="app"></div><script src="js/pentapod/vendors~addon-settings~credits~editor~embed~fullscreen~player.45dd6e407c8ffbbecd9f.js"></script><script src="js/pentapod/vendors~editor~embed~fullscreen~player.202a6407c9f00d62fa4f.js"></script><script src="js/pentapod/addon-settings~addons~editor~fullscreen~player.e893bd25972266d9f4b4.js"></script><script src="js/pentapod/addon-settings~editor~embed~fullscreen~player.d6de70dff7d3a87c893b.js"></script><script src="js/pentapod/editor.5fd1d8c53969bfbc827f.js"></script></body></html>
+    })();</script><div id="app"></div><script src="js/pentapod/9482.f9d98ce52f694b034829.js"></script><script src="js/pentapod/5567.51d281d0dbf25e603d33.js"></script><script src="js/pentapod/6396.e7a0d16995354739d542.js"></script><script src="js/pentapod/1910.5470e7897cf0ce09857b.js"></script><script src="js/pentapod/7734.b2e68ad6852cb50a9e1a.js"></script><script src="js/pentapod/editor.038f2b69363add6d4376.js"></script></body></html>
