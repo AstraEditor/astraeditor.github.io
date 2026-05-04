@@ -19,7 +19,7 @@
         }
 
         .splash-screen[data-theme="dark"] {
-          background-color: #222;
+          background-color: #333;
           color: white;
         }
 
@@ -119,17 +119,13 @@
 
         .splash-errors {
           font-family: monospace;
-          max-height: 50vh;
-          max-width: 50vw;
-          overflow: auto;
-          z-index: 9999;
+          max-width: 40%;
           margin-left: auto;
           margin-top: 20px;
           margin-bottom: 20px;
           background-color: #ffffff44;
           padding: 5px;
           border-radius: 10px;
-          position: relative;
         }
 
         .splash-error-list {
@@ -148,7 +144,7 @@
 
         .splash-reset:disabled {
           opacity: 0.8;
-        }</style></head><body><noscript><div class="splash-screen"><div><h1>AstraEditor requires JavaScript</h1><p>Consider using <a href="https://editors.astras.top/">AstraEditor Desktop</a> if you are afraid of remote JavaScript.</p></div></div></noscript><div class="splash-screen spash-waiting-for-js" hidden><div class="logo"><div class="circle" id="circle_1"></div><div class="circle" id="circle_2"></div><div class="circle" id="circle_3"></div></div><div><div class="splash-error-title" hidden><span class="splash-error-title-text1">Something went wrong. </span><a class="splash-error-link" href="https://github.com/AstraEditor/scratch-gui/issues" target="_blank" rel="noreferrer">Please report</a> <span class="splash-error-title-text2">with the information below.</span></div><div class="splash-errors" hidden></div><button class="splash-reset" hidden>Click here to reset caches (can fix some errors)</button></div></div><script>(function () {
+        }</style></head><body><noscript><div class="splash-screen"><div><h1>AstraEditor requires JavaScript</h1><p>Consider using <a href="https://desktop.turbowarp.org/">TurboWarp Desktop</a> if you are afraid of remote JavaScript.</p></div></div></noscript><div class="splash-screen spash-waiting-for-js" hidden><div class="logo"><div class="circle" id="circle_1"></div><div class="circle" id="circle_2"></div><div class="circle" id="circle_3"></div></div><div><div class="splash-error-title" hidden><span class="splash-error-title-text1">Something went wrong. </span><a class="splash-error-link" href="https://github.com/AstraEditor/scratch-gui/issues" target="_blank" rel="noreferrer">Please report</a> <span class="splash-error-title-text2">with the information below.</span></div><div class="splash-errors" hidden></div><button class="splash-reset" hidden>Click here to reset caches (can fix some errors)</button></div></div><script>(function () {
       'use strict';
 
       var logoAll = document.getElementsByClassName('logo')[0];
@@ -220,55 +216,31 @@
       }
 
       try {
-        var themeSetting = JSON.parse(localStorage.getItem('tw:theme'));
-      } catch {
-        // ignore
-      }
-      
-      // dark, accent: ae
-      theme = 'dark';
-      accent = '#0099ff';
-
-      try {
-        theme = themeSetting.gui || 'dark';
-        var parsed = themeSetting.accent;
-        switch (parsed) {
-          case ('purple'):
-            accent = '#855cd6';
-            break
-          case ('blue'):
-            accent = '#4c97ff';
-            break
-          case ('red'):
-            accent = '#ff4c4c';
-            break
-          case ('rainbow'):
-            accent = '#ff4c4c';
-            break
-          case ('ce'):
-            accent = '#ff9b86';
-            break
-          case ('ty'):
-            accent = '#66ccff';
-            break
-          case ('miku'):
-            accent = '#39c5bb';
-            break
-          case ('astraeditor'):
-            accent = '#0099ff';
-            break
-          default:
-            accent = '#0099ff';
-
-        }
-
-        if (parsed.gui === 'dark' || parsed.gui === 'light') {
-          theme = parsed.gui;
-        }
+        var themeSetting = localStorage.getItem('tw:theme');
       } catch (e) {
         // ignore
       }
-
+      if (themeSetting === 'light') {
+        theme = 'light';
+      } else if (themeSetting === 'dark') {
+        theme = 'dark';
+      } else if (themeSetting) {
+        try {
+          var parsed = JSON.parse(themeSetting);
+          if (parsed.accent === 'purple') {
+            accent = '#855cd6';
+          } else if (parsed.accent === 'blue') {
+            accent = '#4c97ff';
+          } else {
+            accent = '#0099ff';
+          }
+          if (parsed.gui === 'dark' || parsed.gui === 'light') {
+            theme = parsed.gui;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
 
       if (!theme) {
         theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -278,20 +250,18 @@
       var logo = document.getElementsByClassName('circle');
       splash.setAttribute('data-theme', theme);
 
-      console.log(theme)
       if (theme !== 'dark' && !!theme) {
         for (let element = 0; element < logo.length; element += 1) {
           logo[element].style.backgroundColor = '#ffffff50';
           logo[element].style.borderColor = '#ffffff10';
         };
-        splash.style.backgroundColor = accent;
-        splash.style.color = 'white';
-      } else {
-        splash.style.backgroundColor = '#222';
-        splash.style.color = 'white';
+          
+          splash.style.color = accent;
+          
+       } else {
         for (let element = 0; element < logo.length; element += 1) {
-          logo[element].style.backgroundColor = '#ffffff50';
-          logo[element].style.borderColor = '#ffffff10';
+          logo[element].style.backgroundColor = accent + '50';
+          logo[element].style.borderColor = accent + '10';
         };
       }
 
@@ -320,8 +290,6 @@
         splashError.appendChild(el);
         logoAll.style.transform = 'scale(6, 6) translate(20px, 40px)';
         splash.style.backgroundColor = '#ff8888';
-        splash.style.color = 'white';
-        splashErrorTitle.style.color = 'white';
         for (let element = 0; element < logo.length; element += 1) {
           logo[element].style.backgroundColor = '#ffffff50';
           logo[element].style.borderColor = '#ffffff10';
@@ -357,4 +325,4 @@
         splash.hidden = true;
         window.onerror = null;
       };
-    })();</script><div id="app"></div><script src="js/pentapod/9482.f9d98ce52f694b034829.js"></script><script src="js/pentapod/5567.51d281d0dbf25e603d33.js"></script><script src="js/pentapod/6396.3904fd1ed2944415bafc.js"></script><script src="js/pentapod/6250.941df999a00ba6218097.js"></script><script src="js/pentapod/7734.91b4721c09e84d05ff28.js"></script><script src="js/pentapod/fullscreen.71dcaf243a992981476a.js"></script></body></html>
+    })();</script><div id="app"></div><script src="js/pentapod/vendors~addon-settings~credits~editor~embed~fullscreen~player.1cafabc0f2c7c4a6799c.js"></script><script src="js/pentapod/vendors~editor~embed~fullscreen~player.e88dfa0e8ab6b12c943c.js"></script><script src="js/pentapod/addon-settings~addons~editor~fullscreen~player.69099fed206f49005090.js"></script><script src="js/pentapod/addon-settings~editor~embed~fullscreen~player.c5535efe485ea56112ab.js"></script><script src="js/pentapod/fullscreen.4aa27d98de3b5d2a3962.js"></script></body></html>
