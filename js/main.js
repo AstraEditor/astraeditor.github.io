@@ -547,7 +547,7 @@
         if (!downloadButton) return;
 
         // 从远程获取版本号
-        let VERSION = '1.1.4'; // 默认版本
+        let VERSION = '1.2.0'; // 默认版本
         try {
             const response = await fetch('https://raw.githubusercontent.com/AstraEditor/Desktop/refs/heads/master/docs/version.json');
             if (response.ok) {
@@ -675,9 +675,7 @@
             <a class="download-distro-btn" href="https://astras.ct.ws/">
                 <span>https://astras.ct.ws/</span>
             </a>
-            <a class="download-distro-btn" href="https://download.astras.cc/">
-                <span>https://download.astras.cc/</span>
-            </a>
+
 
         `;
 
