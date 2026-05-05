@@ -672,10 +672,9 @@
             <h4>
                 <span>${t('Other download sites')}</span>
             </h4>
-            <a class="download-distro-btn" href="https://astras.ct.ws/">
-                <span>https://astras.ct.ws/</span>
+            <a class="download-distro-btn" href="https://download.astras.cc/">
+                <span>https://download.astras.cc/</span>
             </a>
-
 
         `;
 
