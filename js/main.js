@@ -44,6 +44,7 @@
             'appimage': 'Appimage',
             'rpm': 'Cent OS/Fedora (.rpm)',
             'Other download sites': '其他下载站',
+            'version': '版本',
             // 更新日志
             'changelogTitle': '更新日志',
             'changelogIntro': '查看 AstraEditor 的最新变化',
@@ -96,6 +97,7 @@
             'appimage': 'Appimage',
             'rpm': 'Cent OS/Fedora (.rpm)',
             'Other download sites': 'Other download sites',
+            'version': "Vesion",
             // Changelog
             'changelogTitle': 'Changelog',
             'changelogIntro': 'See what\'s new in AstraEditor',
@@ -547,7 +549,7 @@
         if (!downloadButton) return;
 
         // 从远程获取版本号
-        let VERSION = '1.2.0'; // 默认版本
+        let VERSION = '1.2.2'; // 默认版本
         try {
             const response = await fetch('https://raw.githubusercontent.com/AstraEditor/Desktop/refs/heads/master/docs/version.json');
             if (response.ok) {
@@ -650,6 +652,7 @@
             linux: t('downloadLinux')
         };
         downloadButton.innerHTML = `
+            <span class="download-version">${t('version')}: ${VERSION}</span>
             <button class="download-btn download-btn-primary" data-platform="${detectedPlatform}">
                 <span class="download-btn-text">${downloadTextMap[detectedPlatform] || `${t('downloadLinux')}`}</span>
                 <img class="download-btn-icon" src="${platformIcon}" alt="${platformName}">
