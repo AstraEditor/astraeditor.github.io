@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /snapshot/*.js$
+Disallow: /online/*.js$
