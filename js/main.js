@@ -549,7 +549,7 @@
         if (!downloadButton) return;
 
         // 从远程获取版本号
-        let VERSION = '1.2.2'; // 默认版本
+        let VERSION = '1.2.3'; // 默认版本
         try {
             const response = await fetch('https://raw.githubusercontent.com/AstraEditor/Desktop/refs/heads/master/docs/version.json');
             if (response.ok) {
@@ -710,6 +710,19 @@
                             <img src="./images/archlinux.svg" alt="Arch Linux">
                             <span>${t('archLinuxBin')}</span>
                         </a>
+                        <div class="download-distro-btn">
+                            <div class="download-distro-btn-parts">
+                                <div class="download-distro-btn-part">
+                                    <img src="./images/archlinux.svg" alt="Arch Linux">
+                                    <span>${t('pacman')}</span>
+                                </div>
+                                <div class="download-distro-btn-part">
+                                    <a href="${getDownloadUrl(downloadAssets.linux.pacman.x64)}">amd64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.pacman.arm64)}">arm64</a>
+                                    <a href="${getDownloadUrl(downloadAssets.linux.pacman.armv7l)}">armv7l</a>
+                                </div>
+                            </div>
+                        </div>
                         <div class="download-distro-btn">
                             <div class="download-distro-btn-parts">
                                 <div class="download-distro-btn-part">
