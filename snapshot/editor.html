@@ -151,6 +151,21 @@
         }</style></head><body><noscript><div class="splash-screen"><div><h1>AstraEditor requires JavaScript</h1><p>Consider using <a href="https://editors.astras.top/">AstraEditor Desktop</a> if you are afraid of remote JavaScript.</p></div></div></noscript><div class="splash-screen spash-waiting-for-js" hidden><div class="logo"><div class="circle" id="circle_1"></div><div class="circle" id="circle_2"></div><div class="circle" id="circle_3"></div></div><div><div class="splash-error-title" hidden><span class="splash-error-title-text1">Something went wrong. </span><a class="splash-error-link" href="https://github.com/AstraEditor/scratch-gui/issues" target="_blank" rel="noreferrer">Please report</a> <span class="splash-error-title-text2">with the information below.</span></div><div class="splash-errors" hidden></div><button class="splash-reset" hidden>Click here to reset caches (can fix some errors)</button></div></div><script>(function () {
       'use strict';
 
+      // Ignore ResizeObserver errors (common benign browser warning)
+      var debounceResizeObserver = function (e) {
+        try {
+          if (e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
+            e.message.indexOf('ResizeObserver') !== -1) {
+            e.stopImmediatePropagation();
+            return false;
+          }
+        } catch {
+          return true
+        }
+      };
+      window.addEventListener('error', debounceResizeObserver, true);
+      window.addEventListener('unhandledrejection', debounceResizeObserver, true);
+
       var logoAll = document.getElementsByClassName('logo')[0];
       logoAll.style.transform = 'scale(1.5, 1.5) translateY(40px)';
 
@@ -224,7 +239,7 @@
       } catch {
         // ignore
       }
-      
+
       // dark, accent: ae
       theme = 'dark';
       accent = '#0099ff';
@@ -357,4 +372,4 @@
         splash.hidden = true;
         window.onerror = null;
       };
-    })();</script><div id="app"></div><script src="js/pentapod/9482.f9d98ce52f694b034829.js"></script><script src="js/pentapod/3443.124614885eef0ea0cb64.js"></script><script src="js/pentapod/6396.1fab292899f5b6bae74d.js"></script><script src="js/pentapod/1575.c35990a995ae60649823.js"></script><script src="js/pentapod/2289.bf8451c5fc9a4f6f5d22.js"></script><script src="js/pentapod/7734.8e1ccb9d5bced8670df0.js"></script><script src="js/pentapod/editor.c0faad5f1549d798bd41.js"></script></body></html>
+    })();</script><div id="app"></div><script src="js/pentapod/6778.7e4ecf97c0f879d322d4.js"></script><script src="js/pentapod/3021.59523a41efa12e541fb3.js"></script><script src="js/pentapod/2171.1ed83071cbda0c5aa52f.js"></script><script src="js/pentapod/9634.aeebdf77692253bc7601.js"></script><script src="js/pentapod/5419.6f98ce2a58b722aa1dc0.js"></script><script src="js/pentapod/5330.6651aeee8febebde6081.js"></script><script src="js/pentapod/editor.ed3887a3d925279c00f4.js"></script></body></html>
