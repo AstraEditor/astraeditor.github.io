@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkGUI=self.webpackChunkGUI||[]).push([[2101],{58782(s,e,n){async function t(s){s.addon.tab.traps.vm.setCompilerOptions({enabled:!1})}n.r(e),n.d(e,{resources:()=>c});const c={"userscript.js":t}}}]);
