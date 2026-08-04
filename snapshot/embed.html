@@ -1,4 +1,13 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="google" value="notranslate"><title>Embedded Project - AstraEditor</title><link rel="icon" href="favicon.ico"><style>.splash-screen {
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="google" value="notranslate">
+    <title>Embedded Project - AstraEditor</title>
+    <link rel="icon" href="favicon.ico">
+    <style>
+      .splash-screen {
         position: absolute;
         width: 100%;
         height: 100%;
@@ -29,7 +38,22 @@
       @keyframes splash-spinner {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
-      }</style></head><body><noscript><div class="splash-screen"><h1>This embed requires JavaScript</h1></div></noscript><div class="splash-screen" hidden id="splash-need-js"><div class="splash-spinner"></div></div><script>(function() {
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>
+      <div class="splash-screen">
+        <h1>This embed requires JavaScript</h1>
+      </div>
+    </noscript>
+
+    <div class="splash-screen" hidden id="splash-need-js">
+      <div class="splash-spinner"></div>
+    </div>
+
+    <script>
+      (function() {
         'use strict';
 
         var splash = document.getElementById('splash-need-js');
@@ -38,4 +62,9 @@
         window.SplashEnd = () => {
           splash.hidden = true;
         };
-      }());</script><div id="app"></div><script src="js/pentapod/5404.30b6aff00dbf6a7b107a.js"></script><script src="js/pentapod/1296.650a3302b67cd6ed980f.js"></script><script src="js/pentapod/7561.1d45363901062535396c.js"></script><script src="js/pentapod/1599.796fbbd548556fa95a01.js"></script><script src="js/pentapod/embed.31b95a5531c88e5864e2.js"></script></body></html>
+      }());
+    </script>
+
+    <div id="app"></div>
+  <script src="js/vendors-node_modules_pnpm_css-loader_6_11_0_webpack_5_106_2_node_modules_css-loader_dist_runt-760044.js"></script><script src="js/vendors-node_modules_pnpm_microbit_microbit-universal-hex_0_2_2_tslib_2_8_1_node_modules_micr-52cddc.js"></script><script src="js/src_lib_brand_js-src_lib_themes_guiHelpers_js-src_lib_themes_themePersistance_js-src_playgrou-f11971.js"></script><script src="js/src_addons_entry_js-src_lib_app-state-hoc_jsx-src_lib_tw-state-manager-hoc_jsx-src_playground-3dd446.js"></script><script src="js/embed.js"></script></body>
+</html>
