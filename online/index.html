@@ -1,4 +1,22 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="google" value="notranslate"><meta name="description" content="AstraEditor is a Scratch mod with a compiler to run projects faster, dark mode for your eyes, a bunch of addons to improve the editor, and more."/><title>AstraEditor - Run Scratch projects faster</title><link rel="icon" href="favicon.ico"><link rel="apple-touch-icon" href="images/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><style>.splash-screen {
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="google" value="notranslate">
+  <meta name="description"
+    content="AstraEditor is a Scratch mod with a compiler to run projects faster, dark mode for your eyes, a bunch of addons to improve the editor, and more." />
+  <title>
+    AstraEditor - Run Scratch projects faster
+  </title>
+  <link rel="icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+  
+    <link rel="manifest" href="manifest.webmanifest">
+    
+      <style>
+        .splash-screen {
           position: absolute;
           width: 100%;
           height: 100%;
@@ -148,7 +166,43 @@
 
         .splash-reset:disabled {
           opacity: 0.8;
-        }</style></head><body><noscript><div class="splash-screen"><div><h1>AstraEditor requires JavaScript</h1><p>Consider using <a href="https://editors.astras.top/">AstraEditor Desktop</a> if you are afraid of remote JavaScript.</p></div></div></noscript><div class="splash-screen spash-waiting-for-js" hidden><div class="logo"><div class="circle" id="circle_1"></div><div class="circle" id="circle_2"></div><div class="circle" id="circle_3"></div></div><div><div class="splash-error-title" hidden><span class="splash-error-title-text1">Something went wrong. </span><a class="splash-error-link" href="https://github.com/AstraEditor/scratch-gui/issues" target="_blank" rel="noreferrer">Please report</a> <span class="splash-error-title-text2">with the information below.</span></div><div class="splash-errors" hidden></div><button class="splash-reset" hidden>Click here to reset caches (can fix some errors)</button></div></div><script>(function () {
+        }
+      </style>
+</head>
+
+<body>
+  <noscript>
+    <div class="splash-screen">
+      <div>
+        <h1>
+          AstraEditor requires JavaScript
+        </h1>
+        <p>Consider using <a href="https://editors.astras.top/">AstraEditor Desktop</a> if you are afraid of remote
+          JavaScript.</p>
+      </div>
+    </div>
+  </noscript>
+
+  <div class="splash-screen spash-waiting-for-js" hidden>
+    <div class="logo">
+      <div class="circle" id="circle_1"></div>
+      <div class="circle" id="circle_2"></div>
+      <div class="circle" id="circle_3"></div>
+    </div>
+    <div>
+      <div class="splash-error-title" hidden><span class="splash-error-title-text1">Something went wrong. </span><a
+          class="splash-error-link" href="https://github.com/AstraEditor/scratch-gui/issues" target="_blank"
+          rel="noreferrer">Please report</a>
+        <span class="splash-error-title-text2">with the information below.</span>
+      </div>
+      <div class="splash-errors" hidden></div>
+      <button class="splash-reset" hidden>Click here to reset caches (can fix some errors)</button>
+    </div>
+  </div>
+
+
+  <script>
+    (function () {
       'use strict';
 
       // Ignore ResizeObserver errors (common benign browser warning)
@@ -372,4 +426,9 @@
         splash.hidden = true;
         window.onerror = null;
       };
-    })();</script><div id="app"></div><script src="js/pentapod/1238.5e255b731f6b13ac0cee.js"></script><script src="js/pentapod/3797.c634b2b57135c3b3ce7a.js"></script><script src="js/pentapod/1146.a3cc032f40a7a69f1250.js"></script><script src="js/pentapod/240.59df7b4d0074f16d704d.js"></script><script src="js/pentapod/1648.0861cf318af0e1c0d29c.js"></script><script src="js/pentapod/6057.d50364841b066038f90c.js"></script><script src="js/pentapod/player.67a255d0e92213a3d11e.js"></script></body></html>
+    })();
+  </script>
+  <div id="app"></div>
+<script src="js/vendors-node_modules_pnpm_css-loader_6_11_0_webpack_5_106_2_node_modules_css-loader_dist_runt-760044.js"></script><script src="js/vendors-node_modules_pnpm_microbit_microbit-universal-hex_0_2_2_tslib_2_8_1_node_modules_micr-52cddc.js"></script><script src="js/src_lib_brand_js-src_lib_themes_guiHelpers_js-src_lib_themes_themePersistance_js-src_playgrou-f11971.js"></script><script src="js/src_addons_settings-store-singleton_js.js"></script><script src="js/src_addons_entry_js-src_lib_app-state-hoc_jsx-src_lib_tw-state-manager-hoc_jsx-src_playground-3dd446.js"></script><script src="js/src_playground_render-interface_jsx.js"></script><script src="js/player.js"></script></body>
+
+</html>

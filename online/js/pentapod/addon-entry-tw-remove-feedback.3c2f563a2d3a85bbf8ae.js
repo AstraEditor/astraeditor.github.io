@@ -1,1 +1,0 @@
-(self.webpackChunkGUI=self.webpackChunkGUI||[]).push([[8169],{92522(e,s,n){"use strict";n.r(s);var a=n(78158);const c={"remove-feedback.css":n.n(a)()};n.d(s,["resources",0,c])},78158(e,s,n){var a=n(37360),c=n(28049)(a);c.push([e.id,'a[class^="menu-bar_feedback-link_"] {\n  display: none;\n}\n',""]),e.exports=c}}]);
