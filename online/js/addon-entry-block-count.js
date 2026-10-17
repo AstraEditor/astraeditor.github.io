@@ -62,6 +62,7 @@ Object.defineProperty(__WEBPACK_DEFAULT_EXPORT__, "name", { value: "default", co
         let display = topBar.appendChild(document.createElement('span'));
         addon.tab.displayNoneWhileDisabled(display);
         display.style.order = 1;
+        display.style.width = 'max-content';
         display.innerText = msg('blocks', {
           num: getBlockCount().blockCount
         });
