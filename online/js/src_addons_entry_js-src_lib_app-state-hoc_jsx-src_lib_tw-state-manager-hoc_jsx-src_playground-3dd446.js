@@ -96594,6 +96594,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react */ "../../node_modules/.pnpm/react@16.14.0/node_modules/react/index.js");
 /* harmony import */ var _containers_modal_jsx__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../containers/modal.jsx */ "./src/containers/modal.jsx");
 /* harmony import */ var _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./ae-preview-ext.css */ "./src/components/ae-preview-ext/ae-preview-ext.css");
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 
 
 
@@ -96610,8 +96616,13 @@ const messages = (0,react_intl__WEBPACK_IMPORTED_MODULE_0__.defineMessages)({
 
 // 展示组件
 const PreviewExtComponent = props => {
+  // raw | svg
+  const _useState = (0,react__WEBPACK_IMPORTED_MODULE_2__.useState)('svg'),
+    _useState2 = _slicedToArray(_useState, 2),
+    nowPage = _useState2[0],
+    setPage = _useState2[1];
   /** @type {string} */
-  const extContent = props.svgList;
+  const extContent = props.svgList.data;
   const textareaRef = (0,react__WEBPACK_IMPORTED_MODULE_2__.useRef)(null);
   const decode = () => {
     if (extContent.startsWith('http')) {
@@ -96654,11 +96665,43 @@ const PreviewExtComponent = props => {
     id: "previewExt"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", {
     className: _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__["default"].body
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("textarea", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", {
+    className: _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__["default"].Modaltab,
+    style: {
+      margin: '0'
+    }
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("button", {
+    className: nowPage === 'svg' ? _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__["default"].tabButtonEnable : _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__["default"].tabButtonUnable,
+    style: {
+      display: 'inline-block',
+      width: "50%",
+      height: '100%'
+    },
+    onClick: () => setPage('svg')
+  }, "SVG"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("button", {
+    className: nowPage === 'raw' ? _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__["default"].tabButtonEnable : _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__["default"].tabButtonUnable,
+    style: {
+      display: 'inline-block',
+      width: "50%",
+      height: '100%'
+    },
+    onClick: () => setPage('raw')
+  }, "JavaScript")), nowPage === 'raw' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("textarea", {
     ref: textareaRef,
     className: _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__["default"].textarea,
     value: decode(),
     readOnly: true
+  }) : props.svgList.svgs && props.svgList.svgs.length > 0 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", {
+    className: _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__["default"].svgList
+  }, props.svgList.svgs.map((svg, index) => /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", {
+    key: index,
+    className: _ae_preview_ext_css__WEBPACK_IMPORTED_MODULE_4__["default"].svgItem,
+    dangerouslySetInnerHTML: {
+      __html: "<svg className=svgBlock>".concat(svg, "</svg>")
+    }
+  }))) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement(react_intl__WEBPACK_IMPORTED_MODULE_0__.FormattedMessage, {
+    defaultMessage: "No blocks to preview",
+    id: "tw.previewextension.noblocks"
   })));
 };
 PreviewExtComponent.propTypes = {
@@ -101206,13 +101249,17 @@ const ExtensionChooser = props => {
       style: {
         textShadow: '0 0 3px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.5)'
       }
-    }, item.id))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", null, vm.extensionManager.getExtensionURLs()[item.id] && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("button", {
+    }, item.id))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("button", {
       className: _extension_chooser_css__WEBPACK_IMPORTED_MODULE_14__["default"].button,
       style: {
         color: item.color2 == undefined ? item.color1 : item.color2
       },
       onClick: () => {
-        dispatch((0,_reducers_ae_preview_ext_data__WEBPACK_IMPORTED_MODULE_16__.setPreviewExtData)(vm.extensionManager.getExtensionURLs()[item.id]));
+        var _vm$extensionManager$;
+        dispatch((0,_reducers_ae_preview_ext_data__WEBPACK_IMPORTED_MODULE_16__.setPreviewExtData)({
+          data: (_vm$extensionManager$ = vm.extensionManager.getExtensionURLs()[item.id]) !== null && _vm$extensionManager$ !== void 0 ? _vm$extensionManager$ : "data:text/plain;base64,VEFUIFRoaXMgRXh0ZW5zaW9uIGlzIGJ1aWx0SW4gb3IgY2FuJ3QgYmUgbG9hZC4=",
+          svgs: getSVGfromOpcodes(getOpcodefromExt(item))
+        }));
         dispatch((0,_reducers_modals__WEBPACK_IMPORTED_MODULE_15__.openPreviewExt)());
       }
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement(react_intl__WEBPACK_IMPORTED_MODULE_3__.FormattedMessage, {
@@ -127297,10 +127344,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
 const version = {
-  version: '1.2.8',
-  date: '2026-10-17',
-  webBuild: '13',
-  webUpdate: ['跟进上游', '将扩展预览改为预览JS']
+  version: '1.2.9',
+  date: '2026-10-18',
+  webBuild: '14',
+  webUpdate: ['修复SPA插件的诸多问题', '加回扩展的SVG预览']
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (version);
 
@@ -146664,6 +146711,7 @@ ___CSS_LOADER_EXPORT___.push([module.id, `/* overridden by src/lib/themes/guiHel
   height: calc(100vh - 250px);
   overflow-y: auto;
   display: flex;
+  flex-direction: column;
 }
 
 .ae-preview-ext_tab-button-enable_A9tOq,
@@ -146829,7 +146877,75 @@ svg {
   width: 100%;
   flex: 1;
   resize: none;
-}`, "",{"version":3,"sources":["webpack://./src/components/ae-preview-ext/ae-preview-ext.css"],"names":[],"mappings":"AAAA,+CAA+C;;AAE/C;EACE,gBAAgB;AAClB;;AAEA;EACE,sCAAsC;EACtC,2BAA2B;EAC3B,gBAAgB;EAChB,aAAa;AACf;;AAEA;;EAEE,YAAY;EACZ,4BAA4B;EAC5B,YAAY;EACZ,gBAAgB;EAChB,mBAAmB;EACnB,gBAAgB;EAChB,uBAAuB;AACzB;;AAEA;EACE,uBAAuB;AACzB;;AAEA;;EAEE,uBAAuB;AACzB;;AAEA;;EAEE,uBAAuB;AACzB;;AAEA,4CAA4C;;AAE5C;EACE;IACE,iBAAiB;EACnB;;EAEA;IACE,+BAA+B;EACjC;AACF;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,oBAAoB;EACpB,iBAAiB;EACjB,kBAAkB;AACpB;;AAEA;EACE,mCAAmC;AACrC;;AAEA;;EAEE,+BAA+B;AACjC;;AAEA;EACE,YAAY;EACZ,aAAa;EACb,mBAAmB;EACnB,mBAAmB;AACrB;;AAEA;EACE,yBAAyB;AAC3B;;AAEA;;;EAGE,UAAU;EACV,SAAS;EACT,oCAAoC;AACtC;;AAEA;EACE,oBAAoB;AACtB;;AAEA;EACE,kBAAkB;EAClB,SAAS;EACT,6BAA6B;EAC7B,WAAW;EACX,YAAY;EACZ,qBAAqB;EACrB,mBAAmB;EACnB,eAAe;AACjB;;AAEA;EACE,cAAc;EACd,kBAAkB;EAClB,MAAM;EACN,OAAO;EACP,WAAW;EACX,YAAY;EACZ,gCAAgC;AAClC;;AAEA;EACE,oBAAoB;AACtB;;AAEA;EACE,WAAW;AACb;;AAEA;EACE,sBAAsB;AACxB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,mBAAmB;EACnB,oBAAoB;EACpB,iBAAiB;AACnB;;AAEA;EACE,YAAY;EACZ,iBAAiB;EACjB,yCAAyC;AAC3C;;AAEA;EACE,oBAAoB;EACpB,eAAe;EACf,wCAAwC;EACxC,YAAY;EACZ,YAAY;EACZ,oBAAoB;EACpB,SAAS;EACT,kBAAkB;EAClB,eAAe;EACf,oBAAoB;EACpB,iBAAiB;AACnB;;AAEA;;EAEE,8CAA8C;AAChD;;AAEA;EACE,oBAAoB;EACpB,iBAAiB;EACjB,kBAAkB;EAClB,6BAA6B;EAC7B,kCAAkC;AACpC;;AAEA;EACE,oBAAoB;AACtB;;AAEA;EACE,4BAA4B;AAC9B;;AAEA;EACE,WAAW;EACX,OAAO;EACP,YAAY;AACd","sourcesContent":["/* overridden by src/lib/themes/guiHelpers.js */\n\n.modal-content {\n  max-width: 750px;\n}\n\n.body {\n  background: var(--ui-modal-background);\n  height: calc(100vh - 250px);\n  overflow-y: auto;\n  display: flex;\n}\n\n.tab-button-enable,\n.tab-button-unable {\n  border: none;\n  transition: filter 0.2s ease;\n  height: 30px;\n  line-height: 1.5;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n.tab-button-enable {\n  filter: brightness(0.8);\n}\n\n.tab-button-enable:hover,\n.tab-button-unable:hover {\n  filter: brightness(1.2);\n}\n\n.tab-button-enable:active,\n.tab-button-unable:active {\n  filter: brightness(0.5);\n}\n\n/* For small screens, such as in the embed */\n\n@media (max-height: 600px) {\n  .modal-content {\n    margin: 50px auto;\n  }\n\n  .body {\n    max-height: calc(100vh - 150px);\n  }\n}\n\n.setting {\n  display: flex;\n  flex-direction: column;\n  padding: 0.5rem 1rem;\n  margin: 0.25rem 0;\n  border-radius: 4px;\n}\n\n.setting.active {\n  background: var(--badge-background);\n}\n\n.setting:hover,\n.setting:focus-within {\n  background: var(--badge-border);\n}\n\n.label {\n  height: 32px;\n  display: flex;\n  flex-direction: row;\n  align-items: center;\n}\n\n.setting table {\n  border-collapse: collapse;\n}\n\n.setting tr,\n.setting td,\n.setting th {\n  padding: 0;\n  margin: 0;\n  border: 1px solid var(--ui-tertiary);\n}\n\n.checkbox {\n  margin-right: 0.5rem;\n}\n\n.help-icon {\n  position: relative;\n  border: 0;\n  background-color: transparent;\n  width: 20px;\n  height: 20px;\n  background-size: 100%;\n  margin-left: 0.5rem;\n  cursor: pointer;\n}\n\n.help-icon img {\n  display: block;\n  position: absolute;\n  top: 0;\n  left: 0;\n  width: 100%;\n  height: 100%;\n  filter: var(--filter-icon-black);\n}\n\n.custom-stage-size > * {\n  margin-right: 0.5rem;\n}\n\n.custom-stage-size-input {\n  width: 80px;\n}\n\n.info {\n  margin-bottom: 0.25rem;\n}\n\n.header {\n  display: flex;\n  flex-direction: row;\n  align-items: center;\n  margin: 0.5rem 0 0 0;\n  font-weight: bold;\n}\n\n.divider {\n  flex-grow: 1;\n  margin-left: 1rem;\n  border-top: 1px dashed var(--ui-tertiary);\n}\n\n.button {\n  font-family: inherit;\n  font-size: 14px;\n  background-color: var(--looks-secondary);\n  color: white;\n  border: none;\n  padding: 0.5rem 1rem;\n  margin: 0;\n  border-radius: 4px;\n  cursor: pointer;\n  font-family: inherit;\n  font-weight: bold;\n}\n\n.button:active,\n.button:focus-within {\n  box-shadow: 0 0 0 3px var(--looks-transparent);\n}\n\n.warning {\n  padding: 0.5rem 1rem;\n  margin: 0.25rem 0;\n  border-radius: 4px;\n  background: rgb(233, 233, 53);\n  color: var(--text-primary-default);\n}\n\n.svgItem {\n  margin-bottom: -75px;\n}\n\nsvg {\n  overflow: visible !important;\n}\n\n.textarea {\n  width: 100%;\n  flex: 1;\n  resize: none;\n}"],"sourceRoot":""}]);
+}
+
+.ae-preview-ext_tab-button-enable_A9tOq,
+.ae-preview-ext_tab-button-unable_CJiS5 {
+  border: none;
+  transition: all 0.15s cubic-bezier(0, 0.7, 0.3, 0.99);
+  height: 30px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--ui-modal-background);
+  filter: brightness(0.8);
+  -webkit-filter: brightness(0.8);
+}
+
+.ae-preview-ext_Modaltab__PgCc {
+  position: relative;
+  height: 35px;
+}
+
+.ae-preview-ext_tab-button-enable_A9tOq {
+  filter: brightness(1);
+  -webkit-filter: brightness(1);
+}
+
+.ae-preview-ext_Modaltab__PgCc::after {
+  content: '';
+  position: absolute;
+  width: 50%;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background-color: var(--looks-secondary);
+  transition: all 0.15s cubic-bezier(0, 0.7, 0.3, 0.99);
+}
+
+.ae-preview-ext_Modaltab__PgCc:has(button:nth-child(1).ae-preview-ext_tab-button-enable_A9tOq)::after {
+  left: 0;
+}
+
+.ae-preview-ext_Modaltab__PgCc:has(button:nth-child(2).ae-preview-ext_tab-button-enable_A9tOq)::after {
+  left: 50%;
+}
+
+.ae-preview-ext_Modaltab__PgCc:has(button:active)::after {
+  width: 100% !important;
+  left: 0 !important;
+}
+
+.ae-preview-ext_tab-button-unable_CJiS5:hover {
+  filter: brightness(0.9);
+  -webkit-filter: brightness(0.9);
+}
+
+.ae-preview-ext_tab-button-enable_A9tOq:hover {
+  filter: brightness(1.1);
+  -webkit-filter: brightness(1.1);
+}
+
+.ae-preview-ext_tab-button-enable_A9tOq:active,
+.ae-preview-ext_tab-button-unable_CJiS5:active {
+  filter: brightness(0.9);
+  background: var(--ui-modal-background);
+}
+
+.ae-preview-ext_svg-list_FUTrp {
+  overflow: auto;
+}`, "",{"version":3,"sources":["webpack://./src/components/ae-preview-ext/ae-preview-ext.css"],"names":[],"mappings":"AAAA,+CAA+C;;AAE/C;EACE,gBAAgB;AAClB;;AAEA;EACE,sCAAsC;EACtC,2BAA2B;EAC3B,gBAAgB;EAChB,aAAa;EACb,sBAAsB;AACxB;;AAEA;;EAEE,YAAY;EACZ,4BAA4B;EAC5B,YAAY;EACZ,gBAAgB;EAChB,mBAAmB;EACnB,gBAAgB;EAChB,uBAAuB;AACzB;;AAEA;EACE,uBAAuB;AACzB;;AAEA;;EAEE,uBAAuB;AACzB;;AAEA;;EAEE,uBAAuB;AACzB;;AAEA,4CAA4C;;AAE5C;EACE;IACE,iBAAiB;EACnB;;EAEA;IACE,+BAA+B;EACjC;AACF;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,oBAAoB;EACpB,iBAAiB;EACjB,kBAAkB;AACpB;;AAEA;EACE,mCAAmC;AACrC;;AAEA;;EAEE,+BAA+B;AACjC;;AAEA;EACE,YAAY;EACZ,aAAa;EACb,mBAAmB;EACnB,mBAAmB;AACrB;;AAEA;EACE,yBAAyB;AAC3B;;AAEA;;;EAGE,UAAU;EACV,SAAS;EACT,oCAAoC;AACtC;;AAEA;EACE,oBAAoB;AACtB;;AAEA;EACE,kBAAkB;EAClB,SAAS;EACT,6BAA6B;EAC7B,WAAW;EACX,YAAY;EACZ,qBAAqB;EACrB,mBAAmB;EACnB,eAAe;AACjB;;AAEA;EACE,cAAc;EACd,kBAAkB;EAClB,MAAM;EACN,OAAO;EACP,WAAW;EACX,YAAY;EACZ,gCAAgC;AAClC;;AAEA;EACE,oBAAoB;AACtB;;AAEA;EACE,WAAW;AACb;;AAEA;EACE,sBAAsB;AACxB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,mBAAmB;EACnB,oBAAoB;EACpB,iBAAiB;AACnB;;AAEA;EACE,YAAY;EACZ,iBAAiB;EACjB,yCAAyC;AAC3C;;AAEA;EACE,oBAAoB;EACpB,eAAe;EACf,wCAAwC;EACxC,YAAY;EACZ,YAAY;EACZ,oBAAoB;EACpB,SAAS;EACT,kBAAkB;EAClB,eAAe;EACf,oBAAoB;EACpB,iBAAiB;AACnB;;AAEA;;EAEE,8CAA8C;AAChD;;AAEA;EACE,oBAAoB;EACpB,iBAAiB;EACjB,kBAAkB;EAClB,6BAA6B;EAC7B,kCAAkC;AACpC;;AAEA;EACE,oBAAoB;AACtB;;AAEA;EACE,4BAA4B;AAC9B;;AAEA;EACE,WAAW;EACX,OAAO;EACP,YAAY;AACd;;AAEA;;EAEE,YAAY;EACZ,qDAAqD;EACrD,YAAY;EACZ,gBAAgB;EAChB,mBAAmB;EACnB,gBAAgB;EAChB,uBAAuB;EACvB,sCAAsC;EACtC,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA;EACE,kBAAkB;EAClB,YAAY;AACd;;AAEA;EACE,qBAAqB;EACrB,6BAA6B;AAC/B;;AAEA;EACE,WAAW;EACX,kBAAkB;EAClB,UAAU;EACV,OAAO;EACP,SAAS;EACT,WAAW;EACX,wCAAwC;EACxC,qDAAqD;AACvD;;AAEA;EACE,OAAO;AACT;;AAEA;EACE,SAAS;AACX;;AAEA;EACE,sBAAsB;EACtB,kBAAkB;AACpB;;AAEA;EACE,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA;EACE,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA;;EAEE,uBAAuB;EACvB,sCAAsC;AACxC;;AAEA;EACE,cAAc;AAChB","sourcesContent":["/* overridden by src/lib/themes/guiHelpers.js */\n\n.modal-content {\n  max-width: 750px;\n}\n\n.body {\n  background: var(--ui-modal-background);\n  height: calc(100vh - 250px);\n  overflow-y: auto;\n  display: flex;\n  flex-direction: column;\n}\n\n.tab-button-enable,\n.tab-button-unable {\n  border: none;\n  transition: filter 0.2s ease;\n  height: 30px;\n  line-height: 1.5;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n.tab-button-enable {\n  filter: brightness(0.8);\n}\n\n.tab-button-enable:hover,\n.tab-button-unable:hover {\n  filter: brightness(1.2);\n}\n\n.tab-button-enable:active,\n.tab-button-unable:active {\n  filter: brightness(0.5);\n}\n\n/* For small screens, such as in the embed */\n\n@media (max-height: 600px) {\n  .modal-content {\n    margin: 50px auto;\n  }\n\n  .body {\n    max-height: calc(100vh - 150px);\n  }\n}\n\n.setting {\n  display: flex;\n  flex-direction: column;\n  padding: 0.5rem 1rem;\n  margin: 0.25rem 0;\n  border-radius: 4px;\n}\n\n.setting.active {\n  background: var(--badge-background);\n}\n\n.setting:hover,\n.setting:focus-within {\n  background: var(--badge-border);\n}\n\n.label {\n  height: 32px;\n  display: flex;\n  flex-direction: row;\n  align-items: center;\n}\n\n.setting table {\n  border-collapse: collapse;\n}\n\n.setting tr,\n.setting td,\n.setting th {\n  padding: 0;\n  margin: 0;\n  border: 1px solid var(--ui-tertiary);\n}\n\n.checkbox {\n  margin-right: 0.5rem;\n}\n\n.help-icon {\n  position: relative;\n  border: 0;\n  background-color: transparent;\n  width: 20px;\n  height: 20px;\n  background-size: 100%;\n  margin-left: 0.5rem;\n  cursor: pointer;\n}\n\n.help-icon img {\n  display: block;\n  position: absolute;\n  top: 0;\n  left: 0;\n  width: 100%;\n  height: 100%;\n  filter: var(--filter-icon-black);\n}\n\n.custom-stage-size > * {\n  margin-right: 0.5rem;\n}\n\n.custom-stage-size-input {\n  width: 80px;\n}\n\n.info {\n  margin-bottom: 0.25rem;\n}\n\n.header {\n  display: flex;\n  flex-direction: row;\n  align-items: center;\n  margin: 0.5rem 0 0 0;\n  font-weight: bold;\n}\n\n.divider {\n  flex-grow: 1;\n  margin-left: 1rem;\n  border-top: 1px dashed var(--ui-tertiary);\n}\n\n.button {\n  font-family: inherit;\n  font-size: 14px;\n  background-color: var(--looks-secondary);\n  color: white;\n  border: none;\n  padding: 0.5rem 1rem;\n  margin: 0;\n  border-radius: 4px;\n  cursor: pointer;\n  font-family: inherit;\n  font-weight: bold;\n}\n\n.button:active,\n.button:focus-within {\n  box-shadow: 0 0 0 3px var(--looks-transparent);\n}\n\n.warning {\n  padding: 0.5rem 1rem;\n  margin: 0.25rem 0;\n  border-radius: 4px;\n  background: rgb(233, 233, 53);\n  color: var(--text-primary-default);\n}\n\n.svgItem {\n  margin-bottom: -75px;\n}\n\nsvg {\n  overflow: visible !important;\n}\n\n.textarea {\n  width: 100%;\n  flex: 1;\n  resize: none;\n}\n\n.tab-button-enable,\n.tab-button-unable {\n  border: none;\n  transition: all 0.15s cubic-bezier(0, 0.7, 0.3, 0.99);\n  height: 30px;\n  line-height: 1.5;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  background: var(--ui-modal-background);\n  filter: brightness(0.8);\n  -webkit-filter: brightness(0.8);\n}\n\n.Modaltab {\n  position: relative;\n  height: 35px;\n}\n\n.tab-button-enable {\n  filter: brightness(1);\n  -webkit-filter: brightness(1);\n}\n\n.Modaltab::after {\n  content: '';\n  position: absolute;\n  width: 50%;\n  left: 0;\n  bottom: 0;\n  height: 2px;\n  background-color: var(--looks-secondary);\n  transition: all 0.15s cubic-bezier(0, 0.7, 0.3, 0.99);\n}\n\n.Modaltab:has(button:nth-child(1).tab-button-enable)::after {\n  left: 0;\n}\n\n.Modaltab:has(button:nth-child(2).tab-button-enable)::after {\n  left: 50%;\n}\n\n.Modaltab:has(button:active)::after {\n  width: 100% !important;\n  left: 0 !important;\n}\n\n.tab-button-unable:hover {\n  filter: brightness(0.9);\n  -webkit-filter: brightness(0.9);\n}\n\n.tab-button-enable:hover {\n  filter: brightness(1.1);\n  -webkit-filter: brightness(1.1);\n}\n\n.tab-button-enable:active,\n.tab-button-unable:active {\n  filter: brightness(0.9);\n  background: var(--ui-modal-background);\n}\n\n.svg-list {\n  overflow: auto;\n}"],"sourceRoot":""}]);
 // Exports
 ___CSS_LOADER_EXPORT___.locals = {
 	"modal-content": `ae-preview-ext_modal-content_uCUqm`,
@@ -146855,7 +146971,11 @@ ___CSS_LOADER_EXPORT___.locals = {
 	"button": `ae-preview-ext_button_EWN7A`,
 	"warning": `ae-preview-ext_warning_arnJK`,
 	"svgItem": `ae-preview-ext_svgItem_aT8q4`,
-	"textarea": `ae-preview-ext_textarea_lbB7a`
+	"textarea": `ae-preview-ext_textarea_lbB7a`,
+	"Modaltab": `ae-preview-ext_Modaltab__PgCc`,
+	"modaltab": `ae-preview-ext_Modaltab__PgCc`,
+	"svg-list": `ae-preview-ext_svg-list_FUTrp`,
+	"svgList": `ae-preview-ext_svg-list_FUTrp`
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
