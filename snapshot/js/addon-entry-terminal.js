@@ -497,7 +497,6 @@ const clamp = (i, min, max) => Math.max(min, Math.min(max, i));
 
 class TerminalVirtualList {
   constructor() {
-    let options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
     this.rows = [];
     this.renderedStartIndex = -1;
     this.renderedEndIndex = -1;
@@ -672,6 +671,14 @@ class TerminalVirtualList {
     }
   }
 }
+
+/**
+ * Terminal 插件入口。
+ * @param {object} options 插件运行环境
+ * @param {object} options.addon 插件 API
+ * @param {Console} options.console 控制台对象
+ * @param {Function} options.msg 国际化函数
+ */
 /* harmony default export */ async function __WEBPACK_DEFAULT_EXPORT__(_ref3) {
   let addon = _ref3.addon,
     console = _ref3.console,
@@ -692,6 +699,10 @@ class TerminalVirtualList {
   const POSITION_STORAGE_KEY = 'AETerminalPosition';
 
   // 从 localStorage 读取保存的位置
+  /**
+   * 读取保存的 Terminal 位置。
+   * @returns {string} Terminal 位置
+   */
   function loadSavedPosition() {
     try {
       const saved = localStorage.getItem(POSITION_STORAGE_KEY);
@@ -716,6 +727,10 @@ class TerminalVirtualList {
   }
 
   // 保存位置到 localStorage
+  /**
+   * 保存 Terminal 位置。
+   * @param {string} newPosition 新位置
+   */
   function savePosition(newPosition) {
     try {
       localStorage.setItem(POSITION_STORAGE_KEY, newPosition);
@@ -728,6 +743,10 @@ class TerminalVirtualList {
   let currentPosition = loadSavedPosition();
 
   // 检测是否启用 VSCode 布局
+  /**
+   * 判断 VSCode 布局是否启用。
+   * @returns {boolean} 是否启用
+   */
   function isVSCodeLayoutEnabled() {
     try {
       const settings = localStorage.getItem('AESettings');
@@ -774,6 +793,10 @@ class TerminalVirtualList {
   const RESIZE_THRESHOLD = 8;
 
   // 创建独立窗口
+  /**
+   * 创建独立窗口。
+   * @returns {HTMLElement} 独立窗口元素
+   */
   function createFloatingWindow() {
     if (floatingWindow) return floatingWindow;
     floatingWindow = document.createElement('div');
@@ -792,6 +815,11 @@ class TerminalVirtualList {
     document.body.appendChild(floatingWindow);
     return floatingWindow;
   }
+
+  /**
+   * 处理窗口拖动。
+   * @param {MouseEvent} e 鼠标事件
+   */
   function handleWindowDrag(e) {
     if (!isDraggingWindow) return;
     const x = e.clientX - dragOffsetX;
@@ -800,9 +828,13 @@ class TerminalVirtualList {
     const windowHeight = floatingWindow.offsetHeight;
     const maxX = window.innerWidth - windowWidth;
     const maxY = window.innerHeight - windowHeight;
-    floatingWindow.style.left = Math.min(Math.max(0, x), maxX) + 'px';
-    floatingWindow.style.top = Math.min(Math.max(0, y), maxY) + 'px';
+    floatingWindow.style.left = "".concat(Math.min(Math.max(0, x), maxX), "px");
+    floatingWindow.style.top = "".concat(Math.min(Math.max(0, y), maxY), "px");
   }
+
+  /**
+   * 结束窗口拖动。
+   */
   function stopWindowDrag() {
     isDraggingWindow = false;
     document.removeEventListener('mousemove', handleWindowDrag);
@@ -810,6 +842,10 @@ class TerminalVirtualList {
   }
 
   // 处理窗口调整大小
+  /**
+   * 处理窗口大小调整。
+   * @param {MouseEvent} e 鼠标事件
+   */
   function handleWindowResize(e) {
     if (!isResizing) return;
     const deltaX = e.clientX - resizeStartX;
@@ -867,14 +903,17 @@ class TerminalVirtualList {
       // 再次确保大小不超过页面
       newWidth = Math.min(newWidth, window.innerWidth);
       newHeight = Math.min(newHeight, window.innerHeight);
-      floatingWindow.style.width = newWidth + 'px';
-      floatingWindow.style.height = newHeight + 'px';
-      floatingWindow.style.left = newLeft + 'px';
-      floatingWindow.style.top = newTop + 'px';
+      floatingWindow.style.width = "".concat(newWidth, "px");
+      floatingWindow.style.height = "".concat(newHeight, "px");
+      floatingWindow.style.left = "".concat(newLeft, "px");
+      floatingWindow.style.top = "".concat(newTop, "px");
     }
   }
 
   // 停止调整大小
+  /**
+   * 结束窗口大小调整。
+   */
   function stopWindowResize() {
     isResizing = false;
     resizeDirection = '';
@@ -886,6 +925,11 @@ class TerminalVirtualList {
   }
 
   // 检测调整大小的方向
+  /**
+   * 获取鼠标所在的调整方向。
+   * @param {MouseEvent} e 鼠标事件
+   * @returns {string} 调整方向
+   */
   function getResizeDirection(e) {
     if (!floatingWindow) return '';
     const rect = floatingWindow.getBoundingClientRect();
@@ -923,6 +967,10 @@ class TerminalVirtualList {
   }
 
   // 更新鼠标样式
+  /**
+   * 更新窗口鼠标样式。
+   * @param {MouseEvent} e 鼠标事件
+   */
   function updateCursorStyle(e) {
     if (!floatingWindow) return;
     const direction = getResizeDirection(e);
@@ -945,15 +993,22 @@ class TerminalVirtualList {
         cursor = 'ns-resize';
         break;
       default:
-        // 检查是否在标题栏区域
-        const rect = floatingWindow.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        cursor = y <= 30 ? 'move' : '';
+        {
+          // 检查是否在标题栏区域
+          const rect = floatingWindow.getBoundingClientRect();
+          const y = e.clientY - rect.top;
+          cursor = y <= 30 ? 'move' : '';
+          break;
+        }
     }
     floatingWindow.style.cursor = cursor;
   }
 
   // 切换 Terminal 位置
+  /**
+   * 切换 Terminal 位置。
+   * @param {string} newPosition 新位置
+   */
   function switchTerminalPosition(newPosition) {
     if (newPosition === currentPosition) return;
 
@@ -976,6 +1031,10 @@ class TerminalVirtualList {
   }
 
   // 在指定位置打开 Terminal
+  /**
+   * 在指定位置打开 Terminal。
+   * @param {string} position Terminal 位置
+   */
   function openTerminalAtPosition(position) {
     switch (position) {
       case POSITION_TYPES.SIDEBAR:
@@ -985,39 +1044,45 @@ class TerminalVirtualList {
         _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_0__["default"].switchTo('terminal');
         break;
       case POSITION_TYPES.WINDOW:
-        const window = createFloatingWindow();
-        window.style.display = 'flex';
+        {
+          const window = createFloatingWindow();
+          window.style.display = 'flex';
 
-        // 添加 terminalContainer 到窗口
-        window.appendChild(terminalContainer);
-        terminalContainer.style.flex = '1';
-        terminalContainer.style.overflow = 'auto';
+          // 添加 terminalContainer 到窗口
+          window.appendChild(terminalContainer);
+          terminalContainer.style.flex = '1';
+          terminalContainer.style.overflow = 'auto';
 
-        // 启用虚拟列表
-        virtualList.show();
+          // 启用虚拟列表
+          virtualList.show();
 
-        // 在独立窗口模式下，terminalHeader 作为拖拽标题栏
-        terminalHeader.style.cursor = 'move';
-        terminalHeader.style.userSelect = 'none';
+          // 在独立窗口模式下，terminalHeader 作为拖拽标题栏
+          terminalHeader.style.cursor = 'move';
+          terminalHeader.style.userSelect = 'none';
 
-        // 显示关闭按钮
-        if (windowCloseButton) {
-          windowCloseButton.style.display = 'block';
+          // 显示关闭按钮
+          if (windowCloseButton) {
+            windowCloseButton.style.display = 'block';
+          }
+
+          // 启用拖拽功能
+          terminalHeader.addEventListener('mousedown', handleWindowDragStart);
+
+          // 在整个窗口上添加 mousedown 事件监听器，用于调整大小
+          floatingWindow.addEventListener('mousedown', handleWindowResizeStart);
+
+          // 添加鼠标移动事件监听器，用于更新鼠标样式
+          floatingWindow.addEventListener('mousemove', updateCursorStyle);
+          break;
         }
-
-        // 启用拖拽功能
-        terminalHeader.addEventListener('mousedown', handleWindowDragStart);
-
-        // 在整个窗口上添加 mousedown 事件监听器，用于调整大小
-        floatingWindow.addEventListener('mousedown', handleWindowResizeStart);
-
-        // 添加鼠标移动事件监听器，用于更新鼠标样式
-        floatingWindow.addEventListener('mousemove', updateCursorStyle);
-        break;
     }
   }
 
   // 关闭指定位置的 Terminal
+  /**
+   * 关闭指定位置的 Terminal。
+   * @param {string} position Terminal 位置
+   */
   function closeTerminalAtPosition(position) {
     switch (position) {
       case POSITION_TYPES.SIDEBAR:
@@ -1055,6 +1120,10 @@ class TerminalVirtualList {
   }
 
   // 处理窗口拖拽开始
+  /**
+   * 开始拖动窗口。
+   * @param {MouseEvent} e 鼠标事件
+   */
   function handleWindowDragStart(e) {
     // 不在拖拽按钮上开始拖拽
     if (e.target.tagName === 'BUTTON') return;
@@ -1068,6 +1137,10 @@ class TerminalVirtualList {
   }
 
   // 处理窗口调整大小开始（在整个窗口）
+  /**
+   * 开始调整窗口大小。
+   * @param {MouseEvent} e 鼠标事件
+   */
   function handleWindowResizeStart(e) {
     // 不在按钮上开始调整大小
     if (e.target.tagName === 'BUTTON') return;
@@ -1089,6 +1162,10 @@ class TerminalVirtualList {
   }
 
   // 切换 Terminal 显示/隐藏
+  /**
+   * 切换 Terminal 显示状态。
+   * @param {boolean} [show] 是否显示
+   */
   function toggleTerminal(show) {
     if (show === undefined) {
       show = !isTerminalVisible();
@@ -1101,6 +1178,10 @@ class TerminalVirtualList {
   }
 
   // 检查 Terminal 是否可见
+  /**
+   * 判断 Terminal 是否可见。
+   * @returns {boolean} 是否可见
+   */
   function isTerminalVisible() {
     switch (currentPosition) {
       case POSITION_TYPES.SIDEBAR:
@@ -1115,7 +1196,7 @@ class TerminalVirtualList {
   }
 
   // 等待项目加载完成
-  await new Promise((resolve, reject) => {
+  await new Promise(resolve => {
     if (vm.editingTarget) return resolve();
     vm.runtime.once('PROJECT_LOADED', resolve);
   });
@@ -1273,9 +1354,6 @@ class TerminalVirtualList {
   settingsBtnIcon.src = (0,_lib_tw_recolor_build_icon_setting_svg__WEBPACK_IMPORTED_MODULE_8__["default"])();
   settingsBtnIcon.style.cssText = "\n    width: 16px;\n    height: 16px;\n    filter: grayscale(100%);\n  ";
   settingsButton.appendChild(settingsBtnIcon);
-
-  // 设置界面状态
-  let isSettingsVisible = false;
 
   // 创建设置界面
   const settingsPanel = document.createElement('div');
@@ -1439,13 +1517,11 @@ class TerminalVirtualList {
 
   // 切换显示设置界面（完全替代整个 Terminal 面板）
   const showSettingsPanel = () => {
-    isSettingsVisible = true;
     terminalHeader.style.display = 'none';
     terminalOutput.style.display = 'none';
     settingsPanel.style.display = 'flex';
   };
   const hideSettingsPanel = () => {
-    isSettingsVisible = false;
     terminalHeader.style.display = '';
     terminalOutput.style.display = '';
     settingsPanel.style.display = 'none';
@@ -1466,6 +1542,10 @@ class TerminalVirtualList {
   };
 
   // 更新位置图标映射（重新生成SVG数据）
+  /**
+   * 获取各位置对应的图标。
+   * @returns {object} 位置图标映射
+   */
   function updatePositionIcons() {
     return {
       [POSITION_TYPES.SIDEBAR]: (0,_lib_tw_recolor_build_icon_sidebar_svg__WEBPACK_IMPORTED_MODULE_3__["default"])(),
@@ -1580,6 +1660,9 @@ class TerminalVirtualList {
   });
 
   // 更新位置切换按钮状态
+  /**
+   * 更新位置切换按钮的显示状态。
+   */
   function updatePositionSwitchButton() {
     // 重新生成图标数据
     positionIcons = updatePositionIcons();
@@ -1647,10 +1730,7 @@ class TerminalVirtualList {
   terminalContainer.appendChild(terminalHeader);
 
   // 创建终端输出区域（虚拟滚动列表）
-  const virtualList = new TerminalVirtualList({
-    rowHeight: 16,
-    batchTimeout: 50
-  });
+  const virtualList = new TerminalVirtualList();
   const terminalOutput = virtualList.outerElement;
 
   // 初始化欢迎信息
@@ -1969,7 +2049,7 @@ class TerminalVirtualList {
         }
         return String(arg);
       }).join(' ');
-      textSpan.textContent = ' ' + message;
+      textSpan.textContent = " ".concat(message);
       line.appendChild(textSpan);
       if (args[0] instanceof Error && args[0].stack) {
         const stackInfo = document.createElement('span');
@@ -1987,39 +2067,6 @@ class TerminalVirtualList {
   // 重复内容处理
   let lastLogData = null;
   let lastLogCount = 1;
-  const addLogLine = (content, element) => {
-    const currentContent = content;
-    if (isMergeOutputEnabled && lastLogData && currentContent === lastLogData.contentHash) {
-      lastLogCount++;
-      lastLogData.count = lastLogCount;
-      if (lastLogData.element && lastLogData.element.parentNode) {
-        let counter = lastLogData.element.querySelector('.sa-terminal-log-counter');
-        if (!counter) {
-          counter = document.createElement('span');
-          counter.className = 'sa-terminal-log-counter';
-          lastLogData.element.insertBefore(counter, lastLogData.element.firstChild);
-        }
-        counter.textContent = lastLogCount;
-      }
-    } else {
-      let lineElement = element;
-      if (!lineElement) {
-        lineElement = document.createElement('div');
-        lineElement.className = 'sa-terminal-log-line';
-        lineElement.textContent = content;
-      }
-      virtualList.appendLog({
-        element: lineElement,
-        contentHash: currentContent
-      });
-      lastLogData = {
-        contentHash: currentContent,
-        element: lineElement,
-        count: 1
-      };
-      lastLogCount = 1;
-    }
-  };
 
   // 重置重复内容记录（用于非积木输出的内容）
   const resetLogTracking = () => {
@@ -2082,7 +2129,7 @@ class TerminalVirtualList {
           line.appendChild(mark);
           const textSpan = document.createElement('span');
           textSpan.className = 'sa-terminal-log-text';
-          textSpan.textContent = ' ' + (msg('breakpoint-editor-only') || '断点积木只能在编辑器中使用。');
+          textSpan.textContent = " ".concat(msg('breakpoint-editor-only') || '断点积木只能在编辑器中使用。');
           line.appendChild(textSpan);
           addLogLineWithElement(line);
         }
@@ -2099,7 +2146,7 @@ class TerminalVirtualList {
         line.appendChild(mark);
         const textSpan = document.createElement('span');
         textSpan.className = 'sa-terminal-log-text';
-        textSpan.textContent = ' ' + (msg('breakpoint-paused') || '程序已暂停');
+        textSpan.textContent = " ".concat(msg('breakpoint-paused') || '程序已暂停');
         line.appendChild(textSpan);
         if (thread) {
           const blockId = thread.peekStack();
@@ -2155,58 +2202,91 @@ class TerminalVirtualList {
     }
   });
 
+  // 转义 HTML，避免 BBCode 内容注入脚本或标签
+  const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+
+  // 仅允许常见 CSS 颜色格式，避免通过颜色值注入样式
+  const sanitizeCssColor = value => {
+    const color = String(value).trim();
+    if (/^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color)) {
+      return color;
+    }
+    if (/^[a-z]+$/i.test(color)) return color;
+    if (/^rgba?\([\d\s.,%]+\)$/i.test(color)) return color;
+    if (/^hsla?\([\d\s.,%]+\)$/i.test(color)) return color;
+    return null;
+  };
+  const parseColorList = value => {
+    const colors = String(value).trim().split(/\s+/).map(sanitizeCssColor).filter(Boolean);
+    return colors.length > 0 ? colors : null;
+  };
+  const sanitizeUrl = value => {
+    try {
+      // HTML 转义阶段可能把 URL 中的 & 转成 &amp;，解析前先还原
+      const url = new URL(String(value).replace(/&amp;/g, '&').trim(), window.location.href);
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        return url.href;
+      }
+    } catch (_unused2) {
+      // 无效 URL 不生成链接
+    }
+    return null;
+  };
+
   // BBCode 解析函数
   const parseBBCode = text => {
-    let result = text;
-
-    // 处理转义字符（先存储起来）
+    // 先保护反斜杠转义，再转义 HTML，最后解析 BBCode。
+    // 这样用户输入中的原始 HTML 不会进入 innerHTML。
     const escapeMap = {};
     let escapeIndex = 0;
-    result = result.replace(/\\(.)/g, (match, char) => {
+    let result = String(text !== null && text !== void 0 ? text : '').replace(/\\(.)/g, (match, char) => {
       const key = "__ESCAPE_".concat(escapeIndex++, "__");
       escapeMap[key] = char;
       return key;
     });
+    result = escapeHTML(result);
 
     // 渐变颜色（多个颜色用空格分隔）- 必须先于单色处理
-    result = result.replace(/\[color=([^\]]+)\](.*?)\[\/color\]/gi, (match, colors, content) => {
-      const colorArray = colors.trim().split(/\s+/);
-      if (colorArray.length >= 2) {
-        return "<span style=\"background: linear-gradient(to right, ".concat(colorArray.join(', '), "); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">").concat(content, "</span>");
+    result = result.replace(/\[color=([^\]]+)\](.*?)\[\/color\]/gi, (match, colorValue, content) => {
+      const colors = parseColorList(colorValue);
+      if (!colors) return content;
+      if (colors.length >= 2) {
+        return "<span style=\"background: linear-gradient(to right, ".concat(colors.join(', '), "); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">").concat(content, "</span>");
       }
-      return "<span style=\"color:".concat(colors, "\">").concat(content, "</span>");
+      return "<span style=\"color:".concat(colors[0], "\">").concat(content, "</span>");
     });
-    result = result.replace(/\[c=([^\]]+)\](.*?)\[\/c\]/gi, (match, colors, content) => {
-      const colorArray = colors.trim().split(/\s+/);
-      if (colorArray.length >= 2) {
-        return "<span style=\"background: linear-gradient(to right, ".concat(colorArray.join(', '), "); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">").concat(content, "</span>");
+    result = result.replace(/\[c=([^\]]+)\](.*?)\[\/c\]/gi, (match, colorValue, content) => {
+      const colors = parseColorList(colorValue);
+      if (!colors) return content;
+      if (colors.length >= 2) {
+        return "<span style=\"background: linear-gradient(to right, ".concat(colors.join(', '), "); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">").concat(content, "</span>");
       }
-      return "<span style=\"color:".concat(colors, "\">").concat(content, "</span>");
+      return "<span style=\"color:".concat(colors[0], "\">").concat(content, "</span>");
     });
 
     // 渐变背景（多个颜色用空格分隔）- 必须先于单色处理
-    result = result.replace(/\[background=([^\]]+)\](.*?)\[\/background\]/gi, (match, colors, content) => {
-      const colorArray = colors.trim().split(/\s+/);
-      if (colorArray.length >= 2) {
-        return "<span style=\"background: linear-gradient(to right, ".concat(colorArray.join(', '), ");\">").concat(content, "</span>");
+    result = result.replace(/\[background=([^\]]+)\](.*?)\[\/background\]/gi, (match, colorValue, content) => {
+      const colors = parseColorList(colorValue);
+      if (!colors) return content;
+      if (colors.length >= 2) {
+        return "<span style=\"background: linear-gradient(to right, ".concat(colors.join(', '), ");\">").concat(content, "</span>");
       }
-      return "<span style=\"background-color:".concat(colors, "\">").concat(content, "</span>");
+      return "<span style=\"background-color:".concat(colors[0], "\">").concat(content, "</span>");
     });
-    result = result.replace(/\[bg=([^\]]+)\](.*?)\[\/bg\]/gi, (match, colors, content) => {
-      const colorArray = colors.trim().split(/\s+/);
-      if (colorArray.length >= 2) {
-        return "<span style=\"background: linear-gradient(to right, ".concat(colorArray.join(', '), ");\">").concat(content, "</span>");
+    result = result.replace(/\[bg=([^\]]+)\](.*?)\[\/bg\]/gi, (match, colorValue, content) => {
+      const colors = parseColorList(colorValue);
+      if (!colors) return content;
+      if (colors.length >= 2) {
+        return "<span style=\"background: linear-gradient(to right, ".concat(colors.join(', '), ");\">").concat(content, "</span>");
       }
-      return "<span style=\"background-color:".concat(colors, "\">").concat(content, "</span>");
+      return "<span style=\"background-color:".concat(colors[0], "\">").concat(content, "</span>");
     });
-
-    // 背景色标签
-    result = result.replace(/\[background=([^\]]+)\](.*?)\[\/background\]/gi, '<span style="background-color:$1">$2</span>');
-    result = result.replace(/\[bg=([^\]]+)\](.*?)\[\/bg\]/gi, '<span style="background-color:$1">$2</span>');
-
-    // 颜色标签
-    result = result.replace(/\[color=([^\]]+)\](.*?)\[\/color\]/gi, '<span style="color:$1">$2</span>');
-    result = result.replace(/\[c=([^\]]+)\](.*?)\[\/c\]/gi, '<span style="color:$1">$2</span>');
 
     // 将换行符转换为 <br>
     result = result.replace(/\n/g, '<br>');
@@ -2264,18 +2344,22 @@ class TerminalVirtualList {
     });
 
     // 链接标签 [url=...]
-    result = result.replace(/\[url=([^\]]+)\](.*?)\[\/url\]/gi, '<a href="$1" target="_blank" class="sa-terminal-url-link">$2</a>');
+    result = result.replace(/\[url=([^\]]+)\](.*?)\[\/url\]/gi, (match, url, content) => {
+      const safeUrl = sanitizeUrl(url);
+      if (!safeUrl) return content;
+      return "<a href=\"".concat(escapeHTML(safeUrl), "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"sa-terminal-url-link\">").concat(content, "</a>");
+    });
 
-    // 恢复转义字符
+    // 恢复转义字符；恢复时同样做 HTML 转义，避免绕过上面的保护
     Object.keys(escapeMap).forEach(key => {
-      result = result.replace(key, escapeMap[key]);
+      result = result.replace(key, escapeHTML(escapeMap[key]));
     });
     return result;
   };
   const createTextWithLinks = (container, text, color) => {
     container.innerHTML = '';
     container.style.color = color || '';
-    const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`\[\]]+|data:[^\s<>"{}|\\^`\[\]]+)/gi;
+    const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|data:[^\s<>"{}|\\^`[\]]+)/gi;
     const matches = [...text.matchAll(urlRegex)];
     if (matches.length === 0) {
       container.textContent = text;
@@ -2301,7 +2385,7 @@ class TerminalVirtualList {
           e.preventDefault();
           const url = e.target.dataset.url;
           if (url) {
-            window.open(url, '_blank');
+            window.open(url, '_blank', 'noopener,noreferrer');
           }
         }
       });
@@ -2315,29 +2399,6 @@ class TerminalVirtualList {
       textNode.textContent = text.slice(lastIndex);
       container.appendChild(textNode);
     }
-  };
-
-  // 检查上一行输出内容是否以换行符结尾
-  const isLastLineEndsWithNewline = () => {
-    if (virtualList.rows.length === 0) {
-      return true; // 没有上一行，默认创建新行
-    }
-    const lastRow = virtualList.rows[virtualList.rows.length - 1];
-    if (lastRow.element) {
-      const textElement = lastRow.element.querySelector('.sa-terminal-log-text');
-      if (textElement) {
-        // 检查 textContent 是否以换行符结尾（普通日志）
-        if (textElement.textContent.endsWith('\n')) {
-          return true;
-        }
-        // 检查 innerHTML 是否以 <br> 结尾（BBCode 日志）
-        const innerHTML = textElement.innerHTML;
-        if (innerHTML.trimEnd().endsWith('<br>') || innerHTML.trimEnd().endsWith('<br/>')) {
-          return true;
-        }
-      }
-    }
-    return false; // 默认返回 false，不追加
   };
   const createLogLines = function createLogLines(text, thread) {
     let options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
@@ -2411,7 +2472,7 @@ class TerminalVirtualList {
 
     // 同步处理所有行
     for (let i = 0; i < lines.length; i++) {
-      let lineContent = lines[i];
+      const lineContent = lines[i];
 
       // 如果是空行（连续换行），创建空行
       if (lineContent === '' && i > 0) {
@@ -2499,7 +2560,7 @@ class TerminalVirtualList {
       let text = _ref5.text;
       if (terminalOutput) {
         // 默认 log 函数在输出末尾添加换行符
-        createLogLines(text + '\n', thread);
+        createLogLines("".concat(text, "\n"), thread);
       }
     }
   });
@@ -2511,7 +2572,7 @@ class TerminalVirtualList {
         color = _ref6.color;
       if (terminalOutput) {
         // 默认 log 函数在输出末尾添加换行符
-        createLogLines(text + '\n', thread, {
+        createLogLines("".concat(text, "\n"), thread, {
           color
         });
       }
@@ -2524,7 +2585,7 @@ class TerminalVirtualList {
       let text = _ref7.text;
       if (terminalOutput) {
         // 默认 log 函数在输出末尾添加换行符
-        createLogLines(text + '\n', thread, {
+        createLogLines("".concat(text, "\n"), thread, {
           markClass: 'log',
           markText: '[log]'
         });
@@ -2538,7 +2599,7 @@ class TerminalVirtualList {
       let text = _ref8.text;
       if (terminalOutput) {
         // 默认 log 函数在输出末尾添加换行符
-        createLogLines(text + '\n', thread, {
+        createLogLines("".concat(text, "\n"), thread, {
           markClass: 'warn',
           markText: '[warn]'
         });
@@ -2552,7 +2613,7 @@ class TerminalVirtualList {
       let text = _ref9.text;
       if (terminalOutput) {
         // 默认 log 函数在输出末尾添加换行符
-        createLogLines(text + '\n', thread, {
+        createLogLines("".concat(text, "\n"), thread, {
           markClass: 'error',
           markText: '[error]'
         });
@@ -2572,7 +2633,7 @@ class TerminalVirtualList {
         let outputText = text;
         if (end === '\\n' || end === '\n') {
           // 如果结尾是换行符，则添加换行符
-          outputText = text + '\n';
+          outputText = "".concat(text, "\n");
         } else if (end && end !== '') {
           // 如果结尾是其他非空字符串，则添加该字符串到输出末尾
           outputText = text + end;
@@ -2701,7 +2762,7 @@ class TerminalVirtualList {
             // 移除开头的 "> " 提示符，并添加 [user] 前缀
             const content = textElement.textContent || '';
             const userInput = content.startsWith('> ') ? content.slice(2) : content;
-            return '[user] ' + userInput;
+            return "[user] ".concat(userInput);
           }
         }
       }
@@ -2740,8 +2801,8 @@ class TerminalVirtualList {
   const commands = {
     help: {
       description: msg('command-help-desc') || 'Show available commands',
-      execute: args => {
-        let output = (msg('command-help-available') || 'Available commands:') + '\n\n';
+      execute: () => {
+        let output = "".concat(msg('command-help-available') || 'Available commands:', "\n\n");
         for (const _ref11 of Object.entries(commands)) {
           var _ref12 = _slicedToArray(_ref11, 2);
           const name = _ref12[0];
@@ -2754,7 +2815,7 @@ class TerminalVirtualList {
         // 显示用户指令
         const userCommandCount = Object.keys(userCommands).length;
         if (userCommandCount > 0) {
-          output += '\n' + (msg('command-user-command') || 'User Command：') + '\n';
+          output += "\n".concat(msg('command-user-command') || 'User Command：', "\n");
           for (const _ref13 of Object.entries(userCommands)) {
             var _ref14 = _slicedToArray(_ref13, 2);
             const name = _ref14[0];
@@ -2849,7 +2910,7 @@ class TerminalVirtualList {
             output += "  Downlink: ".concat(connection.downlink, " Mbps\n");
           }
         }
-        output += '\n  AstraEditor Version: ' + _lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__["default"].version + ' ( Built in ' + _lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__["default"].date + ' )\n';
+        output += "\n  AstraEditor Version: ".concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__["default"].version, " ( Built in ").concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__["default"].date, " )\n");
         output += '  Terminal Version: 1.3.0\n';
         const asciiLines = asciiArt.split('\n');
         const infoLines = output.split('\n');
@@ -2859,14 +2920,21 @@ class TerminalVirtualList {
           const ascii = asciiLines[i] || '';
           const info = infoLines[i] || '';
           const paddedAscii = ascii.padEnd(24);
-          combined += paddedAscii + ' ' + info + '\n';
+          combined += "".concat(paddedAscii, " ").concat(info, "\n");
         }
         return combined;
       }
     },
     echo: {
       description: msg('command-echo-desc') || 'Echo the input text',
-      execute: args => args.join(' ')
+      execute: args => {
+        const text = args.join(' ');
+        if (text) {
+          // 直接走 BBCode 输出队列，支持颜色、链接、粗体等格式
+          createBBCodeLogLines(text, null);
+        }
+        return null;
+      }
     },
     project: {
       description: msg('command-project-desc') || 'Show project information',
@@ -2895,7 +2963,7 @@ class TerminalVirtualList {
               output += "  ".concat(v.name, " = ").concat(value, "\n");
             }
           });
-          output += '\n' + (msg('command-variables-local') || 'Local Variables:') + '\n';
+          output += "\n".concat(msg('command-variables-local') || 'Local Variables:', "\n");
           if (!target.isStage) {
             Object.values(target.variables).forEach(v => {
               if (v.type === '' || v.type === 'list') {
@@ -2915,7 +2983,7 @@ class TerminalVirtualList {
       execute: () => {
         try {
           const vm = addon.tab.traps.vm;
-          let output = (msg('command-sprites-output') || 'Sprites:') + '\n';
+          let output = "".concat(msg('command-sprites-output') || 'Sprites:', "\n");
           vm.runtime.targets.forEach(target => {
             if (!target.isStage) {
               output += "  ".concat(target.getName(), "\n");
@@ -2929,7 +2997,7 @@ class TerminalVirtualList {
     },
     version: {
       description: msg('command-version-desc') || 'Show terminal version',
-      execute: () => 'AstraEditor Terminal v' + _lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__["default"].version
+      execute: () => "AstraEditor Terminal v".concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__["default"].version)
     },
     'creeper?': {
       description: '',
@@ -2972,13 +3040,13 @@ class TerminalVirtualList {
         const result = await cmd.execute(args);
         if (result) {
           const lines = result.split('\n');
-          lines.forEach((lineContent, index) => {
+          lines.forEach(lineContent => {
             const resultLine = document.createElement('div');
             resultLine.className = 'sa-terminal-result-line';
             // 解析 BBCode
             let parsedContent = parseBBCode(lineContent);
-            // 将空格转换为非断行空格以保留格式（在 BBCode 解析之后）
-            parsedContent = parsedContent.replace(/ /g, '&nbsp;');
+            // 将文本节点中的空格转换为非断行空格以保留格式（不破坏 BBCode 生成的标签属性）
+            parsedContent = parsedContent.replace(/(^|>)([^<]*)(?=<|$)/g, (match, prefix, content) => prefix + content.replace(/ /g, '&nbsp;'));
             resultLine.innerHTML = parsedContent;
             resultLine.title = lineContent;
             virtualList.appendLog({
@@ -3135,6 +3203,9 @@ class TerminalVirtualList {
   });
 
   // 更新启用按钮位置
+  /**
+   * 更新 Terminal 启用按钮的位置和样式。
+   */
   function updateToggleButtonPosition() {
     // 先移除所有位置的按钮
     if (toggleButton.parentNode) {
@@ -3160,17 +3231,19 @@ class TerminalVirtualList {
         }
         break;
       case POSITION_TYPES.BOTTOM_PANEL:
-        // Bottom Panel 模式：添加到 Bottom Panel 按钮栏
-        const bottomBarButtonBar = _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_0__["default"].getButtonBar();
-        if (bottomBarButtonBar) {
-          toggleButton.className = 'sa-terminal-toggle-button';
-          // 显示图标和文字
-          toggleBtnIcon.style.display = 'inline';
-          toggleBtnText.style.display = 'inline';
-          bottomBarButtonBar.appendChild(toggleButton);
-          _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_0__["default"].updateButtonBarVisibility();
+        {
+          // Bottom Panel 模式：添加到 Bottom Panel 按钮栏
+          const bottomBarButtonBar = _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_0__["default"].getButtonBar();
+          if (bottomBarButtonBar) {
+            toggleButton.className = 'sa-terminal-toggle-button';
+            // 显示图标和文字
+            toggleBtnIcon.style.display = 'inline';
+            toggleBtnText.style.display = 'inline';
+            bottomBarButtonBar.appendChild(toggleButton);
+            _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_0__["default"].updateButtonBarVisibility();
+          }
+          break;
         }
-        break;
       case POSITION_TYPES.WINDOW:
         // 独立窗口模式：添加到舞台头部
         addon.tab.appendToSharedSpace({
@@ -3252,17 +3325,21 @@ class TerminalVirtualList {
 
   // 监听布局变化
   window.addEventListener('storage', e => {
-    if (e.key === 'AESettings') {
-      const newSettings = JSON.parse(e.newValue);
-      const oldSettings = JSON.parse(e.oldValue);
-      if (newSettings.EnableVSCodeLayout !== oldSettings.EnableVSCodeLayout) {
-        // 更新侧边栏按钮的可用状态
-        updatePositionSwitchButton();
+    if (e.key === 'AESettings' && e.newValue && e.oldValue) {
+      try {
+        const newSettings = JSON.parse(e.newValue);
+        const oldSettings = JSON.parse(e.oldValue);
+        if (newSettings.EnableVSCodeLayout !== oldSettings.EnableVSCodeLayout) {
+          // 更新侧边栏按钮的可用状态
+          updatePositionSwitchButton();
 
-        // 如果当前在侧边栏模式且布局被禁用，切换到底部面板
-        if (currentPosition === POSITION_TYPES.SIDEBAR && !newSettings.EnableVSCodeLayout) {
-          switchTerminalPosition(POSITION_TYPES.BOTTOM_PANEL);
+          // 如果当前在侧边栏模式且布局被禁用，切换到底部面板
+          if (currentPosition === POSITION_TYPES.SIDEBAR && !newSettings.EnableVSCodeLayout) {
+            switchTerminalPosition(POSITION_TYPES.BOTTOM_PANEL);
+          }
         }
+      } catch (error) {
+        console.error('Failed to parse AESettings:', error);
       }
     }
   });
