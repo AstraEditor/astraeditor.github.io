@@ -24,6 +24,572 @@ const resources = {
 
 /***/ },
 
+/***/ "./src/addons/addons/astras-copilot/agent/block-xml.js"
+/*!*************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/block-xml.js ***!
+  \*************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   BLOCK_INPUTS: () => (/* binding */ BLOCK_INPUTS),
+/* harmony export */   buildScriptsXml: () => (/* binding */ buildScriptsXml),
+/* harmony export */   describeCoreBlocks: () => (/* binding */ describeCoreBlocks),
+/* harmony export */   generateId: () => (/* binding */ generateId)
+/* harmony export */ });
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+/**
+ * Scratch block XML compiler.
+ *
+ * Turns a compact, model-friendly block descriptor (plain JSON) into the
+ * scratch-blocks XML string that `Blockly.Xml.domToWorkspace` can load into the
+ * real editor workspace. Loading through the workspace is deliberate: the GUI
+ * forwards every create/change/delete event to `vm.blockListener`, so the VM
+ * stays authoritative and the edit lands on the native undo stack (Ctrl+Z).
+ *
+ * The module is framework-free: it builds a tiny element tree and serialises it
+ * by hand, so it works in the browser and can be unit-tested in plain Node.
+ */
+
+// ---------------------------------------------------------------------------
+// Vocabulary tables
+// ---------------------------------------------------------------------------
+
+/**
+ * Value inputs that Scratch expects on each opcode. Only used to pre-create
+ * default shadows for inputs the model leaves out; anything the model supplies
+ * is applied on top.
+ */
+const BLOCK_INPUTS = {
+  control_repeat: ['TIMES'],
+  control_repeat_until: ['CONDITION'],
+  control_while: ['CONDITION'],
+  control_for_each: ['VALUE'],
+  control_wait: ['DURATION'],
+  control_wait_until: ['CONDITION'],
+  control_if: ['CONDITION'],
+  control_if_else: ['CONDITION'],
+  control_create_clone_of: ['CLONE_OPTION'],
+  event_whenkeypressed: ['KEY_OPTION'],
+  event_whenbroadcastreceived: [],
+  event_whengreaterthan: ['VALUE'],
+  event_broadcast: ['BROADCAST_INPUT'],
+  event_broadcastandwait: ['BROADCAST_INPUT'],
+  looks_say: ['MESSAGE'],
+  looks_sayforsecs: ['MESSAGE', 'SECS'],
+  looks_think: ['MESSAGE'],
+  looks_thinkforsecs: ['MESSAGE', 'SECS'],
+  looks_switchcostumeto: ['COSTUME'],
+  looks_switchbackdropto: ['BACKDROP'],
+  looks_switchbackdroptoandwait: ['BACKDROP'],
+  looks_changeeffectby: ['CHANGE'],
+  looks_seteffectto: ['VALUE'],
+  looks_changesizeby: ['CHANGE'],
+  looks_setsizeto: ['SIZE'],
+  looks_goforwardbackward: ['NUM'],
+  motion_movesteps: ['STEPS'],
+  motion_gotoxy: ['X', 'Y'],
+  motion_goto: ['TO'],
+  motion_turnright: ['DEGREES'],
+  motion_turnleft: ['DEGREES'],
+  motion_pointindirection: ['DIRECTION'],
+  motion_pointtowards: ['TOWARDS'],
+  motion_glidesecstoxy: ['SECS', 'X', 'Y'],
+  motion_glideto: ['SECS', 'TO'],
+  motion_changexby: ['DX'],
+  motion_setx: ['X'],
+  motion_changeyby: ['DY'],
+  motion_sety: ['Y'],
+  operator_add: ['NUM1', 'NUM2'],
+  operator_subtract: ['NUM1', 'NUM2'],
+  operator_multiply: ['NUM1', 'NUM2'],
+  operator_divide: ['NUM1', 'NUM2'],
+  operator_lt: ['OPERAND1', 'OPERAND2'],
+  operator_equals: ['OPERAND1', 'OPERAND2'],
+  operator_gt: ['OPERAND1', 'OPERAND2'],
+  operator_and: ['OPERAND1', 'OPERAND2'],
+  operator_or: ['OPERAND1', 'OPERAND2'],
+  operator_not: ['OPERAND'],
+  operator_random: ['FROM', 'TO'],
+  operator_join: ['STRING1', 'STRING2'],
+  operator_letter_of: ['STRING', 'LETTER'],
+  operator_length: ['STRING'],
+  operator_contains: ['STRING1', 'STRING2'],
+  operator_mod: ['NUM1', 'NUM2'],
+  operator_round: ['NUM'],
+  operator_mathop: ['NUM'],
+  sound_play: ['SOUND_MENU'],
+  sound_playuntildone: ['SOUND_MENU'],
+  sound_setvolumeto: ['VOLUME'],
+  sound_changevolumeby: ['VOLUME'],
+  sensing_touchingobject: ['TOUCHINGOBJECTMENU'],
+  sensing_touchingcolor: ['COLOR'],
+  sensing_coloristouchingcolor: ['COLOR', 'COLOR2'],
+  sensing_distanceto: ['DISTANCETOMENU'],
+  sensing_of: ['OBJECT'],
+  sensing_keypressed: ['KEY_OPTION'],
+  sensing_askandwait: ['QUESTION'],
+  data_setvariableto: ['VALUE'],
+  data_changevariableby: ['VALUE'],
+  data_addtolist: ['ITEM'],
+  data_deleteoflist: ['INDEX'],
+  data_insertatlist: ['INDEX', 'ITEM'],
+  data_replaceitemoflist: ['INDEX', 'ITEM'],
+  data_itemoflist: ['INDEX'],
+  data_itemnumoflist: ['ITEM'],
+  data_listcontainsitem: ['ITEM']
+};
+
+/** Inputs that expect a boolean reporter; no numeric/text shadow is created. */
+const BOOLEAN_INPUTS = new Set(['CONDITION', 'OPERAND', 'OPERAND1', 'OPERAND2', 'STRING1', 'STRING2']);
+
+/** Default shadow type keyed by input name. */
+const INPUT_SHADOW = {
+  TIMES: 'math_whole_number',
+  STEPS: 'math_number',
+  DEGREES: 'math_number',
+  DURATION: 'math_number',
+  SECS: 'math_number',
+  X: 'math_number',
+  Y: 'math_number',
+  DX: 'math_number',
+  DY: 'math_number',
+  CHANGE: 'math_number',
+  SIZE: 'math_number',
+  NUM: 'math_number',
+  NUM1: 'math_number',
+  NUM2: 'math_number',
+  FROM: 'math_number',
+  TO: 'math_number',
+  LETTER: 'math_integer',
+  INDEX: 'math_integer',
+  VALUE: 'math_number',
+  VOLUME: 'math_number',
+  MESSAGE: 'text',
+  STRING: 'text',
+  STRING1: 'text',
+  STRING2: 'text',
+  ITEM: 'text',
+  QUESTION: 'text',
+  CONDITION: 'text',
+  OPERAND: 'text',
+  OPERAND1: 'text',
+  OPERAND2: 'text',
+  TOWARDS: 'motion_pointtowards_menu',
+  COSTUME: 'looks_costume',
+  BACKDROP: 'looks_backdrops',
+  CLONE_OPTION: 'control_create_clone_of_menu',
+  TOUCHINGOBJECTMENU: 'sensing_touchingobjectmenu',
+  DISTANCETOMENU: 'sensing_distancetomenu',
+  KEY_OPTION: 'sensing_keyoptions',
+  SOUND_MENU: 'sound_sounds_menu',
+  OBJECT: 'sensing_of_object_menu',
+  COLOR: 'colour_picker',
+  COLOR2: 'colour_picker',
+  BROADCAST_INPUT: 'event_broadcast_menu'
+};
+
+/** Per-opcode overrides when one input name maps to different menu types. */
+const OPCODE_INPUT_SHADOW = {
+  motion_goto__TO: 'motion_goto_menu',
+  motion_glideto__TO: 'motion_glideto_menu',
+  motion_pointtowards__TOWARDS: 'motion_pointtowards_menu',
+  looks_switchcostumeto__COSTUME: 'looks_costume',
+  looks_switchbackdropto__BACKDROP: 'looks_backdrops',
+  looks_switchbackdroptoandwait__BACKDROP: 'looks_backdrops',
+  control_create_clone_of__CLONE_OPTION: 'control_create_clone_of_menu',
+  sensing_touchingobject__TOUCHINGOBJECTMENU: 'sensing_touchingobjectmenu',
+  sensing_distanceto__DISTANCETOMENU: 'sensing_distancetomenu',
+  event_broadcast__BROADCAST_INPUT: 'event_broadcast_menu',
+  event_broadcastandwait__BROADCAST_INPUT: 'event_broadcast_menu',
+  sound_play__SOUND_MENU: 'sound_sounds_menu',
+  sound_playuntildone__SOUND_MENU: 'sound_sounds_menu',
+  sensing_of__OBJECT: 'sensing_of_object_menu'
+};
+
+/** Shadow type -> the field name it stores its literal value in. */
+const SHADOW_FIELD = {
+  math_whole_number: 'NUM',
+  math_number: 'NUM',
+  math_integer: 'NUM',
+  math_positive_number: 'NUM',
+  math_angle: 'NUM',
+  text: 'TEXT',
+  looks_costume: 'COSTUME',
+  looks_backdrops: 'BACKDROP',
+  motion_goto_menu: 'TO',
+  motion_glideto_menu: 'TO',
+  motion_pointtowards_menu: 'TOWARDS',
+  control_create_clone_of_menu: 'CLONE_OPTION',
+  sensing_touchingobjectmenu: 'TOUCHINGOBJECTMENU',
+  sensing_distancetomenu: 'DISTANCETOMENU',
+  sensing_keyoptions: 'KEY_OPTION',
+  event_broadcast_menu: 'BROADCAST_OPTION',
+  sound_sounds_menu: 'SOUND_MENU',
+  sensing_of_object_menu: 'OBJECT',
+  colour_picker: 'COLOUR'
+};
+
+/** Menu shadows whose value should default to a project resource when omitted. */
+const RESOURCE_INPUT = {
+  COSTUME: 'costume',
+  BACKDROP: 'backdrop',
+  SOUND_MENU: 'sound'
+};
+const ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%()*+,-./:;=?@[]^_`{|}~';
+
+/**
+ * Generate a scratch-style 20 character id.
+ * @returns {string} Id.
+ */
+const generateId = () => {
+  let id = '';
+  for (let i = 0; i < 20; i++) id += ID_CHARS.charAt(Math.floor(Math.random() * ID_CHARS.length));
+  return id;
+};
+const isPlainObject = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const isNumericLike = value => value !== '' && Number.isFinite(Number(value));
+const pickShadowType = (opcode, inputName, value) => {
+  const override = OPCODE_INPUT_SHADOW["".concat(opcode, "__").concat(inputName)];
+  if (override) return override;
+  const fallback = INPUT_SHADOW[inputName];
+  if (fallback) {
+    // A literal text value in an otherwise-numeric input still uses text so the
+    // model can intentionally put a name there; numeric stays numeric.
+    if (fallback.startsWith('math_') && !isNumericLike(value)) return 'text';
+    return fallback;
+  }
+  return isNumericLike(value) ? 'math_number' : 'text';
+};
+const defaultLiteralFor = (opcode, inputName, ctx) => {
+  const shadowType = OPCODE_INPUT_SHADOW["".concat(opcode, "__").concat(inputName)] || INPUT_SHADOW[inputName];
+  if (shadowType && shadowType.startsWith('math_')) return '0';
+  const resource = RESOURCE_INPUT[inputName];
+  if (resource && ctx) {
+    if (resource === 'costume' && ctx.defaultCostume) return ctx.defaultCostume;
+    if (resource === 'backdrop' && ctx.defaultBackdrop) return ctx.defaultBackdrop;
+    if (resource === 'sound' && ctx.defaultSound) return ctx.defaultSound;
+  }
+  return '';
+};
+const makeShadow = (opcode, inputName, value, ctx) => {
+  const shadowType = pickShadowType(opcode, inputName, value);
+  const fieldName = SHADOW_FIELD[shadowType] || 'TEXT';
+  let text = value;
+  if (shadowType.startsWith('math_')) text = String(Number(value) || 0);else if (value === undefined || value === null) text = defaultLiteralFor(opcode, inputName, ctx);
+  return {
+    tag: 'shadow',
+    attrs: {
+      type: shadowType
+    },
+    children: [{
+      tag: 'field',
+      attrs: {
+        name: fieldName
+      },
+      text: String(text)
+    }]
+  };
+};
+const makeFieldBlock = (opcode, fieldName, value, ctx) => {
+  let fieldAttrs = {
+    name: fieldName
+  };
+  let text = String(value === undefined || value === null ? '' : value);
+  if (fieldName === 'VARIABLE' || fieldName === 'LIST' || fieldName === 'BROADCAST_OPTION') {
+    const resolved = ctx && ctx.resolveField ? ctx.resolveField(fieldName, value) : null;
+    if (resolved) {
+      fieldAttrs = {
+        name: fieldName,
+        id: resolved.id,
+        variabletype: resolved.type || ''
+      };
+      text = resolved.name;
+    }
+  }
+  return {
+    tag: 'block',
+    attrs: {
+      type: opcode
+    },
+    children: [{
+      tag: 'field',
+      attrs: fieldAttrs,
+      text
+    }]
+  };
+};
+const serializeMutation = mutation => {
+  const attrs = {};
+  for (const _ref of Object.entries(mutation)) {
+    var _ref2 = _slicedToArray(_ref, 2);
+    const key = _ref2[0];
+    const value = _ref2[1];
+    if (value === undefined || value === null) continue;
+    attrs[key] = Array.isArray(value) || isPlainObject(value) && key === 'argumentids' ? JSON.stringify(value) : String(value);
+  }
+  return attrs;
+};
+
+/**
+ * Build one block element from a descriptor.
+ * @param {object} desc Block descriptor.
+ * @param {object} ctx Resolution context.
+ * @param {Array<string>} warnings Collected warnings.
+ * @returns {object} Element tree node.
+ */
+const buildBlock = (desc, ctx, warnings) => {
+  if (!isPlainObject(desc) || typeof desc.opcode !== 'string' || !desc.opcode) {
+    throw new Error('Each block needs an "opcode" string.');
+  }
+  const opcode = desc.opcode;
+  const blockEl = {
+    tag: 'block',
+    attrs: {
+      type: opcode,
+      id: desc.id || generateId()
+    },
+    children: []
+  };
+
+  // 1. Pre-create default value inputs so the block is structurally complete.
+  const required = BLOCK_INPUTS[opcode] || [];
+  const providedInputs = isPlainObject(desc.inputs) ? desc.inputs : {};
+  for (const inputName of required) {
+    if (inputName in providedInputs) continue;
+    if (BOOLEAN_INPUTS.has(inputName)) continue;
+    blockEl.children.push({
+      tag: 'value',
+      attrs: {
+        name: inputName
+      },
+      children: [makeShadow(opcode, inputName, defaultLiteralFor(opcode, inputName, ctx), ctx)]
+    });
+  }
+
+  // 2. Explicit inputs.
+  for (const _ref3 of Object.entries(providedInputs)) {
+    var _ref4 = _slicedToArray(_ref3, 2);
+    const inputName = _ref4[0];
+    const value = _ref4[1];
+    const valueEl = {
+      tag: 'value',
+      attrs: {
+        name: inputName
+      },
+      children: []
+    };
+    if (isPlainObject(value) && typeof value.opcode === 'string') {
+      valueEl.children.push(buildBlock(value, ctx, warnings));
+    } else if (isPlainObject(value) && 'variable' in value) {
+      valueEl.children.push(makeFieldBlock('data_variable', 'VARIABLE', value.variable, ctx));
+    } else if (isPlainObject(value) && 'list' in value) {
+      valueEl.children.push(makeFieldBlock('data_listcontents', 'LIST', value.list, ctx));
+    } else if (value === null || value === undefined) {
+      if (!BOOLEAN_INPUTS.has(inputName)) {
+        valueEl.children.push(makeShadow(opcode, inputName, '', ctx));
+      }
+    } else {
+      valueEl.children.push(makeShadow(opcode, inputName, value, ctx));
+    }
+    blockEl.children.push(valueEl);
+  }
+
+  // 3. Fields (dropdown / variable / list / broadcast).
+  if (isPlainObject(desc.fields)) {
+    for (const _ref5 of Object.entries(desc.fields)) {
+      var _ref6 = _slicedToArray(_ref5, 2);
+      const fieldName = _ref6[0];
+      const value = _ref6[1];
+      const field = {
+        tag: 'field',
+        attrs: {
+          name: fieldName
+        },
+        text: String(value !== null && value !== void 0 ? value : '')
+      };
+      if (fieldName === 'VARIABLE' || fieldName === 'LIST' || fieldName === 'BROADCAST_OPTION') {
+        const resolved = ctx && ctx.resolveField ? ctx.resolveField(fieldName, value) : null;
+        if (resolved) {
+          field.attrs.id = resolved.id;
+          field.attrs.variabletype = resolved.type || '';
+          field.text = resolved.name;
+        }
+      }
+      blockEl.children.push(field);
+    }
+  }
+
+  // 4. Mutation (custom blocks / advanced blocks).
+  if (isPlainObject(desc.mutation)) {
+    blockEl.children.push({
+      tag: 'mutation',
+      attrs: serializeMutation(desc.mutation),
+      children: []
+    });
+  }
+
+  // 5. Substack / else branch.
+  const substack = buildStack(desc.substack, ctx, warnings);
+  if (substack) blockEl.children.push({
+    tag: 'statement',
+    attrs: {
+      name: 'SUBSTACK'
+    },
+    children: [substack]
+  });
+  const substack2 = buildStack(desc.substack2 || desc.ELSE, ctx, warnings);
+  if (substack2) blockEl.children.push({
+    tag: 'statement',
+    attrs: {
+      name: 'SUBSTACK2'
+    },
+    children: [substack2]
+  });
+
+  // 6. Chained next statement(s) from a single descriptor.
+  if (desc.next) {
+    const nextChain = buildStack(Array.isArray(desc.next) ? desc.next : [desc.next], ctx, warnings);
+    if (nextChain) blockEl.children.push({
+      tag: 'next',
+      attrs: {},
+      children: [nextChain]
+    });
+  }
+  return blockEl;
+};
+
+/**
+ * Build a statement stack: the first block with the rest chained via <next>.
+ * @param {Array<object>} descriptors Statement descriptors.
+ * @param {object} ctx Resolution context.
+ * @param {Array<string>} warnings Collected warnings.
+ * @returns {object|null} First block element, or null.
+ */
+const buildStack = (descriptors, ctx, warnings) => {
+  if (!Array.isArray(descriptors) || descriptors.length === 0) return null;
+  const elements = descriptors.filter(Boolean).map(desc => buildBlock(desc, ctx, warnings));
+  if (elements.length === 0) return null;
+  for (let i = elements.length - 1; i > 0; i--) {
+    elements[i - 1].children.unshift({
+      tag: 'next',
+      attrs: {},
+      children: [elements[i]]
+    });
+  }
+  return elements[0];
+};
+
+// ---------------------------------------------------------------------------
+// Serialisation
+// ---------------------------------------------------------------------------
+
+const escapeAttr = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const escapeText = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const serializeNode = node => {
+  const attrs = Object.entries(node.attrs || {}).filter(_ref7 => {
+    let _ref8 = _slicedToArray(_ref7, 2),
+      value = _ref8[1];
+    return value !== undefined && value !== null;
+  }).map(_ref9 => {
+    let _ref0 = _slicedToArray(_ref9, 2),
+      key = _ref0[0],
+      value = _ref0[1];
+    return " ".concat(key, "=\"").concat(escapeAttr(value), "\"");
+  }).join('');
+  const children = node.children || [];
+  const inner = "".concat(node.text !== undefined ? escapeText(node.text) : '').concat(children.map(serializeNode).join(''));
+  if (!inner) return "<".concat(node.tag).concat(attrs, "/>");
+  return "<".concat(node.tag).concat(attrs, ">").concat(inner, "</").concat(node.tag, ">");
+};
+
+/**
+ * Compile a list of scripts into one workspace XML document string.
+ *
+ * Each script is `{ x, y, blocks: [blockDescriptor, ...] }` where the block list
+ * is the full stack (including the hat). Variables/lists/broadcasts referenced
+ * by name are resolved through `ctx`; unknown ones are collected as
+ * `declarations` so the applier can create them (on both the workspace and the
+ * VM) before loading the blocks. They are intentionally NOT embedded in the XML,
+ * because `domToVariables` would create them on the workspace only and the VM
+ * would never learn about them.
+ *
+ * @param {Array<object>} scripts Script descriptors.
+ * @param {object} ctx Resolution context (see tools.js makeVarContext).
+ * @returns {{xml: string, scripts: number, warnings: Array<string>, declarations: Array<object>}}
+ */
+const buildScriptsXml = (scripts, ctx) => {
+  if (!Array.isArray(scripts) || scripts.length === 0) {
+    throw new Error('No scripts were provided.');
+  }
+  const warnings = [];
+  const blockRoots = [];
+  for (const script of scripts) {
+    const blocks = Array.isArray(script && script.blocks) ? script.blocks : null;
+    if (!blocks || blocks.length === 0) {
+      throw new Error('Every script needs a non-empty "blocks" array.');
+    }
+    const root = buildStack(blocks, ctx, warnings);
+    if (!root) continue;
+    const x = Number.isFinite(Number(script.x)) ? Number(script.x) : 60 + blockRoots.length * 40;
+    const y = Number.isFinite(Number(script.y)) ? Number(script.y) : 60 + blockRoots.length * 360;
+    root.attrs.x = x;
+    root.attrs.y = y;
+    blockRoots.push(root);
+  }
+  const declarations = ctx && typeof ctx.drainDeclarations === 'function' ? ctx.drainDeclarations() : [];
+  const parts = ['<xml xmlns="http://www.w3.org/1999/xhtml">'];
+  for (const root of blockRoots) parts.push(serializeNode(root));
+  parts.push('</xml>');
+  return {
+    xml: parts.join(''),
+    scripts: blockRoots.length,
+    warnings,
+    declarations
+  };
+};
+
+/**
+ * Describe the core opcodes an agent can use, for the block-catalog tool.
+ * @param {string} [filter] Optional case-insensitive substring filter.
+ * @returns {Array<object>} Compact descriptions.
+ */
+const describeCoreBlocks = function describeCoreBlocks() {
+  let filter = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+  const needle = String(filter || '').toLowerCase();
+  const entries = Object.entries(BLOCK_INPUTS).filter(_ref1 => {
+    let _ref10 = _slicedToArray(_ref1, 1),
+      opcode = _ref10[0];
+    return !needle || opcode.toLowerCase().includes(needle);
+  }).map(_ref11 => {
+    let _ref12 = _slicedToArray(_ref11, 2),
+      opcode = _ref12[0],
+      inputs = _ref12[1];
+    return {
+      opcode,
+      inputs: inputs.slice()
+    };
+  });
+  // Opcodes with no value inputs but that are still useful statements.
+  const extra = ['event_whenflagclicked', 'event_whenthisspriteclicked', 'event_whenstageclicked', 'event_whenbackdropswitchesto', 'control_forever', 'control_stop', 'control_delete_this_clone', 'control_start_as_clone', 'looks_show', 'looks_hide', 'looks_nextcostume', 'looks_nextbackdrop', 'looks_cleargraphiceffects', 'motion_ifonedgebounce', 'motion_setrotationstyle', 'sound_stopallsounds', 'data_deletealloflist', 'sensing_resettimer'];
+  for (const opcode of extra) {
+    if (needle && !opcode.toLowerCase().includes(needle)) continue;
+    if (!entries.some(entry => entry.opcode === opcode)) entries.push({
+      opcode,
+      inputs: []
+    });
+  }
+  return entries;
+};
+
+/***/ },
+
 /***/ "./src/addons/addons/astras-copilot/agent/client.js"
 /*!**********************************************************!*\
   !*** ./src/addons/addons/astras-copilot/agent/client.js ***!
@@ -156,17 +722,58 @@ const applyToolCallDelta = (calls, toolCall) => {
  */
 const normalizeAssistantMessage = (message, usage) => ({
   content: normalizeContent(message && message.content),
+  reasoning: normalizeContent(message && (message.reasoning_content || message.reasoning)),
   toolCalls: normalizeToolCalls(message && message.tool_calls),
   usage: usage || null
+});
+
+/**
+ * Create an abort error that matches fetch/DOMException naming.
+ * @returns {Error} Abort error.
+ */
+const createAbortError = () => {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  return error;
+};
+
+/**
+ * Wait a delay that can be interrupted by an abort signal.
+ * @param {number} ms Delay in milliseconds.
+ * @param {AbortSignal} signal Abort signal.
+ * @returns {Promise<void>} Completion promise.
+ */
+const wait = (ms, signal) => new Promise((resolve, reject) => {
+  if (signal && signal.aborted) {
+    reject(createAbortError());
+    return;
+  }
+  const onAbort = () => {
+    clearTimeout(timer);
+    cleanup();
+    reject(createAbortError());
+  };
+  const cleanup = () => {
+    if (signal) signal.removeEventListener('abort', onAbort);
+  };
+  const timer = setTimeout(() => {
+    cleanup();
+    resolve();
+  }, ms);
+  if (signal) signal.addEventListener('abort', onAbort, {
+    once: true
+  });
 });
 
 /**
  * Read an SSE streaming response.
  * @param {Response} response Fetch response.
  * @param {Function} [onDelta] Content delta callback.
+ * @param {Function} [onReasoning] Reasoning-content delta callback.
+ * @param {number} [idleTimeoutMs] Maximum time to wait between chunks.
  * @returns {Promise<object>} Normalized assistant message.
  */
-const readStreamingResponse = async (response, onDelta) => {
+const readStreamingResponse = async (response, onDelta, onReasoning, idleTimeoutMs) => {
   if (!response.body || typeof response.body.getReader !== 'function') {
     let data;
     try {
@@ -174,7 +781,11 @@ const readStreamingResponse = async (response, onDelta) => {
     } catch (error) {
       throw new Error('The API returned no response body.');
     }
-    if (data && data.error) throw new Error(data.error.message || 'The API returned an error.');
+    if (data && data.error) {
+      const error = new Error(data.error.message || 'The API returned an error.');
+      error.status = 0;
+      throw error;
+    }
     const choice = data && Array.isArray(data.choices) ? data.choices[0] : null;
     if (!choice || !choice.message) throw new Error('The API returned no assistant message.');
     return normalizeAssistantMessage(choice.message, data.usage);
@@ -183,12 +794,32 @@ const readStreamingResponse = async (response, onDelta) => {
   const decoder = new TextDecoder();
   const state = {
     content: '',
+    reasoning: '',
     toolCalls: [],
     usage: null
   };
   let buffer = '';
   let raw = '';
   let sawData = false;
+  let idleTimer = null;
+  let idleAborted = false;
+  const clearIdleTimer = () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+  };
+  const readChunk = () => new Promise((resolve, reject) => {
+    reader.read().then(resolve).catch(reject);
+    if (!idleTimeoutMs || idleTimer) return;
+    idleTimer = setTimeout(() => {
+      idleTimer = null;
+      idleAborted = true;
+      const error = new Error('The stream timed out waiting for data from the API.');
+      error.name = 'TimeoutError';
+      reject(error);
+    }, idleTimeoutMs);
+  });
   const consumeEvent = eventText => {
     const dataLines = [];
     for (const line of eventText.split('\n')) {
@@ -206,11 +837,20 @@ const readStreamingResponse = async (response, onDelta) => {
     } catch (error) {
       throw new Error('The streaming response could not be parsed.');
     }
-    if (data && data.error) throw new Error(data.error.message || 'The API returned an error.');
+    if (data && data.error) {
+      const apiError = new Error(data.error.message || 'The API returned an error.');
+      apiError.status = 0;
+      throw apiError;
+    }
     if (data && data.usage) state.usage = data.usage;
     const choice = data && Array.isArray(data.choices) ? data.choices[0] : null;
     const delta = choice && choice.delta;
     if (!delta) return;
+    const reasoning = normalizeContent(delta.reasoning_content || delta.reasoning);
+    if (reasoning) {
+      state.reasoning += reasoning;
+      if (typeof onReasoning === 'function') onReasoning(reasoning);
+    }
     if (typeof delta.content === 'string' && delta.content) {
       state.content += delta.content;
       if (typeof onDelta === 'function') onDelta(delta.content);
@@ -219,63 +859,109 @@ const readStreamingResponse = async (response, onDelta) => {
       for (const toolCall of delta.tool_calls) applyToolCallDelta(state.toolCalls, toolCall);
     }
   };
-  while (true) {
-    const _await$reader$read = await reader.read(),
-      done = _await$reader$read.done,
-      value = _await$reader$read.value;
-    if (done) break;
-    const text = decoder.decode(value, {
-      stream: true
-    });
-    raw += text;
-    buffer += text.replace(/\r\n/g, '\n');
-    let boundary;
-    while ((boundary = buffer.indexOf('\n\n')) !== -1) {
-      consumeEvent(buffer.slice(0, boundary));
-      buffer = buffer.slice(boundary + 2);
+  try {
+    while (true) {
+      let chunk;
+      try {
+        chunk = await readChunk();
+      } catch (error) {
+        if (idleAborted) {
+          try {
+            await reader.cancel();
+          } catch (cancelError) {
+            // The stream may already be closed.
+          }
+        }
+        throw error;
+      }
+      clearIdleTimer();
+      const _chunk = chunk,
+        done = _chunk.done,
+        value = _chunk.value;
+      if (done) break;
+      const text = decoder.decode(value, {
+        stream: true
+      });
+      raw += text;
+      buffer += text.replace(/\r\n/g, '\n');
+      let boundary;
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+        consumeEvent(buffer.slice(0, boundary));
+        buffer = buffer.slice(boundary + 2);
+      }
     }
-  }
-  const tail = decoder.decode();
-  raw += tail;
-  buffer += tail.replace(/\r\n/g, '\n');
-  if (buffer.trim()) consumeEvent(buffer);
-  if (!sawData) {
-    let data = null;
-    try {
-      data = JSON.parse(raw);
-    } catch (error) {
-      data = null;
+    const tail = decoder.decode();
+    raw += tail;
+    buffer += tail.replace(/\r\n/g, '\n');
+    if (buffer.trim()) consumeEvent(buffer);
+    if (!sawData) {
+      let data = null;
+      try {
+        data = JSON.parse(raw);
+      } catch (error) {
+        data = null;
+      }
+      if (data && data.error) {
+        const apiError = new Error(data.error.message || 'The API returned an error.');
+        apiError.status = 0;
+        throw apiError;
+      }
+      const choice = data && Array.isArray(data.choices) ? data.choices[0] : null;
+      if (choice && choice.message) return normalizeAssistantMessage(choice.message, data.usage);
+      throw new Error('The API returned an empty stream.');
     }
-    if (data && data.error) throw new Error(data.error.message || 'The API returned an error.');
-    const choice = data && Array.isArray(data.choices) ? data.choices[0] : null;
-    if (choice && choice.message) return normalizeAssistantMessage(choice.message, data.usage);
-    throw new Error('The API returned an empty stream.');
+    return {
+      content: state.content,
+      reasoning: state.reasoning,
+      toolCalls: normalizeToolCalls(state.toolCalls),
+      usage: state.usage
+    };
+  } finally {
+    clearIdleTimer();
   }
-  return {
-    content: state.content,
-    toolCalls: normalizeToolCalls(state.toolCalls),
-    usage: state.usage
-  };
 };
 
 /**
- * Call an OpenAI-compatible chat completions endpoint with tools.
+ * HTTP status codes that warrant retrying the request.
+ */
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+/**
+ * Whether an error is transient and worth retrying.
+ * @param {Error} error Error to inspect.
+ * @returns {boolean} Whether the request should be retried.
+ */
+const isRetryableError = error => {
+  if (!error) return false;
+  if (error.name === 'AbortError') return false;
+  if (error.name === 'TimeoutError') return true;
+  if (Number.isInteger(error.status)) {
+    // status 0 means the API reported an application error, not an HTTP status.
+    if (error.status === 0) return false;
+    return RETRYABLE_STATUS.has(error.status);
+  }
+  // Network failures and unparseable responses are transient by default.
+  return true;
+};
+
+/**
+ * Perform one chat-completions attempt.
  * @param {object} options Options.
  * @param {object} options.config Agent configuration.
  * @param {Array<object>} options.messages Chat messages.
  * @param {Array<object>} options.tools Tool definitions.
  * @param {AbortSignal} options.signal Abort signal.
  * @param {Function} [options.onDelta] Content delta callback.
+ * @param {Function} [options.onReasoning] Reasoning-content delta callback.
  * @returns {Promise<object>} Assistant message.
  */
-const callChatCompletion = async _ref3 => {
+const attemptRequest = async _ref3 => {
   let config = _ref3.config,
     messages = _ref3.messages,
     tools = _ref3.tools,
     signal = _ref3.signal,
-    onDelta = _ref3.onDelta;
-  if (!config.apiUrl) throw new Error('API URL is not configured.');
-  if (!config.model) throw new Error('Model is not configured.');
+    onDelta = _ref3.onDelta,
+    onReasoning = _ref3.onReasoning;
   let url;
   try {
     url = new URL(config.apiUrl);
@@ -291,8 +977,8 @@ const callChatCompletion = async _ref3 => {
   const body = {
     model: config.model,
     messages,
-    temperature: 0.2,
-    max_tokens: 3000,
+    temperature: Number.isFinite(Number(config.temperature)) ? Number(config.temperature) : 0.2,
+    max_tokens: Math.max(1, Math.min(32000, Number(config.maxTokens) || 3000)),
     stream: wantsStream
   };
   if (Array.isArray(tools) && tools.length > 0) {
@@ -307,20 +993,83 @@ const callChatCompletion = async _ref3 => {
   });
   if (!response.ok) {
     const body = await readErrorBody(response);
-    throw new Error("API request failed (".concat(response.status, ")").concat(body ? ": ".concat(body) : ''));
+    const error = new Error("API request failed (".concat(response.status, ")").concat(body ? ": ".concat(body) : ''));
+    error.status = response.status;
+    throw error;
   }
   const contentType = (response.headers.get('content-type') || '').toLowerCase();
   const isSse = contentType.includes('text/event-stream');
   if (contentType.includes('application/json') || !wantsStream && !isSse) {
     const data = await response.json();
     if (data && data.error) {
-      throw new Error(data.error.message || 'The API returned an error.');
+      const error = new Error(data.error.message || 'The API returned an error.');
+      error.status = 0;
+      throw error;
     }
     const choice = data && Array.isArray(data.choices) ? data.choices[0] : null;
     if (!choice || !choice.message) throw new Error('The API returned no assistant message.');
     return normalizeAssistantMessage(choice.message, data.usage);
   }
-  return readStreamingResponse(response, onDelta);
+  const idleTimeoutMs = Math.max(0, Number(config.streamIdleTimeoutMs) || 30000);
+  return readStreamingResponse(response, onDelta, onReasoning, idleTimeoutMs);
+};
+
+/**
+ * Call an OpenAI-compatible chat completions endpoint with tools and retries.
+ * Transient failures (timeouts, rate limits, 5xx, network errors) are retried
+ * with exponential backoff. Application errors (bad key, invalid request) and
+ * user aborts are not retried.
+ * @param {object} options Options.
+ * @param {object} options.config Agent configuration.
+ * @param {Array<object>} options.messages Chat messages.
+ * @param {Array<object>} options.tools Tool definitions.
+ * @param {AbortSignal} options.signal Abort signal.
+ * @param {Function} [options.onDelta] Content delta callback.
+ * @param {Function} [options.onReasoning] Reasoning-content delta callback.
+ * @param {Function} [options.onRetry] Retry notification callback.
+ * @returns {Promise<object>} Assistant message.
+ */
+const callChatCompletion = async _ref4 => {
+  let config = _ref4.config,
+    messages = _ref4.messages,
+    tools = _ref4.tools,
+    signal = _ref4.signal,
+    onDelta = _ref4.onDelta,
+    onReasoning = _ref4.onReasoning,
+    onRetry = _ref4.onRetry;
+  if (!config.apiUrl) throw new Error('API URL is not configured.');
+  if (!config.model) throw new Error('Model is not configured.');
+  const retries = Number.isFinite(Number(config.retries)) ? Math.max(0, Math.min(5, Number(config.retries))) : 2;
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await attemptRequest({
+        config,
+        messages,
+        tools,
+        signal,
+        onDelta,
+        onReasoning
+      });
+    } catch (error) {
+      if (attempt >= retries || !isRetryableError(error)) throw error;
+      attempt++;
+      if (typeof onRetry === 'function') {
+        try {
+          onRetry({
+            attempt,
+            max: retries,
+            name: error.name || 'Error',
+            status: Number.isInteger(error.status) ? error.status : 0
+          });
+        } catch (callbackError) {
+          // UI errors must not interrupt retrying.
+        }
+      }
+      const delay = Math.min(1000 * 2 ** (attempt - 1), 8000) + Math.floor(Math.random() * 400);
+      await wait(delay, signal);
+    }
+  }
 };
 
 /***/ },
@@ -943,6 +1692,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 const MAX_CONTEXT_MESSAGES = 24;
+const MAX_TOOL_RESULT_CHARS = 12000;
 const ID_PATTERN = /\bids?\b|identifier|编号|标识/i;
 const ID_NEGATIVE_PATTERN = /(?:\b(?:don'?t|doesn'?t|do not|never|without|no|avoid|not)\b[^.!?\n]{0,25}\bids?\b)|(?:\bno\s+need\s+for\s+(?:the\s+)?ids?\b)|(?:不要|不需要|不需|不用|不必|别|无需|避免|而不是|并非|没有|不)\s*(?:再|把|给我|告诉|我|显示|包含|使用|提到|输出|返回|提供|复制|贴|列出|是)*\s*(?:任何)?\s*(?:ID|编号|标识)/i;
 const ID_REQUEST_PATTERN = /\b(?:what|which|show|give|list|tell|print|display|include|need|want|find|get|provide|return|repeat|copy)\b[^.!?\n]{0,50}\bids?\b|\bids?\b[^.!?\n]{0,30}\b(?:of|for)\b/i;
@@ -1011,7 +1761,7 @@ const throwIfAborted = signal => {
 };
 
 /**
- * Run the Astra Copilot agent loop with approval-gated read-only tools.
+ * Run the Astra Copilot agent loop with approval-gated tools.
  * @param {object} options Options.
  * @param {object} options.vm Scratch VM.
  * @param {object} options.config Agent configuration.
@@ -1019,6 +1769,7 @@ const throwIfAborted = signal => {
  * @param {AbortSignal} options.signal Abort signal.
  * @param {Function} [options.onEvent] Event callback.
  * @param {Function} [options.requestApproval] Async approval callback.
+ * @param {boolean} [options.writeEnabled] Whether edit tools are exposed.
  * @param {number} [options.maxSteps] Maximum tool steps.
  * @returns {Promise<object>} Final result.
  */
@@ -1029,12 +1780,17 @@ const runAgent = async _ref => {
     signal = _ref.signal,
     onEvent = _ref.onEvent,
     requestApproval = _ref.requestApproval,
+    _ref$writeEnabled = _ref.writeEnabled,
+    writeEnabled = _ref$writeEnabled === void 0 ? false : _ref$writeEnabled,
     _ref$maxSteps = _ref.maxSteps,
     maxSteps = _ref$maxSteps === void 0 ? 8 : _ref$maxSteps;
   const tools = (0,_tools_js__WEBPACK_IMPORTED_MODULE_3__.createScratchTools)(vm);
+  const activeTools = writeEnabled ? _tools_js__WEBPACK_IMPORTED_MODULE_3__.TOOL_DEFINITIONS : _tools_js__WEBPACK_IMPORTED_MODULE_3__.TOOL_DEFINITIONS.filter(definition => !_tools_js__WEBPACK_IMPORTED_MODULE_3__.WRITE_TOOL_NAMES.includes(definition.function.name));
   const apiMessages = [{
     role: 'system',
-    content: (0,_prompt_js__WEBPACK_IMPORTED_MODULE_2__.buildSystemPrompt)()
+    content: (0,_prompt_js__WEBPACK_IMPORTED_MODULE_2__.buildSystemPrompt)({
+      writeEnabled
+    })
   }, ...messages.filter(message => message && (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string' && message.content.trim().length > 0).slice(-MAX_CONTEXT_MESSAGES).map(message => ({
     role: message.role,
     content: message.content
@@ -1056,17 +1812,35 @@ const runAgent = async _ref => {
     const response = await (0,_client_js__WEBPACK_IMPORTED_MODULE_0__.callChatCompletion)({
       config,
       messages: apiMessages,
-      tools: _tools_js__WEBPACK_IMPORTED_MODULE_3__.TOOL_DEFINITIONS,
+      tools: activeTools,
       signal,
       onDelta: delta => emitEvent(onEvent, {
         type: 'stream-delta',
         delta,
         step: step + 1
+      }),
+      onReasoning: delta => emitEvent(onEvent, {
+        type: 'reasoning-delta',
+        delta,
+        step: step + 1
+      }),
+      onRetry: info => emitEvent(onEvent, {
+        type: 'retry',
+        attempt: info.attempt,
+        max: info.max,
+        step: step + 1
       })
     });
+    throwIfAborted(signal);
     emitEvent(onEvent, {
       type: 'stream-end',
       step: step + 1
+    });
+    emitEvent(onEvent, {
+      type: 'assistant-step',
+      step: step + 1,
+      content: wantsIds ? response.content : (0,_dsl_js__WEBPACK_IMPORTED_MODULE_1__.replaceInternalIds)(vm, response.content),
+      reasoning: response.reasoning || ''
     });
     if (!response.toolCalls) {
       const content = response.content.trim();
@@ -1077,11 +1851,14 @@ const runAgent = async _ref => {
         trace
       };
     }
-    apiMessages.push({
+    const assistantMessage = {
       role: 'assistant',
       content: response.content || null,
       tool_calls: response.toolCalls
-    });
+    };
+    // Thinking-enabled providers may require their returned reasoning on tool continuations.
+    if (response.reasoning) assistantMessage.reasoning_content = response.reasoning;
+    apiMessages.push(assistantMessage);
     for (const toolCall of response.toolCalls) {
       throwIfAborted(signal);
       const toolName = toolCall.function.name;
@@ -1173,6 +1950,7 @@ const runAgent = async _ref => {
           error: error && error.message ? error.message : String(error)
         };
       }
+      throwIfAborted(signal);
       entry.status = succeeded ? 'ok' : 'error';
       entry.ok = succeeded;
       entry.summary = (0,_trace_js__WEBPACK_IMPORTED_MODULE_4__.describeToolResult)(toolName, args, result, succeeded);
@@ -1187,11 +1965,12 @@ const runAgent = async _ref => {
         preview: entry.preview,
         traceIndex
       });
+      const serializedResult = JSON.stringify(result === undefined ? null : result);
       apiMessages.push({
         role: 'tool',
         tool_call_id: toolCall.id,
         name: toolName,
-        content: JSON.stringify(result === undefined ? null : result)
+        content: serializedResult.length > MAX_TOOL_RESULT_CHARS ? "".concat(serializedResult.slice(0, MAX_TOOL_RESULT_CHARS), "...[truncated]") : serializedResult
       });
     }
   }
@@ -1217,7 +1996,8 @@ const BLOCKQUOTE_PATTERN = /^\s*>\s?(.*)$/;
 const UNORDERED_ITEM_PATTERN = /^(\s*)[-*+]\s+(.*)$/;
 const ORDERED_ITEM_PATTERN = /^(\s*)\d+[.)]\s+(.*)$/;
 const RULE_PATTERN = /^\s{0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/;
-const INLINE_PATTERN = /(`[^`\n]+`|\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)\s]+\))/g;
+const TABLE_SEPARATOR = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+const INLINE_PATTERN = /(!\[[^\]\n]*\]\([^)\s]+\)|`[^`\n]+`|\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)\s]+\))/g;
 
 /**
  * Match a Markdown list item.
@@ -1295,6 +2075,20 @@ const appendInline = (text, container) => {
       const deleted = document.createElement('del');
       appendInline(token.slice(2, -2), deleted);
       container.appendChild(deleted);
+    } else if (token.startsWith('![')) {
+      const imageMatch = /^!\[([^\]]*)\]\(([^)]+)\)$/.exec(token);
+      const href = imageMatch ? safeHref(imageMatch[2]) : null;
+      if (href) {
+        const link = document.createElement('a');
+        link.className = 'sa-agent-md-image';
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = "".concat(imageMatch[1] || 'image', " \u2197");
+        container.appendChild(link);
+      } else {
+        container.appendChild(document.createTextNode(token));
+      }
     } else if (token.startsWith('[')) {
       const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token);
       const href = linkMatch ? safeHref(linkMatch[2]) : null;
@@ -1383,6 +2177,16 @@ const appendList = (lines, start, container) => {
       itemText += " ".concat(line.trim());
       index++;
     }
+    const taskMatch = /^\[([ xX])\]\s+(.*)$/.exec(itemText.trim());
+    if (taskMatch) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'sa-agent-md-task';
+      checkbox.disabled = true;
+      checkbox.checked = taskMatch[1].toLowerCase() === 'x';
+      listItem.appendChild(checkbox);
+      itemText = taskMatch[2];
+    }
     appendInline(itemText, listItem);
     while (index < lines.length) {
       const nested = matchListItem(lines[index]);
@@ -1407,6 +2211,94 @@ const appendParagraph = (lines, container) => {
     appendInline(line.trim(), paragraph);
   });
   container.appendChild(paragraph);
+};
+
+/**
+ * Split a Markdown table row into trimmed cells.
+ * @param {string} line Table row.
+ * @returns {Array<string>} Cells.
+ */
+const splitTableRow = line => {
+  let text = String(line || '').trim();
+  if (text.startsWith('|')) text = text.slice(1);
+  if (text.endsWith('|')) text = text.slice(0, -1);
+  return text.split('|').map(cell => cell.trim());
+};
+
+/**
+ * Parse a GFM table starting at a given line.
+ * @param {Array<string>} lines Source lines.
+ * @param {number} start Header row index.
+ * @returns {object} Parsed table and the next line index.
+ */
+const parseTable = (lines, start) => {
+  const header = splitTableRow(lines[start]);
+  const alignments = splitTableRow(lines[start + 1]).map(cell => {
+    const left = /^:/.test(cell);
+    const right = /:$/.test(cell);
+    if (left && right) return 'center';
+    if (right) return 'right';
+    if (left) return 'left';
+    return '';
+  });
+  const rows = [];
+  let index = start + 2;
+  while (index < lines.length && lines[index].trim()) {
+    if (TABLE_SEPARATOR.test(lines[index]) || !lines[index].includes('|')) break;
+    rows.push(splitTableRow(lines[index]));
+    index++;
+  }
+  return {
+    header,
+    alignments,
+    rows,
+    next: index
+  };
+};
+
+/**
+ * Render a Markdown table into a scrollable wrapper.
+ * @param {Array<string>} lines Source lines.
+ * @param {number} start Header row index.
+ * @param {HTMLElement} container Destination element.
+ * @returns {number} Next line index.
+ */
+const appendTable = (lines, start, container) => {
+  const table = parseTable(lines, start);
+  const element = document.createElement('table');
+  element.className = 'sa-agent-md-table';
+  if (table.header.length > 0) {
+    const thead = document.createElement('thead');
+    const tr = document.createElement('tr');
+    table.header.forEach((cell, index) => {
+      const th = document.createElement('th');
+      if (table.alignments[index]) th.style.textAlign = table.alignments[index];
+      appendInline(cell, th);
+      tr.appendChild(th);
+    });
+    thead.appendChild(tr);
+    element.appendChild(thead);
+  }
+  if (table.rows.length > 0) {
+    const tbody = document.createElement('tbody');
+    for (const row of table.rows) {
+      const tr = document.createElement('tr');
+      for (let index = 0; index < table.header.length; index++) {
+        const td = document.createElement('td');
+        const cell = row[index] !== undefined ? row[index] : '';
+        if (table.alignments[index]) td.style.textAlign = table.alignments[index];
+        appendInline(cell, td);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    element.appendChild(tbody);
+  }
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sa-agent-md-table-wrap';
+  wrapper.appendChild(element);
+  container.appendChild(wrapper);
+  return table.next;
 };
 
 /**
@@ -1461,6 +2353,10 @@ const appendBlocks = (lines, container) => {
       index = appendList(lines, index, container);
       continue;
     }
+    if (line.includes('|') && index + 1 < lines.length && TABLE_SEPARATOR.test(lines[index + 1])) {
+      index = appendTable(lines, index, container);
+      continue;
+    }
     const paragraphLines = [];
     while (index < lines.length && lines[index].trim() && !startsBlock(lines[index])) {
       paragraphLines.push(lines[index]);
@@ -1505,9 +2401,24 @@ __webpack_require__.r(__webpack_exports__);
  * Build the Scratch coding-copilot system prompt.
  * The live project is intentionally not included: project data is only read
  * after the user asks for it and approves the tool call.
+ * @param {object} [options] Prompt options.
+ * @param {boolean} [options.writeEnabled] Whether edit tools are available.
  * @returns {string} System prompt.
  */
-const buildSystemPrompt = () => ['You are Astra Copilot, a coding copilot for Scratch 3 projects inside AstraEditor.', 'Your job is to help the user understand, debug, review, and improve the current Scratch project.', '', 'Tool policy:', '- Do not inspect the project automatically. Never read the project just because a conversation started.', '- Call a read-only tool only when the user asks you to inspect, explain, debug, review, compare, or modify project content, or when the answer genuinely cannot be given without project data.', '- For general Scratch questions, answer from your own knowledge without calling tools.', '- If the request is vague, ask a clarifying question instead of reading the whole project.', '- Use the narrowest tool needed. Prefer search_blocks or list_scripts before get_script, and avoid requesting the entire project when one sprite or script is enough.', '- When the user asks how a loaded extension works, use get_extension_source to read its block metadata and available source code instead of guessing.', '- Every tool call requires explicit user approval in the UI. If the user denies a call, do not retry it or work around the denial.', '- If a tool fails, explain the failure and ask how the user wants to proceed.', '', 'Project rules:', '- This version is read-only. You cannot apply changes to the project. When suggesting a fix, describe the exact sprite, script, and blocks the user should change, and do not claim that you changed anything.', '- Ground every claim about the project in tool results. Never invent sprite names, variables, scripts, or block contents.', '- Never include block IDs, script IDs, target IDs, or raw opcodes in your final reply. Refer to sprites by name and blocks by their visible labels (for example "when green flag clicked" or "set variable to"). Only include an ID if the user explicitly asks for one.', '- If the user explicitly asks to see an extension implementation, you may quote the relevant source code returned by get_extension_source.', '- Scripts are returned as readable Scratch DSL, one statement per line. Treat the DSL as code, not as internal identifiers.', '', 'Response style:', '- Be concise, direct, and practical, like a coding assistant.', '- When explaining a script, name the sprite and walk through the hat block and relevant blocks in order.', '- When finding a bug, state the cause, the affected sprite/script, and a concrete fix.', '- The UI displays tool activity automatically. Do not paste raw JSON or duplicate the entire tool output in your reply.', '- If the project does not contain the requested information, say so clearly.', '- Reply in the same language the user uses.', '- Format replies with Markdown (short paragraphs, lists, and fenced code blocks). Never output raw HTML.'].join('\n');
+const buildSystemPrompt = function buildSystemPrompt() {
+  let _ref = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
+    _ref$writeEnabled = _ref.writeEnabled,
+    writeEnabled = _ref$writeEnabled === void 0 ? false : _ref$writeEnabled;
+  const lines = ['You are Astra Copilot, a coding copilot for Scratch 3 projects inside AstraEditor.', 'Your job is to help the user understand, debug, review, and improve the current Scratch project.', '', 'Tool policy:', '- Do not inspect the project automatically. Never read the project just because a conversation started.', '- Call a read-only tool only when the user asks you to inspect, explain, debug, review, compare, or modify project content, or when the answer genuinely cannot be given without project data.', '- For general Scratch questions, answer from your own knowledge without calling tools.', '- If the request is vague, ask a clarifying question instead of reading the whole project.', '- Use the narrowest and most suitable tool needed:', '  * Use get_project_summary when the user asks for high-level structure, sprite counts, global variables, or loaded extensions.', '  * Use list_targets to list all sprites and identify the currently selected sprite.', '  * Use get_target to view details of a specific sprite (costumes, sounds, local variables).', '  * Use list_scripts to inspect the list of scripts and their hat blocks in a sprite.', '  * Use get_script to retrieve the complete Scratch DSL code of a specific script.', '  * Use search_blocks to locate specific blocks by opcode, text, or variable.', '  * Use get_runtime_state when asked if the project is running or to check active thread execution.', '  * Use get_extension_source when the user asks how a loaded extension works to read its block metadata and source code.', '  * Use block_catalog to look up exact opcodes, default fields, and input signatures.', '- Every tool call requires explicit user approval in the UI. If the user denies a call, do not retry it or work around the denial.', '- If a tool fails, explain the failure and ask how the user wants to proceed.', ''];
+  lines.push('Environment & Network boundaries:', '- You run completely locally within AstraEditor. You do NOT have internet access, web search engines, or URL fetching capabilities.', '- Never claim, assume, or pretend that you can browse the web, visit online links, or fetch live internet data.', '- Only call tools that are explicitly provided in your tool definitions. Never invent non-existent tool names.', '- For general Scratch, programming, logic, or math questions, answer directly from your own built-in pre-trained knowledge base.', '- For project-specific questions, rely strictly on the provided local Scratch inspection tools.', '');
+  if (writeEnabled) {
+    lines.push('Editing the project (Build Mode is ACTIVE):', '- You may modify the project with apply_scripts, delete_scripts, create_variable and rename_target. These are real edits: the user sees them in the editor and can undo them with Ctrl+Z.', '- Before editing, inspect first: use list_scripts/get_script or get_target so you know the real sprite, script and block names. Never invent them.', '- Work in small, verifiable steps. Apply one clear change at a time, then briefly say what you changed.', '- Use block_catalog when unsure about an exact opcode or input name.', '- apply_scripts only ADDS the blocks you provide; it never deletes existing scripts. To remove code, use delete_scripts with IDs from list_scripts.', '- To change existing code, prefer adding a corrected script (and deleting the old one if asked) over guessing how to patch deeply nested blocks.', '- After editing, state which sprite changed and what the new behaviour is. Do not claim a change succeeded if a tool returned an error.', '- Still respect every approval prompt; the user can reject an edit and you must not retry it.', '');
+  } else {
+    lines.push('Plan Mode (Read-only mode is ACTIVE):', '- You are currently in Plan Mode. You cannot apply changes to the project directly. When suggesting a fix, review, or architecture, describe the exact sprite, script, and blocks the user should change, and do not claim that you changed anything.', '- If the user asks you to directly create, edit, or delete blocks/scripts in the project, explain that you are in Plan Mode and remind them to switch to "Build Mode" (构建模式) via the mode button at the bottom of the input card.', '');
+  }
+  lines.push('Grounding:', '- Ground every claim about the project in tool results. Never invent sprite names, variables, scripts, or block contents.', '- Never include block IDs, script IDs, target IDs, or raw opcodes in your final reply. Refer to sprites by name and blocks by their visible labels (for example "when green flag clicked" or "set variable to"). Only include an ID if the user explicitly asks for one.', '- If the user explicitly asks to see an extension implementation, you may quote the relevant source code returned by get_extension_source.', '- Scripts are returned as readable Scratch DSL, one statement per line. Treat the DSL as code, not as internal identifiers.', '', 'Response style:', '- Be concise, direct, and practical, like a coding assistant.', '- When explaining a script, name the sprite and walk through the hat block and relevant blocks in order.', '- When finding a bug, state the cause, the affected sprite/script, and a concrete fix.', '- The UI displays tool activity automatically. Do not paste raw JSON or duplicate the entire tool output in your reply.', '- If the project does not contain the requested information, say so clearly.', '- Reply in the same language the user uses.', '- Format replies with Markdown (short paragraphs, lists, and fenced code blocks). Never output raw HTML.');
+  return lines.join('\n');
+};
 
 /***/ },
 
@@ -1521,11 +2432,14 @@ const buildSystemPrompt = () => ['You are Astra Copilot, a coding copilot for Sc
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   TOOL_DEFINITIONS: () => (/* binding */ TOOL_DEFINITIONS),
+/* harmony export */   WRITE_TOOL_NAMES: () => (/* binding */ WRITE_TOOL_NAMES),
 /* harmony export */   createScratchTools: () => (/* binding */ createScratchTools)
 /* harmony export */ });
 /* harmony import */ var scratch_vm_src_dispatch_central_dispatch__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! scratch-vm/src/dispatch/central-dispatch */ "../scratch-vm/src/dispatch/central-dispatch.js");
 /* harmony import */ var scratch_vm_src_dispatch_central_dispatch__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(scratch_vm_src_dispatch_central_dispatch__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _dsl_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./dsl.js */ "./src/addons/addons/astras-copilot/agent/dsl.js");
+/* harmony import */ var _block_xml_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./block-xml.js */ "./src/addons/addons/astras-copilot/agent/block-xml.js");
+/* harmony import */ var _writer_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./writer.js */ "./src/addons/addons/astras-copilot/agent/writer.js");
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
@@ -1537,6 +2451,8 @@ function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) 
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
 function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+
+
 
 
 const MAX_FIELD_LENGTH = 500;
@@ -2213,6 +3129,236 @@ const getRuntimeState = vm => {
     currentTarget: editingTarget ? getTargetIdentity(editingTarget) : null
   };
 };
+
+/**
+ * Get the stage target.
+ * @param {object} vm Scratch VM.
+ * @returns {object|null} Stage.
+ */
+const getStage = vm => {
+  return vm && vm.runtime && typeof vm.runtime.getTargetForStage === 'function' ? vm.runtime.getTargetForStage() : null;
+};
+
+/**
+ * Build a name-resolution context for the block XML compiler.
+ *
+ * Variables, lists and broadcasts referenced by name are looked up on the
+ * target then the stage; anything missing is declared in a <variables> preamble
+ * so the workspace creates it on load (which the VM mirrors via blockListener).
+ * @param {object} vm Scratch VM.
+ * @param {object} target Editing target the blocks belong to.
+ * @returns {object} Compiler context.
+ */
+const makeVarContext = (vm, target) => {
+  const stage = getStage(vm);
+  const declarations = [];
+  const cache = new Map();
+  const lookup = (holder, type, name) => {
+    return holder && typeof holder.lookupVariableByNameAndType === 'function' ? holder.lookupVariableByNameAndType(name, type) : null;
+  };
+  const findVariable = (type, name) => lookup(target, type, name) || lookup(stage, type, name);
+  const firstCostume = target && typeof target.getCostumes === 'function' ? target.getCostumes()[0] : null;
+  const stageCostumes = stage && typeof stage.getCostumes === 'function' ? stage.getCostumes() : [];
+  const backdrop = stageCostumes[stageCostumes.length - 1] || stageCostumes[0] || null;
+  const firstSound = target && typeof target.getSounds === 'function' ? target.getSounds()[0] : null;
+  return {
+    defaultCostume: firstCostume ? firstCostume.name : '',
+    defaultBackdrop: backdrop ? backdrop.name : '',
+    defaultSound: firstSound ? firstSound.name : '',
+    resolveField(fieldName, rawName) {
+      const name = String(rawName === undefined || rawName === null ? '' : rawName);
+      const type = fieldName === 'LIST' ? 'list' : fieldName === 'BROADCAST_OPTION' ? 'broadcast_msg' : '';
+      const key = "".concat(type, ":").concat(name);
+      if (cache.has(key)) return cache.get(key);
+      const existing = findVariable(type, name);
+      if (existing) {
+        const resolved = {
+          id: existing.id,
+          name: existing.name,
+          type: existing.type || ''
+        };
+        cache.set(key, resolved);
+        return resolved;
+      }
+      const id = (0,_block_xml_js__WEBPACK_IMPORTED_MODULE_2__.generateId)();
+      const created = {
+        id,
+        name,
+        type,
+        isLocal: false
+      };
+      declarations.push(created);
+      cache.set(key, created);
+      return created;
+    },
+    drainDeclarations() {
+      const out = declarations.slice();
+      declarations.length = 0;
+      return out;
+    }
+  };
+};
+
+/**
+ * Report whether the write bridge is ready.
+ * @returns {object} Status.
+ */
+const getWriteReady = () => ({
+  ready: (0,_writer_js__WEBPACK_IMPORTED_MODULE_3__.hasApplier)(),
+  canApply: (0,_writer_js__WEBPACK_IMPORTED_MODULE_3__.hasApplier)()
+});
+
+/**
+ * Tool names that change the project. The agent loop only exposes these to the
+ * model when write mode is enabled for the conversation.
+ */
+const WRITE_TOOL_NAMES = ['apply_scripts', 'delete_scripts', 'create_variable', 'rename_target'];
+
+// --- Write tools -----------------------------------------------------------
+
+/**
+ * Apply one script to a target's workspace.
+ * @param {object} vm Scratch VM.
+ * @param {object} args Tool arguments.
+ * @param {object} args.target Target name or ID (omit for editing target).
+ * @param {Array<object>} args.scripts Script descriptors.
+ * @returns {Promise<object>} Result.
+ */
+const applyScripts = async (vm, args) => {
+  if (!Array.isArray(args.scripts) || args.scripts.length === 0) {
+    throw new Error('scripts is required: provide an array of { blocks: [...] } entries.');
+  }
+  const target = requireTarget(vm, args.target);
+  if (!target || target.isStage === undefined) throw new Error('Target not found.');
+  const ctx = makeVarContext(vm, target);
+  const compiled = (0,_block_xml_js__WEBPACK_IMPORTED_MODULE_2__.buildScriptsXml)(args.scripts, ctx);
+  const result = await (0,_writer_js__WEBPACK_IMPORTED_MODULE_3__.applyXml)(compiled.xml, {
+    targetId: target.id,
+    declarations: compiled.declarations
+  });
+  return {
+    ok: true,
+    target: getTargetIdentity(target),
+    scripts: compiled.scripts,
+    warnings: compiled.warnings,
+    applied: result && result.blockIds ? result.blockIds.length : compiled.scripts
+  };
+};
+
+/**
+ * Delete top-level scripts from a target.
+ * @param {object} vm Scratch VM.
+ * @param {object} args Tool arguments.
+ * @param {object} args.target Target name or ID.
+ * @param {Array<string>} args.scriptIds Script root IDs (from list_scripts).
+ * @returns {Promise<object>} Result.
+ */
+const deleteScripts = async (vm, args) => {
+  const ids = Array.isArray(args.scriptIds) ? args.scriptIds.filter(id => typeof id === 'string' && id) : args.scriptId ? [args.scriptId] : [];
+  if (ids.length === 0) throw new Error('scriptIds is required (use list_scripts to get them).');
+  const target = requireTarget(vm, args.target);
+  const blocks = getBlockMap(target);
+  const existing = ids.filter(id => blocks[id] && blocks[id].topLevel);
+  if (existing.length === 0) throw new Error('None of the given script IDs are top-level scripts of this target.');
+  const result = await (0,_writer_js__WEBPACK_IMPORTED_MODULE_3__.applyXml)('', {
+    targetId: target.id,
+    deleteScriptIds: existing
+  });
+  return {
+    ok: true,
+    target: getTargetIdentity(target),
+    deleted: existing.length,
+    skipped: ids.length - existing.length,
+    applied: result && result.deleted !== undefined ? result.deleted : existing.length
+  };
+};
+
+/**
+ * Create a variable, list or broadcast.
+ * @param {object} vm Scratch VM.
+ * @param {object} args Tool arguments.
+ * @returns {Promise<object>} Result.
+ */
+const createVariable = async (vm, args) => {
+  const name = String(args.name || '').trim();
+  if (!name) throw new Error('name is required.');
+  const kind = String(args.kind || 'variable').toLowerCase();
+  const type = kind === 'list' ? 'list' : kind === 'broadcast' ? 'broadcast_msg' : '';
+  const target = requireTarget(vm, args.target);
+  // Broadcasts and global variables live on the stage; locals on the sprite.
+  const isLocal = Boolean(args.local) && !target.isStage && type !== 'broadcast_msg';
+  const holder = isLocal ? target : getStage(vm);
+  if (!holder) throw new Error('Stage not found.');
+  const existing = holder.lookupVariableByNameAndType(name, type);
+  if (existing) {
+    return {
+      ok: true,
+      created: false,
+      name,
+      kind,
+      existing: true
+    };
+  }
+  const id = (0,_block_xml_js__WEBPACK_IMPORTED_MODULE_2__.generateId)();
+  const result = await (0,_writer_js__WEBPACK_IMPORTED_MODULE_3__.applyXml)('', {
+    targetId: holder.id,
+    declarations: [{
+      id,
+      name,
+      type,
+      isLocal,
+      isCloud: Boolean(args.cloud) && !isLocal
+    }]
+  });
+  return {
+    ok: true,
+    created: true,
+    name,
+    kind,
+    applied: 1,
+    id: result && result.id ? result.id : id
+  };
+};
+
+/**
+ * Rename a target (sprite/stage).
+ * @param {object} vm Scratch VM.
+ * @param {object} args Tool arguments.
+ * @returns {Promise<object>} Result.
+ */
+const renameTarget = async (vm, args) => {
+  const currentName = String(args.target || '').trim();
+  const newName = String(args.newName || '').trim();
+  if (!newName) throw new Error('newName is required.');
+  const target = requireTarget(vm, currentName);
+  if (!target || typeof target.setName !== 'function') throw new Error('Target cannot be renamed.');
+  if (target.isStage) throw new Error('The stage cannot be renamed.');
+  const before = target.getName();
+  await (0,_writer_js__WEBPACK_IMPORTED_MODULE_3__.applyXml)('', {
+    targetId: target.id,
+    renameTarget: newName
+  });
+  const after = target.getName();
+  return {
+    ok: true,
+    before,
+    after
+  };
+};
+
+/**
+ * List core block opcodes an agent may use, optionally filtered.
+ * @param {object} args Tool arguments.
+ * @returns {object} Catalog.
+ */
+const blockCatalog = args => {
+  const filter = String(args.query || '').trim();
+  const blocks = (0,_block_xml_js__WEBPACK_IMPORTED_MODULE_2__.describeCoreBlocks)(filter);
+  return {
+    count: blocks.length,
+    blocks: blocks.slice(0, 200)
+  };
+};
 const TOOL_DEFINITIONS = [{
   type: 'function',
   function: {
@@ -2359,10 +3505,147 @@ const TOOL_DEFINITIONS = [{
       additionalProperties: false
     }
   }
+}, {
+  type: 'function',
+  function: {
+    name: 'apply_scripts',
+    description: 'ADD OR MODIFY blocks in a sprite or the stage. Compiles a JSON block tree into Scratch blocks and loads them into the real editor workspace (the change is undoable with Ctrl+Z). Use list_scripts/get_script first to see existing code, and block_catalog to confirm opcodes and input names. Only include the blocks you intend to add; this never deletes existing scripts. Provide blocks as a nested tree: {opcode, fields:{}, inputs:{}} where inputs are literal values or nested block trees, and control blocks use substack/substack2 arrays plus next for the following statement.',
+    parameters: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          description: 'Sprite name or ID. Omit to use the current editing target.'
+        },
+        scripts: {
+          type: 'array',
+          description: 'Array of scripts. Each script is {x, y, blocks: [blockTree, ...]} where blocks is the whole stack starting from a hat block.',
+          items: {
+            type: 'object',
+            properties: {
+              x: {
+                type: 'number',
+                description: 'X position of the script on the workspace.'
+              },
+              y: {
+                type: 'number',
+                description: 'Y position of the script on the workspace.'
+              },
+              blocks: {
+                type: 'array',
+                description: 'Statement stack; the first item is usually a hat block like event_whenflagclicked.',
+                items: {
+                  type: 'object'
+                }
+              }
+            },
+            required: ['blocks']
+          }
+        }
+      },
+      required: ['scripts'],
+      additionalProperties: false
+    }
+  }
+}, {
+  type: 'function',
+  function: {
+    name: 'delete_scripts',
+    description: 'DELETE one or more top-level scripts from a sprite or the stage. Get script IDs from list_scripts or search_blocks. Undoable with Ctrl+Z.',
+    parameters: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          description: 'Sprite name or ID. Omit to use the current editing target.'
+        },
+        scriptIds: {
+          type: 'array',
+          description: 'Script root IDs to delete.',
+          items: {
+            type: 'string'
+          }
+        }
+      },
+      required: ['scriptIds'],
+      additionalProperties: false
+    }
+  }
+}, {
+  type: 'function',
+  function: {
+    name: 'create_variable',
+    description: 'Create a variable, list, or broadcast message. Creates nothing if it already exists. Undoable with Ctrl+Z.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Variable/list/broadcast name.'
+        },
+        kind: {
+          type: 'string',
+          enum: ['variable', 'list', 'broadcast'],
+          description: 'What to create. Defaults to variable.'
+        },
+        target: {
+          type: 'string',
+          description: 'Sprite name or ID that should own a local variable. Omit for a global (stage) variable.'
+        },
+        local: {
+          type: 'boolean',
+          description: 'Create a sprite-local variable instead of a global. Ignored for broadcasts and the stage.'
+        },
+        cloud: {
+          type: 'boolean',
+          description: 'Create a cloud variable. Requires a stage/global variable.'
+        }
+      },
+      required: ['name'],
+      additionalProperties: false
+    }
+  }
+}, {
+  type: 'function',
+  function: {
+    name: 'rename_target',
+    description: 'Rename a sprite (not the stage). The rename is applied immediately.',
+    parameters: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          description: 'Current sprite/stage name or ID.'
+        },
+        newName: {
+          type: 'string',
+          description: 'New name.'
+        }
+      },
+      required: ['newName'],
+      additionalProperties: false
+    }
+  }
+}, {
+  type: 'function',
+  function: {
+    name: 'block_catalog',
+    description: 'List core Scratch block opcodes with their input names, optionally filtered. Use this to look up exact opcodes/inputs before calling apply_scripts.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Optional case-insensitive filter, e.g. "motion" or "data_".'
+        }
+      },
+      additionalProperties: false
+    }
+  }
 }];
 
 /**
- * Create read-only Scratch tool handlers bound to a VM.
+ * Create Scratch tool handlers bound to a VM.
  * @param {object} vm Scratch VM.
  * @returns {object} Tool handlers.
  */
@@ -2377,7 +3660,13 @@ const createScratchTools = vm => ({
   get_script: args => getScript(vm, args || {}),
   search_blocks: args => searchBlocks(vm, args || {}),
   get_extension_source: args => getExtensionSource(vm, args || {}),
-  get_runtime_state: () => getRuntimeState(vm)
+  get_runtime_state: () => getRuntimeState(vm),
+  block_catalog: args => blockCatalog(args || {}),
+  get_write_status: () => getWriteReady(),
+  apply_scripts: args => applyScripts(vm, args || {}),
+  delete_scripts: args => deleteScripts(vm, args || {}),
+  create_variable: args => createVariable(vm, args || {}),
+  rename_target: args => renameTarget(vm, args || {})
 });
 
 /***/ },
@@ -2412,6 +3701,11 @@ const previewToolResult = (result, name) => {
   if (name === 'get_extension_source' && result && typeof result === 'object' && result.source) {
     value = _objectSpread(_objectSpread({}, result), {}, {
       source: "[".concat(result.source.length, " characters of source code]")
+    });
+  }
+  if (name === 'fetch_url' && result && typeof result === 'object' && typeof result.text === 'string') {
+    value = _objectSpread(_objectSpread({}, result), {}, {
+      text: "[".concat(result.text.length, " characters of text]")
     });
   }
   let text = '';
@@ -2490,9 +3784,111 @@ const describeToolResult = (name, args, result, ok) => {
         running: Boolean(result.isRunning),
         threads: result.threadCount || 0
       };
+    case 'search_web':
+      return {
+        kind: 'web-search',
+        query: String(result.query || ''),
+        count: Array.isArray(result.results) ? result.results.length : 0
+      };
+    case 'fetch_url':
+      return {
+        kind: 'page',
+        url: String(result.url || ''),
+        chars: Number(result.chars) || 0
+      };
+    case 'apply_scripts':
+      return {
+        kind: 'apply-scripts',
+        name: result.target && result.target.name || '',
+        scripts: result.scripts || 0
+      };
+    case 'delete_scripts':
+      return {
+        kind: 'delete-scripts',
+        name: result.target && result.target.name || '',
+        count: result.deleted || 0
+      };
+    case 'create_variable':
+      return {
+        kind: 'create-variable',
+        name: result.name || '',
+        variableKind: result.kind || 'variable',
+        created: Boolean(result.created)
+      };
+    case 'rename_target':
+      return {
+        kind: 'rename-target',
+        before: result.before || '',
+        after: result.after || ''
+      };
+    case 'block_catalog':
+      return {
+        kind: 'block-catalog',
+        count: result.count || 0
+      };
     default:
       return null;
   }
+};
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/writer.js"
+/*!**********************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/writer.js ***!
+  \**********************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   applyXml: () => (/* binding */ applyXml),
+/* harmony export */   hasApplier: () => (/* binding */ hasApplier),
+/* harmony export */   setApplier: () => (/* binding */ setApplier)
+/* harmony export */ });
+/**
+ * Write bridge for Astra Copilot.
+ *
+ * The agent tools live in plain modules that have no direct access to
+ * scratch-blocks. This module is a tiny registry: the addon's userscript
+ * installs an `applier` once the editor is ready, and the write tools call
+ * `applyXml` to push compiled block XML into the real workspace.
+ *
+ * Applying through `Blockly.Xml.domToWorkspace` is intentional:
+ *   - the GUI forwards every create/delete event to `vm.blockListener`, so the
+ *     VM stays the source of truth;
+ *   - events are recorded on Blockly's undo stack, so a single Ctrl+Z reverts
+ *     the whole injection.
+ */
+
+let applier = null;
+
+/**
+ * Register the workspace applier.
+ * @param {Function} fn Async applier: (xml, meta) => Promise<{blockIds?: Array<string>}>.
+ */
+const setApplier = fn => {
+  applier = typeof fn === 'function' ? fn : null;
+};
+
+/**
+ * Whether an applier is currently registered.
+ * @returns {boolean} Availability.
+ */
+const hasApplier = () => typeof applier === 'function';
+
+/**
+ * Apply compiled XML through the registered applier.
+ * @param {string} xml Block XML (may be empty when only deleting).
+ * @param {object} [meta] Extra instructions: targetId, deleteScriptIds.
+ * @returns {Promise<object>} Applier result.
+ */
+const applyXml = async function applyXml(xml) {
+  let meta = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  if (typeof applier !== 'function') {
+    throw new Error('The editor is not ready to apply changes yet. Try again once the project has loaded.');
+  }
+  return applier(xml, meta || {});
 };
 
 /***/ },
@@ -2517,14 +3913,21 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _lib_tw_recolor_build_icon_plus_svg__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-plus.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-plus.svg");
 /* harmony import */ var _lib_tw_recolor_build_icon_rename_svg__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-rename.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-rename.svg");
 /* harmony import */ var _lib_tw_recolor_build_icon_trash_svg__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-trash.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-trash.svg");
-/* harmony import */ var _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../../ui/side-bar/side-bar.js */ "./src/addons/ui/side-bar/side-bar.js");
-/* harmony import */ var _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../ui/bottom-panel/bottom-panel.js */ "./src/addons/ui/bottom-panel/bottom-panel.js");
-/* harmony import */ var _agent_client_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./agent/client.js */ "./src/addons/addons/astras-copilot/agent/client.js");
-/* harmony import */ var _agent_dsl_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ./agent/dsl.js */ "./src/addons/addons/astras-copilot/agent/dsl.js");
-/* harmony import */ var _agent_markdown_js__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ./agent/markdown.js */ "./src/addons/addons/astras-copilot/agent/markdown.js");
-/* harmony import */ var _agent_loop_js__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ./agent/loop.js */ "./src/addons/addons/astras-copilot/agent/loop.js");
-/* harmony import */ var _agent_prompt_js__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ./agent/prompt.js */ "./src/addons/addons/astras-copilot/agent/prompt.js");
-/* harmony import */ var _agent_tools_js__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ./agent/tools.js */ "./src/addons/addons/astras-copilot/agent/tools.js");
+/* harmony import */ var _lib_tw_recolor_build_icon_more_svg__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-more.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-more.svg");
+/* harmony import */ var _lib_tw_recolor_build_icon_build_svg__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-build.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-build.svg");
+/* harmony import */ var _lib_tw_recolor_build_icon_plan_svg__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-plan.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-plan.svg");
+/* harmony import */ var _lib_tw_recolor_build_icon_undo_svg__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-undo.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-undo.svg");
+/* harmony import */ var _lib_tw_recolor_build_icon_retry_svg__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-retry.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-retry.svg");
+/* harmony import */ var _lib_tw_recolor_build_icon_branch_svg__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-branch.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-branch.svg");
+/* harmony import */ var _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ../../ui/side-bar/side-bar.js */ "./src/addons/ui/side-bar/side-bar.js");
+/* harmony import */ var _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ../../ui/bottom-panel/bottom-panel.js */ "./src/addons/ui/bottom-panel/bottom-panel.js");
+/* harmony import */ var _agent_client_js__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ./agent/client.js */ "./src/addons/addons/astras-copilot/agent/client.js");
+/* harmony import */ var _agent_dsl_js__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ./agent/dsl.js */ "./src/addons/addons/astras-copilot/agent/dsl.js");
+/* harmony import */ var _agent_markdown_js__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ./agent/markdown.js */ "./src/addons/addons/astras-copilot/agent/markdown.js");
+/* harmony import */ var _agent_loop_js__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ./agent/loop.js */ "./src/addons/addons/astras-copilot/agent/loop.js");
+/* harmony import */ var _agent_prompt_js__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ./agent/prompt.js */ "./src/addons/addons/astras-copilot/agent/prompt.js");
+/* harmony import */ var _agent_tools_js__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ./agent/tools.js */ "./src/addons/addons/astras-copilot/agent/tools.js");
+/* harmony import */ var _agent_writer_js__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ./agent/writer.js */ "./src/addons/addons/astras-copilot/agent/writer.js");
 function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
@@ -2553,11 +3956,19 @@ function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = 
 
 
 
+
+
+
+
+
+
+
 const PLUGIN_ID = 'astras-copilot';
 const CONFIG_KEY = 'astras-agent-config-v2';
 const HISTORY_KEY = 'astras-agent-history-v2';
 const CONVERSATIONS_KEY = 'astras-agent-conversations-v1';
 const POSITION_KEY = 'AEAstrasCopilotPosition';
+const WRITE_ENABLED_KEY = 'astras-agent-write-enabled-v1';
 const MAX_HISTORY_MESSAGES = 40;
 const MAX_CONVERSATIONS = 30;
 const WIDE_LAYOUT_MIN_WIDTH = 560;
@@ -2565,12 +3976,18 @@ const POSITION_TYPES = {
   SIDEBAR: 'sidebar',
   BOTTOM: 'bottom'
 };
+const DEFAULT_MODELS = ['gpt-4o-mini', 'gpt-4o', 'claude-3-7-sonnet', 'claude-3-5-sonnet', 'deepseek-chat', 'deepseek-reasoner'];
 const DEFAULT_CONFIG = {
   apiUrl: 'https://api.openai.com/v1/chat/completions',
   apiKey: '',
   model: 'gpt-4o-mini',
+  models: DEFAULT_MODELS.join('\n'),
   headers: {},
-  stream: true
+  stream: true,
+  temperature: 0.2,
+  maxTokens: 3000,
+  retries: 2,
+  streamIdleTimeoutMs: 30000
 };
 
 /**
@@ -2639,6 +4056,30 @@ const savePosition = position => {
 };
 
 /**
+ * Load write mode enabled state.
+ * @returns {boolean} Whether write mode is enabled.
+ */
+const loadWriteEnabled = () => {
+  try {
+    return localStorage.getItem(WRITE_ENABLED_KEY) === 'true';
+  } catch (error) {
+    return false;
+  }
+};
+
+/**
+ * Save write mode enabled state.
+ * @param {boolean} enabled Whether write mode is enabled.
+ */
+const saveWriteEnabled = enabled => {
+  try {
+    localStorage.setItem(WRITE_ENABLED_KEY, enabled ? 'true' : 'false');
+  } catch (error) {
+    // Ignore storage failures.
+  }
+};
+
+/**
  * Load the agent configuration, migrating the API fields from the old AC format.
  * @returns {object} Agent configuration.
  */
@@ -2665,8 +4106,13 @@ const loadConfig = () => {
     apiUrl: typeof stored.apiUrl === 'string' && stored.apiUrl ? stored.apiUrl : DEFAULT_CONFIG.apiUrl,
     apiKey: typeof stored.apiKey === 'string' ? stored.apiKey : DEFAULT_CONFIG.apiKey,
     model: typeof stored.model === 'string' && stored.model ? stored.model : DEFAULT_CONFIG.model,
+    models: typeof stored.models === 'string' && stored.models ? stored.models : DEFAULT_CONFIG.models,
     headers: stored.headers && typeof stored.headers === 'object' && !Array.isArray(stored.headers) ? stored.headers : {},
-    stream: stored.stream !== false
+    stream: stored.stream !== false,
+    temperature: Number.isFinite(Number(stored.temperature)) ? Number(stored.temperature) : DEFAULT_CONFIG.temperature,
+    maxTokens: Number.isFinite(Number(stored.maxTokens)) ? Number(stored.maxTokens) : DEFAULT_CONFIG.maxTokens,
+    retries: Number.isFinite(Number(stored.retries)) ? Number(stored.retries) : DEFAULT_CONFIG.retries,
+    streamIdleTimeoutMs: Number.isFinite(Number(stored.streamIdleTimeoutMs)) ? Number(stored.streamIdleTimeoutMs) : DEFAULT_CONFIG.streamIdleTimeoutMs
   };
 };
 
@@ -2797,7 +4243,7 @@ const saveConversations = state => {
  * @param {string} content Message content.
  */
 const renderFormattedContent = (container, content) => {
-  container.appendChild((0,_agent_markdown_js__WEBPACK_IMPORTED_MODULE_13__.renderMarkdown)(content));
+  container.appendChild((0,_agent_markdown_js__WEBPACK_IMPORTED_MODULE_19__.renderMarkdown)(content));
 };
 
 /**
@@ -2808,8 +4254,8 @@ const renderFormattedContent = (container, content) => {
  */
 const createIcon = (iconSource, className) => {
   const image = document.createElement('img');
-  image.className = className;
-  image.src = iconSource();
+  image.className = "sa-agent-icon ".concat(className || '').trim();
+  image.src = typeof iconSource === 'function' ? iconSource() : iconSource;
   image.draggable = false;
   image.alt = '';
   return image;
@@ -2857,6 +4303,9 @@ const createIcon = (iconSource, className) => {
   let conversationLayoutObserver = null;
   let isWideLayout = false;
   let conversationPaneOpen = false;
+  let pendingDeleteId = null;
+  let sessionMenu = null;
+  let statusRow = null;
   let statusElement = null;
   let inputElement = null;
   let sendButton = null;
@@ -2874,11 +4323,18 @@ const createIcon = (iconSource, className) => {
   let settingsErrorElement = null;
   let apiUrlInput = null;
   let apiKeyInput = null;
-  let modelInput = null;
   let headersInput = null;
   let streamInput = null;
   let autoApproveInput = null;
   let autoApproveTools = false;
+  let modeButton = null;
+  let modelSelectElement = null;
+  let modelsInput = null;
+  let writeEnabled = loadWriteEnabled();
+  const approvedConversations = new Set();
+  let temperatureInput = null;
+  let maxTokensInput = null;
+  let retriesInput = null;
   let contextElement = null;
   let compressButton = null;
   let compressController = null;
@@ -2886,9 +4342,14 @@ const createIcon = (iconSource, className) => {
   let compressing = false;
   let autoScrollEnabled = true;
   let liveTrace = [];
+  let liveParts = [];
   let liveTraceElement = null;
+  const disclosureElements = new WeakMap();
   const approvalResolvers = new Map();
   let streamingText = '';
+  let streamingReasoning = '';
+  let streamingReasoningElement = null;
+  let streamingReasoningBody = null;
   let streamingSanitize = true;
   let streamingRow = null;
   let streamingBubble = null;
@@ -2938,27 +4399,70 @@ const createIcon = (iconSource, className) => {
   };
 
   /**
-   * Update the status line below the message list.
+   * Show a trailing status bubble in the conversation's scrolling timeline.
    * @param {string} text Status text.
    * @param {boolean} [isError] Whether this is an error status.
    */
   const setStatus = function setStatus(text) {
     let isError = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
-    if (!statusElement) return;
+    if (!statusElement || !messagesElement) return;
+    const stick = isNearBottom() || autoScrollEnabled;
     statusElement.textContent = text || '';
     statusElement.classList.toggle('sa-agent-status-error', Boolean(isError));
-    const settingsOpen = Boolean(settingsPanel && settingsPanel.style.display !== 'none');
-    statusElement.style.display = text && !settingsOpen ? 'block' : 'none';
+    statusElement.setAttribute('role', isError ? 'alert' : 'status');
+    if (text) messagesElement.appendChild(statusRow);else statusRow.remove();
+    if (stick) scrollToBottom();
   };
 
   /**
-   * Compose a localized status message for a tool call.
-   * @param {string} toolName Tool name.
-   * @returns {string} Status message.
+   * Get the list of configured model names.
+   * @returns {Array<string>} Model names.
    */
-  const getToolStatus = toolName => msg('status-tool', {
-    name: getToolLabel(toolName)
-  });
+  const getConfiguredModels = () => {
+    const raw = String(config.models || '').trim();
+    const list = raw ? raw.split(/[\n,]+/).map(item => item.trim()).filter(Boolean) : [];
+    if (config.model && !list.includes(config.model)) {
+      list.unshift(config.model);
+    }
+    if (!list.length) {
+      list.push('gpt-4o-mini');
+    }
+    return [...new Set(list)];
+  };
+
+  /**
+   * Update the model selector dropdown in the composer toolbar.
+   */
+  const updateModelSelector = () => {
+    if (!modelSelectElement) return;
+    const models = getConfiguredModels();
+    modelSelectElement.innerHTML = '';
+    for (const m of models) {
+      const option = document.createElement('option');
+      option.value = m;
+      option.textContent = m;
+      if (m === config.model) option.selected = true;
+      modelSelectElement.appendChild(option);
+    }
+    modelSelectElement.value = config.model;
+  };
+
+  /**
+   * Update the mode button UI state (Build / Plan).
+   */
+  const updateModeUI = () => {
+    if (modeButton) {
+      modeButton.className = "sa-agent-mode-button ".concat(writeEnabled ? 'sa-agent-mode-build' : 'sa-agent-mode-plan');
+      modeButton.innerHTML = '';
+      const modeIcon = createIcon(writeEnabled ? _lib_tw_recolor_build_icon_build_svg__WEBPACK_IMPORTED_MODULE_10__["default"] : _lib_tw_recolor_build_icon_plan_svg__WEBPACK_IMPORTED_MODULE_11__["default"], 'sa-agent-mode-icon');
+      const modeText = document.createElement('span');
+      modeText.textContent = writeEnabled ? msg('mode-build') : msg('mode-plan');
+      modeButton.appendChild(modeIcon);
+      modeButton.appendChild(modeText);
+      modeButton.title = writeEnabled ? msg('mode-switch-build') : msg('mode-switch-plan');
+      modeButton.setAttribute('aria-label', modeButton.title);
+    }
+  };
 
   /**
    * Update the enablement of the composer controls.
@@ -2968,6 +4472,7 @@ const createIcon = (iconSource, className) => {
     sendButton.disabled = busy || compressing || inputElement.value.trim().length === 0;
     stopButton.style.display = busy ? 'inline-flex' : 'none';
     if (compressButton) compressButton.disabled = busy || compressing;
+    updateModeUI();
   };
 
   /**
@@ -2975,8 +4480,8 @@ const createIcon = (iconSource, className) => {
    * @returns {object} Estimated token count and message count.
    */
   const estimateContextUsage = () => {
-    const history = chatMessages.filter(message => message && (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string' && message.content.trim()).slice(-_agent_loop_js__WEBPACK_IMPORTED_MODULE_14__.MAX_CONTEXT_MESSAGES);
-    let tokens = estimateTextTokens((0,_agent_prompt_js__WEBPACK_IMPORTED_MODULE_15__.buildSystemPrompt)()) + estimateTextTokens(JSON.stringify(_agent_tools_js__WEBPACK_IMPORTED_MODULE_16__.TOOL_DEFINITIONS));
+    const history = chatMessages.filter(message => message && (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string' && message.content.trim()).slice(-_agent_loop_js__WEBPACK_IMPORTED_MODULE_20__.MAX_CONTEXT_MESSAGES);
+    let tokens = estimateTextTokens((0,_agent_prompt_js__WEBPACK_IMPORTED_MODULE_21__.buildSystemPrompt)()) + estimateTextTokens(JSON.stringify(_agent_tools_js__WEBPACK_IMPORTED_MODULE_22__.TOOL_DEFINITIONS));
     for (const message of history) {
       tokens += estimateTextTokens(message.content) + 4;
     }
@@ -3033,7 +4538,7 @@ const createIcon = (iconSource, className) => {
     updateComposer();
     setStatus(msg('status-compressing'));
     try {
-      const response = await (0,_agent_client_js__WEBPACK_IMPORTED_MODULE_11__.callChatCompletion)({
+      const response = await (0,_agent_client_js__WEBPACK_IMPORTED_MODULE_17__.callChatCompletion)({
         config: _objectSpread(_objectSpread({}, config), {}, {
           stream: false
         }),
@@ -3044,7 +4549,11 @@ const createIcon = (iconSource, className) => {
           role: message.role,
           content: message.content
         }))],
-        signal: controller.signal
+        signal: controller.signal,
+        onRetry: info => setStatus(msg('status-retrying', {
+          attempt: Number(info.attempt) || 1,
+          max: Number(info.max) || 1
+        }))
       });
       if (requestId !== compressRequestId || conversationId !== activeConversationId) return;
       const summary = String(response.content || '').trim();
@@ -3086,13 +4595,18 @@ const createIcon = (iconSource, className) => {
    */
   const resizeInput = () => {
     if (!inputElement) return;
+    if (!inputElement.value) {
+      inputElement.style.height = '20px';
+      inputElement.style.overflowY = 'hidden';
+      return;
+    }
     inputElement.style.height = 'auto';
     const styles = window.getComputedStyle(inputElement);
     const maxHeight = parseFloat(styles.maxHeight);
     const borderHeight = Math.max(0, inputElement.offsetHeight - inputElement.clientHeight);
     const contentHeight = inputElement.scrollHeight + borderHeight;
     const nextHeight = Number.isFinite(maxHeight) ? Math.min(contentHeight, maxHeight) : contentHeight;
-    inputElement.style.height = "".concat(nextHeight, "px");
+    inputElement.style.height = "".concat(Math.max(20, nextHeight), "px");
     inputElement.style.overflowY = contentHeight > nextHeight ? 'auto' : 'hidden';
     scrollToBottom();
   };
@@ -3104,8 +4618,18 @@ const createIcon = (iconSource, className) => {
     get_script: msg('tool-get-script'),
     search_blocks: msg('tool-search-blocks'),
     get_extension_source: msg('tool-get-extension-source'),
-    get_runtime_state: msg('tool-get-runtime-state')
+    get_runtime_state: msg('tool-get-runtime-state'),
+    search_web: msg('tool-search-web'),
+    fetch_url: msg('tool-fetch-url'),
+    block_catalog: msg('tool-block-catalog'),
+    apply_scripts: msg('tool-apply-scripts'),
+    delete_scripts: msg('tool-delete-scripts'),
+    create_variable: msg('tool-create-variable'),
+    rename_target: msg('tool-rename-target')
   };
+
+  /** Tools that modify the project (approval prompt wording differs). */
+  const WRITE_TOOL_SET = new Set(['apply_scripts', 'delete_scripts', 'create_variable', 'rename_target']);
 
   /**
    * Get a localized tool name.
@@ -3284,15 +4808,11 @@ const createIcon = (iconSource, className) => {
    * Delete a conversation.
    * @param {string} id Conversation id.
    */
-  const deleteConversation = async id => {
+  const deleteConversation = id => {
     const conversation = findConversation(id);
     if (!conversation) return;
-    const confirmed = await addon.tab.confirm(msg('conversation-delete'), msg('conversation-delete-confirm', {
-      title: getConversationTitle(conversation)
-    }), {
-      useEditorClasses: true
-    });
-    if (!confirmed) return;
+    pendingDeleteId = null;
+    approvedConversations.delete(id);
     const wasActive = conversation.id === activeConversationId;
     cancelCompression();
     if (wasActive && busy) stopRequest();
@@ -3312,6 +4832,7 @@ const createIcon = (iconSource, className) => {
         lastUsage = null;
       }
       liveTrace = [];
+      liveParts = [];
       liveTraceElement = null;
       clearStreaming();
       renderMessages();
@@ -3358,15 +4879,66 @@ const createIcon = (iconSource, className) => {
       deleteButton.setAttribute('aria-label', msg('conversation-delete'));
       deleteButton.addEventListener('click', event => {
         event.stopPropagation();
-        deleteConversation(conversation.id).catch(() => {});
+        pendingDeleteId = conversation.id;
+        renderConversationList();
+        const cancel = conversationListElement.querySelector('.sa-agent-delete-cancel');
+        if (cancel) cancel.focus();
       });
       actions.appendChild(renameButton);
       actions.appendChild(deleteButton);
       item.appendChild(titleButton);
       item.appendChild(actions);
+      if (pendingDeleteId === conversation.id) {
+        item.classList.add('sa-agent-conversation-item-confirming');
+        const confirmation = document.createElement('div');
+        confirmation.className = 'sa-agent-delete-confirm';
+        confirmation.setAttribute('role', 'group');
+        const prompt = document.createElement('div');
+        prompt.textContent = msg('conversation-delete-confirm', {
+          title: getConversationTitle(conversation)
+        });
+        confirmation.appendChild(prompt);
+        const buttons = document.createElement('div');
+        buttons.className = 'sa-agent-delete-actions';
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'sa-agent-tool-approval-button sa-agent-delete-cancel';
+        cancel.textContent = msg('cancel');
+        const dismiss = () => {
+          pendingDeleteId = null;
+          renderConversationList();
+          const restored = Array.from(conversationListElement.children).find(element => element.dataset.conversationId === conversation.id);
+          if (restored) restored.querySelector('.sa-agent-delete-button').focus();
+        };
+        cancel.addEventListener('click', dismiss);
+        confirmation.addEventListener('keydown', event => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            dismiss();
+          }
+        });
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.className = 'sa-agent-tool-approval-button sa-agent-delete-accept';
+        confirm.textContent = msg('conversation-delete');
+        confirm.addEventListener('click', () => {
+          deleteConversation(conversation.id);
+          const next = conversationListElement.querySelector('.sa-agent-conversation-item-title');
+          if (next) next.focus();
+        });
+        buttons.appendChild(cancel);
+        buttons.appendChild(confirm);
+        confirmation.appendChild(buttons);
+        item.appendChild(confirmation);
+      }
+      item.dataset.conversationId = conversation.id;
+      deleteButton.classList.add('sa-agent-delete-button');
       conversationListElement.appendChild(item);
     }
     updateHeaderTitle();
+    autoApproveTools = approvedConversations.has(activeConversationId);
+    if (autoApproveInput) autoApproveInput.checked = autoApproveTools;
     conversationListElement.scrollTop = scrollTop;
     const activeItem = conversationListElement.querySelector('.sa-agent-conversation-item-active');
     if (activeItem) {
@@ -3392,6 +4964,9 @@ const createIcon = (iconSource, className) => {
     streamingRow = null;
     streamingBubble = null;
     streamingText = '';
+    streamingReasoning = '';
+    streamingReasoningElement = null;
+    streamingReasoningBody = null;
   };
 
   /**
@@ -3399,17 +4974,30 @@ const createIcon = (iconSource, className) => {
    */
   const renderStreamingBubble = () => {
     streamingRenderFrame = 0;
-    if (!streamingBubble) return;
-    const content = streamingSanitize ? (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_12__.replaceInternalIds)(vm, streamingText) : streamingText;
+    if (!streamingRow) return;
+    const stick = isNearBottom() || autoScrollEnabled;
+    if (streamingReasoning) {
+      if (!streamingReasoningElement) {
+        streamingReasoningElement = buildReasoningElement(streamingReasoning, {}, true);
+        streamingReasoningBody = streamingReasoningElement.querySelector('.sa-agent-reasoning-body');
+        streamingRow.insertBefore(streamingReasoningElement, streamingBubble);
+      }
+      streamingReasoningBody.textContent = '';
+      streamingReasoningBody.appendChild((0,_agent_markdown_js__WEBPACK_IMPORTED_MODULE_19__.renderMarkdown)(streamingReasoning));
+      streamingReasoningElement.querySelector('summary').textContent = msg(streamingText ? 'reasoning-title' : 'reasoning-active');
+    }
+    const content = streamingSanitize ? (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_18__.replaceInternalIds)(vm, streamingText) : streamingText;
     streamingBubble.textContent = '';
-    streamingBubble.appendChild((0,_agent_markdown_js__WEBPACK_IMPORTED_MODULE_13__.renderMarkdown)(content));
+    streamingBubble.appendChild((0,_agent_markdown_js__WEBPACK_IMPORTED_MODULE_19__.renderMarkdown)(content));
+    streamingBubble.hidden = !streamingText;
+    if (stick) scrollToBottom();
   };
 
   /**
    * Append streaming text and update the live assistant bubble.
    */
   const updateStreaming = () => {
-    if (!messagesElement || !streamingText) return;
+    if (!messagesElement || !streamingText && !streamingReasoning) return;
     const stick = isNearBottom();
     if (!streamingRow || !streamingRow.isConnected) {
       streamingRow = document.createElement('div');
@@ -3421,7 +5009,7 @@ const createIcon = (iconSource, className) => {
       streamingBubble.className = 'sa-agent-bubble sa-agent-streaming-bubble';
       streamingRow.appendChild(role);
       streamingRow.appendChild(streamingBubble);
-      messagesElement.appendChild(streamingRow);
+      messagesElement.insertBefore(streamingRow, statusRow.parentNode === messagesElement ? statusRow : null);
     }
     if (!streamingRenderFrame) streamingRenderFrame = requestAnimationFrame(renderStreamingBubble);
     if (stick) {
@@ -3478,6 +5066,39 @@ const createIcon = (iconSource, className) => {
           state: msg(summary.running ? 'trace-running' : 'trace-stopped'),
           threads: summary.threads
         });
+      case 'web-search':
+        return msg('trace-web-search', {
+          query: String(summary.query || '').slice(0, 120),
+          count: summary.count
+        });
+      case 'page':
+        return msg('trace-page', {
+          url: String(summary.url || '').slice(0, 80),
+          chars: summary.chars
+        });
+      case 'apply-scripts':
+        return msg('trace-apply-scripts', {
+          name: summary.name,
+          scripts: summary.scripts
+        });
+      case 'delete-scripts':
+        return msg('trace-delete-scripts', {
+          name: summary.name,
+          count: summary.count
+        });
+      case 'create-variable':
+        return msg(summary.created ? 'trace-create-variable' : 'trace-create-variable-exists', {
+          name: summary.name
+        });
+      case 'rename-target':
+        return msg('trace-rename-target', {
+          before: summary.before,
+          after: summary.after
+        });
+      case 'block-catalog':
+        return msg('trace-block-catalog', {
+          count: summary.count
+        });
       case 'denied':
         return msg('trace-denied-summary');
       case 'error':
@@ -3529,7 +5150,7 @@ const createIcon = (iconSource, className) => {
         }
         const rootBlock = blocks && blocks[rootId] || block;
         try {
-          return (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_12__.getBlockLabel)(vm, rootBlock.opcode, rootBlock.mutation);
+          return (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_18__.getBlockLabel)(vm, rootBlock.opcode, rootBlock.mutation);
         } catch (error) {
           return '';
         }
@@ -3585,6 +5206,11 @@ const createIcon = (iconSource, className) => {
       const script = describeTraceScript(String(args.blockId));
       if (script) parts.push(msg('trace-args-script', {
         script
+      }));
+    }
+    if (args.url) {
+      parts.push(msg('trace-args-url', {
+        url: String(args.url).slice(0, 160)
       }));
     }
     if (args.limit) {
@@ -3679,6 +5305,71 @@ const createIcon = (iconSource, className) => {
     });
   };
 
+  /** Keep disclosure state while live content is rebuilt. */
+  const rememberDisclosure = function rememberDisclosure(element, key) {
+    let defaultOpen = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    const previous = disclosureElements.get(key);
+    element.open = previous ? previous.open : defaultOpen;
+    disclosureElements.set(key, element);
+  };
+
+  /** Render only reasoning text actually returned by the API. */
+  const buildReasoningElement = function buildReasoningElement(text, key) {
+    let active = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    const details = document.createElement('details');
+    details.className = 'sa-agent-reasoning';
+    rememberDisclosure(details, key, active);
+    const summary = document.createElement('summary');
+    summary.textContent = msg(active ? 'reasoning-active' : 'reasoning-title');
+    const body = document.createElement('div');
+    body.className = 'sa-agent-reasoning-body';
+    body.appendChild((0,_agent_markdown_js__WEBPACK_IMPORTED_MODULE_19__.renderMarkdown)(text));
+    details.appendChild(summary);
+    details.appendChild(body);
+    return details;
+  };
+
+  /** Render assistant text and tool groups in their original order. */
+  const appendAssistantParts = function appendAssistantParts(row, parts) {
+    let interactive = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    for (const part of parts) {
+      if (!part) continue;
+      if (part.type === 'tools' && Array.isArray(part.trace) && part.trace.length) {
+        row.appendChild(buildTraceElement(part.trace, interactive));
+      } else if (part.type === 'response') {
+        if (part.reasoning) row.appendChild(buildReasoningElement(part.reasoning, part));
+        if (part.content) {
+          const bubble = document.createElement('div');
+          bubble.className = 'sa-agent-bubble';
+          renderFormattedContent(bubble, part.content);
+          row.appendChild(bubble);
+        }
+      }
+    }
+  };
+
+  /** Group consecutive tool calls without displacing preceding assistant text. */
+  const addLiveTool = entry => {
+    liveTrace.push(entry);
+    let part = liveParts[liveParts.length - 1];
+    if (!part || part.type !== 'tools') {
+      part = {
+        type: 'tools',
+        trace: []
+      };
+      liveParts.push(part);
+    }
+    part.trace.push(entry);
+  };
+
+  /** This permission belongs to the current conversation in this browser session. */
+  const setAutoApproveTools = allowed => {
+    autoApproveTools = allowed;
+    if (allowed) approvedConversations.add(activeConversationId);else approvedConversations.delete(activeConversationId);
+    if (autoApproveInput) autoApproveInput.checked = allowed;
+    if (allowed) Array.from(approvalResolvers.keys()).forEach(id => resolveToolApproval(id, true));
+  };
+
   /**
    * Build a single tool-call row.
    * @param {object} entry Trace entry.
@@ -3691,6 +5382,7 @@ const createIcon = (iconSource, className) => {
     row.className = "sa-agent-tool-row sa-agent-trace-".concat(status);
     const details = document.createElement('details');
     details.className = 'sa-agent-tool';
+    rememberDisclosure(details, entry, false);
     const summary = document.createElement('summary');
     summary.className = 'sa-agent-tool-summary';
     const dot = document.createElement('span');
@@ -3751,7 +5443,9 @@ const createIcon = (iconSource, className) => {
       approval.className = 'sa-agent-tool-approval';
       const hint = document.createElement('span');
       hint.className = 'sa-agent-tool-approval-hint';
-      hint.textContent = msg('trace-approval-hint');
+      const isWrite = WRITE_TOOL_SET.has(entry.name);
+      hint.textContent = msg(isWrite ? 'trace-write-approval-hint' : 'trace-approval-hint');
+      if (isWrite) row.classList.add('sa-agent-tool-write');
       const allow = document.createElement('button');
       allow.type = 'button';
       allow.className = 'sa-agent-tool-approval-button sa-agent-tool-allow';
@@ -3767,9 +5461,7 @@ const createIcon = (iconSource, className) => {
       allowAll.className = 'sa-agent-tool-approval-button sa-agent-tool-allow-all';
       allowAll.textContent = msg('trace-allow-all');
       allowAll.addEventListener('click', () => {
-        autoApproveTools = true;
-        if (autoApproveInput) autoApproveInput.checked = true;
-        resolveToolApproval(entry.id, true);
+        setAutoApproveTools(true);
       });
       approval.appendChild(hint);
       approval.appendChild(allow);
@@ -3790,9 +5482,37 @@ const createIcon = (iconSource, className) => {
     let interactive = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
     const wrapper = document.createElement('div');
     wrapper.className = 'sa-agent-trace';
-    for (const entry of trace) {
-      wrapper.appendChild(buildToolRow(entry, interactive));
+    const awaiting = interactive ? trace.filter(entry => entry.status === 'awaiting') : [];
+    const stacked = trace.filter(entry => !awaiting.includes(entry));
+    if (stacked.length) {
+      const stack = document.createElement('details');
+      stack.className = 'sa-agent-tool-stack';
+      stack.classList.toggle('sa-agent-tool-stack-multiple', stacked.length > 1);
+      rememberDisclosure(stack, trace);
+      const summary = document.createElement('summary');
+      summary.className = 'sa-agent-tool-stack-summary';
+      const title = document.createElement('span');
+      title.textContent = msg('trace-stack-title', {
+        count: stacked.length
+      });
+      const state = document.createElement('span');
+      state.className = 'sa-agent-tool-stack-state';
+      const latest = stacked[stacked.length - 1];
+      const failures = stacked.filter(entry => entry.status === 'error' || entry.status === 'denied').length;
+      state.textContent = failures ? msg('trace-stack-errors', {
+        count: failures
+      }) : "".concat(getToolLabel(latest.name), " \xB7 ").concat(formatTraceStatus(latest.status));
+      summary.appendChild(title);
+      summary.appendChild(state);
+      const body = document.createElement('div');
+      body.className = 'sa-agent-tool-stack-body';
+      for (const entry of stacked) body.appendChild(buildToolRow(entry, false));
+      stack.appendChild(summary);
+      stack.appendChild(body);
+      wrapper.appendChild(stack);
     }
+    // Keep pending approval actions reachable even when the completed stack is collapsed.
+    for (const entry of awaiting) wrapper.appendChild(buildToolRow(entry, true));
     return wrapper;
   };
 
@@ -3801,19 +5521,102 @@ const createIcon = (iconSource, className) => {
    */
   const renderLiveTrace = () => {
     if (!messagesElement) return;
+    const stick = isNearBottom() || autoScrollEnabled;
     if (liveTraceElement && liveTraceElement.parentNode) liveTraceElement.parentNode.removeChild(liveTraceElement);
     liveTraceElement = null;
-    if (liveTrace.length === 0) return;
-    const stick = isNearBottom();
-    liveTraceElement = buildTraceElement(liveTrace, true);
+    if (liveParts.length === 0) return;
+    liveTraceElement = document.createElement('div');
+    liveTraceElement.className = 'sa-agent-message sa-agent-message-assistant';
+    const role = document.createElement('div');
+    role.className = 'sa-agent-message-role';
+    role.textContent = msg('role-agent');
+    liveTraceElement.appendChild(role);
+    appendAssistantParts(liveTraceElement, liveParts, true);
     if (streamingRow && streamingRow.parentNode === messagesElement) {
       messagesElement.insertBefore(liveTraceElement, streamingRow);
     } else {
-      messagesElement.appendChild(liveTraceElement);
+      messagesElement.insertBefore(liveTraceElement, statusRow.parentNode === messagesElement ? statusRow : null);
     }
     if (stick) {
       autoScrollEnabled = true;
       scrollToBottom();
+    }
+  };
+
+  /**
+   * Undo to a specific user message by reverting history and restoring input.
+   * @param {number} targetIndex Message index.
+   */
+  const undoToMessage = targetIndex => {
+    if (targetIndex < 0 || targetIndex >= chatMessages.length) return;
+    if (busy) stopRequest();
+    const targetMsg = chatMessages[targetIndex];
+    const text = targetMsg ? targetMsg.content : '';
+    chatMessages = chatMessages.slice(0, targetIndex);
+    saveCurrentHistory();
+    renderMessages();
+    if (inputElement) {
+      inputElement.value = text;
+      resizeInput();
+      inputElement.focus();
+    }
+    updateComposer();
+  };
+
+  /**
+   * Retry generating from a specific user message.
+   * @param {number} targetIndex Message index.
+   */
+  const retryFromMessage = targetIndex => {
+    if (busy || targetIndex < 0 || targetIndex >= chatMessages.length) return;
+    const targetMsg = chatMessages[targetIndex];
+    if (!targetMsg) return;
+    const prompt = targetMsg.content;
+    chatMessages = chatMessages.slice(0, targetIndex);
+    saveCurrentHistory();
+    renderMessages();
+    sendMessage(prompt).catch(() => {});
+  };
+
+  /**
+   * Branch a new conversation up to the given message index.
+   * @param {number} targetIndex Message index.
+   */
+  const branchFromMessage = targetIndex => {
+    var _chatMessages$targetI;
+    if (targetIndex < 0 || targetIndex >= chatMessages.length) return;
+    cancelCompression();
+    if (busy) stopRequest();
+    saveCurrentHistory();
+    const current = findConversation(activeConversationId);
+    const baseTitle = current && current.title ? current.title : makeConversationTitle(((_chatMessages$targetI = chatMessages[targetIndex]) === null || _chatMessages$targetI === void 0 ? void 0 : _chatMessages$targetI.content) || '');
+    const branchTitle = "".concat(msg('branch-prefix')).concat(baseTitle);
+    const branchedMessages = chatMessages.slice(0, targetIndex + 1).map(m => _objectSpread({}, m));
+    const conversation = createConversation(branchedMessages);
+    conversation.title = branchTitle;
+    pendingDeleteId = null;
+    if (sessionMenu) sessionMenu.open = false;
+    conversations.unshift(conversation);
+    activeConversationId = conversation.id;
+    conversations = trimConversations(conversations, activeConversationId);
+    chatMessages = conversation.messages;
+    lastUsage = null;
+    liveTrace = [];
+    liveParts = [];
+    liveTraceElement = null;
+    clearStreaming();
+    persistConversations();
+    renderConversationList();
+    renderMessages();
+    updateContextUsage();
+    closeConversationPane();
+    setStatus(msg('status-branched'));
+    requestAnimationFrame(() => scrollToBottom(true));
+    if (inputElement) {
+      inputElement.value = '';
+      updateComposer();
+      resizeInput();
+      inputElement.focus();
     }
   };
 
@@ -3823,11 +5626,9 @@ const createIcon = (iconSource, className) => {
   const renderMessages = () => {
     if (!messagesElement) return;
     const stick = isNearBottom() || autoScrollEnabled;
+    clearStreaming();
     messagesElement.textContent = '';
     liveTraceElement = null;
-    streamingRow = null;
-    streamingBubble = null;
-    streamingText = '';
     updateContextUsage();
     if (chatMessages.length === 0) {
       const welcome = document.createElement('div');
@@ -3837,33 +5638,113 @@ const createIcon = (iconSource, className) => {
       title.textContent = msg('title');
       const text = document.createElement('div');
       text.className = 'sa-agent-welcome-text';
-      text.textContent = msg('welcome');
+      text.textContent = msg(writeEnabled ? 'welcome-edit' : 'welcome');
       welcome.appendChild(title);
       welcome.appendChild(text);
       messagesElement.appendChild(welcome);
+      if (statusElement.textContent) messagesElement.appendChild(statusRow);
       return;
     }
     for (const message of chatMessages) {
       const trace = Array.isArray(message.trace) ? message.trace : null;
+      const parts = message.role === 'assistant' && Array.isArray(message.parts) ? message.parts : null;
       const hasContent = typeof message.content === 'string' && message.content.trim().length > 0;
-      if (!hasContent && (!trace || trace.length === 0)) continue;
+      if (!hasContent && (!trace || trace.length === 0) && (!parts || !parts.length) && !message.notice) continue;
       const row = document.createElement('div');
       row.className = "sa-agent-message sa-agent-message-".concat(message.role);
       const role = document.createElement('div');
       role.className = 'sa-agent-message-role';
       role.textContent = message.role === 'user' ? msg('role-you') : msg('role-agent');
       row.appendChild(role);
-      if (message.role === 'assistant' && trace && trace.length > 0) {
+      if (parts && parts.length) {
+        appendAssistantParts(row, parts);
+      } else if (message.role === 'assistant' && trace && trace.length > 0) {
         row.appendChild(buildTraceElement(trace));
       }
-      if (hasContent) {
+      if (hasContent && (!parts || !parts.length)) {
         const bubble = document.createElement('div');
         bubble.className = 'sa-agent-bubble';
         renderFormattedContent(bubble, message.content);
         row.appendChild(bubble);
+        if (message.role === 'user') {
+          const targetIndex = chatMessages.indexOf(message);
+          const actionsBar = document.createElement('div');
+          actionsBar.className = 'sa-agent-user-actions';
+          const undoButton = document.createElement('button');
+          undoButton.type = 'button';
+          undoButton.className = 'sa-agent-user-action-btn';
+          undoButton.title = msg('action-undo');
+          undoButton.setAttribute('aria-label', msg('action-undo'));
+          undoButton.appendChild(createIcon(_lib_tw_recolor_build_icon_undo_svg__WEBPACK_IMPORTED_MODULE_12__["default"], 'sa-agent-user-action-icon'));
+          const undoSpan = document.createElement('span');
+          undoSpan.textContent = msg('action-undo');
+          undoButton.appendChild(undoSpan);
+          undoButton.addEventListener('click', () => undoToMessage(targetIndex));
+          actionsBar.appendChild(undoButton);
+          const retryButton = document.createElement('button');
+          retryButton.type = 'button';
+          retryButton.className = 'sa-agent-user-action-btn';
+          retryButton.title = msg('action-retry');
+          retryButton.setAttribute('aria-label', msg('action-retry'));
+          retryButton.appendChild(createIcon(_lib_tw_recolor_build_icon_retry_svg__WEBPACK_IMPORTED_MODULE_13__["default"], 'sa-agent-user-action-icon'));
+          const retrySpan = document.createElement('span');
+          retrySpan.textContent = msg('action-retry');
+          retryButton.appendChild(retrySpan);
+          retryButton.addEventListener('click', () => retryFromMessage(targetIndex));
+          actionsBar.appendChild(retryButton);
+          const branchButton = document.createElement('button');
+          branchButton.type = 'button';
+          branchButton.className = 'sa-agent-user-action-btn';
+          branchButton.title = msg('action-branch');
+          branchButton.setAttribute('aria-label', msg('action-branch'));
+          branchButton.appendChild(createIcon(_lib_tw_recolor_build_icon_branch_svg__WEBPACK_IMPORTED_MODULE_14__["default"], 'sa-agent-user-action-icon'));
+          const branchSpan = document.createElement('span');
+          branchSpan.textContent = msg('action-branch');
+          branchButton.appendChild(branchSpan);
+          branchButton.addEventListener('click', () => branchFromMessage(targetIndex));
+          actionsBar.appendChild(branchButton);
+          row.appendChild(actionsBar);
+        }
+      }
+      if (message.notice) {
+        const notice = document.createElement('div');
+        notice.className = 'sa-agent-bubble sa-agent-status';
+        notice.classList.toggle('sa-agent-status-error', Boolean(message.error));
+        notice.textContent = message.notice;
+        row.appendChild(notice);
+      }
+      if (message.role === 'assistant' && (message.mode || message.model || message.duration)) {
+        const metaBar = document.createElement('div');
+        metaBar.className = 'sa-agent-message-meta';
+        if (message.mode) {
+          const isBuild = message.mode === 'build';
+          const modeBadge = document.createElement('span');
+          modeBadge.className = "sa-agent-meta-badge ".concat(isBuild ? 'sa-agent-meta-mode-build' : 'sa-agent-meta-mode-plan');
+          const badgeIcon = createIcon(isBuild ? _lib_tw_recolor_build_icon_build_svg__WEBPACK_IMPORTED_MODULE_10__["default"] : _lib_tw_recolor_build_icon_plan_svg__WEBPACK_IMPORTED_MODULE_11__["default"], 'sa-agent-meta-icon');
+          const badgeText = document.createElement('span');
+          badgeText.textContent = isBuild ? msg('mode-build') : msg('mode-plan');
+          modeBadge.appendChild(badgeIcon);
+          modeBadge.appendChild(badgeText);
+          metaBar.appendChild(modeBadge);
+        }
+        if (message.model) {
+          const modelBadge = document.createElement('span');
+          modelBadge.className = 'sa-agent-meta-badge sa-agent-meta-model';
+          modelBadge.textContent = message.model;
+          metaBar.appendChild(modelBadge);
+        }
+        if (typeof message.duration === 'number' && message.duration > 0) {
+          const durationBadge = document.createElement('span');
+          durationBadge.className = 'sa-agent-meta-badge sa-agent-meta-duration';
+          const sec = (message.duration / 1000).toFixed(1);
+          durationBadge.textContent = "".concat(sec, "s");
+          metaBar.appendChild(durationBadge);
+        }
+        row.appendChild(metaBar);
       }
       messagesElement.appendChild(row);
     }
+    if (statusElement.textContent) messagesElement.appendChild(statusRow);
     if (stick) {
       autoScrollEnabled = true;
       scrollToBottom();
@@ -3892,23 +5773,36 @@ const createIcon = (iconSource, className) => {
    * @param {Array<object>} trace Trace entries.
    * @param {string} content Assistant content.
    * @param {boolean} [isError] Whether the run failed.
+   * @param {string} [notice] Notice text.
+   * @param {object} [meta] Metadata (mode, model, duration).
    */
-  const commitTrace = (trace, content, isError) => {
-    const hasTrace = Array.isArray(trace) && trace.length > 0;
-    const hasContent = typeof content === 'string' && content.trim().length > 0;
-    if (!hasTrace && !hasContent) return;
-    if (!hasTrace) {
-      addMessage('assistant', content, isError ? {
-        error: true
-      } : undefined);
-      return;
-    }
-    addMessage('assistant', content, isError ? {
-      trace,
-      error: true
-    } : {
+  const commitTrace = function commitTrace(trace, content, isError) {
+    let notice = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : '';
+    let meta = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : null;
+    const parts = liveParts;
+    if (!parts.length && content) parts.push({
+      type: 'response',
+      content,
+      reasoning: ''
+    });
+    if (!parts.length && trace.length) parts.push({
+      type: 'tools',
       trace
     });
+    const text = parts.filter(part => part.type === 'response').map(part => part.content || '').join('\n\n');
+    liveParts = [];
+    liveTrace = [];
+    liveTraceElement = null;
+    if (parts.length || notice) {
+      const extras = {
+        parts,
+        error: Boolean(isError),
+        notice
+      };
+      if (trace.length) extras.trace = trace;
+      if (meta && typeof meta === 'object') Object.assign(extras, meta);
+      addMessage('assistant', text, extras);
+    }
   };
 
   /**
@@ -3928,24 +5822,32 @@ const createIcon = (iconSource, className) => {
    * Commit the in-flight trace, if any.
    * @param {string} content Assistant content.
    * @param {boolean} [isError] Whether the run failed.
+   * @param {string} [notice] Notice text.
+   * @param {object} [meta] Metadata (mode, model, duration).
    */
-  const commitLiveTrace = (content, isError) => {
-    const trace = liveTrace.map(entry => {
+  const commitLiveTrace = function commitLiveTrace(content, isError) {
+    let notice = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '';
+    let meta = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : null;
+    if (content || streamingReasoning) {
+      liveParts.push({
+        type: 'response',
+        content,
+        reasoning: streamingReasoning
+      });
+    }
+    clearStreaming();
+    for (const entry of liveTrace) {
       if (entry.status === 'pending' || entry.status === 'awaiting') {
-        return _objectSpread(_objectSpread({}, entry), {}, {
-          status: 'error',
-          ok: false,
-          summary: {
-            kind: 'error',
-            message: msg('status-stopped')
-          }
-        });
+        entry.status = 'error';
+        entry.ok = false;
+        entry.summary = {
+          kind: 'error',
+          message: notice || msg('status-stopped')
+        };
       }
-      return entry;
-    });
-    liveTrace = [];
-    liveTraceElement = null;
-    commitTrace(trace, content, isError);
+    }
+    setStatus('');
+    commitTrace(liveTrace, content, isError, notice, meta);
   };
 
   /**
@@ -3955,11 +5857,9 @@ const createIcon = (iconSource, className) => {
     cancelCompression();
     if (!activeController) return;
     requestGeneration++;
-    const partial = streamingText ? streamingSanitize ? (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_12__.replaceInternalIds)(vm, streamingText) : streamingText : '';
-    clearStreaming();
+    const partial = streamingText ? streamingSanitize ? (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_18__.replaceInternalIds)(vm, streamingText) : streamingText : '';
     cancelAllApprovals();
-    commitLiveTrace(partial, true);
-    setStatus(msg('status-stopped'));
+    commitLiveTrace(partial, false, msg('status-stopped'));
     activeController.abort();
   };
 
@@ -3975,9 +5875,12 @@ const createIcon = (iconSource, className) => {
     if (busy) stopRequest();
     saveCurrentHistory();
     activeConversationId = id;
+    pendingDeleteId = null;
+    if (sessionMenu) sessionMenu.open = false;
     chatMessages = next.messages;
     lastUsage = next.lastUsage || null;
     liveTrace = [];
+    liveParts = [];
     liveTraceElement = null;
     clearStreaming();
     persistConversations();
@@ -4010,12 +5913,15 @@ const createIcon = (iconSource, className) => {
       return;
     }
     const conversation = createConversation([]);
+    pendingDeleteId = null;
+    if (sessionMenu) sessionMenu.open = false;
     conversations.unshift(conversation);
     activeConversationId = conversation.id;
     conversations = trimConversations(conversations, activeConversationId);
     chatMessages = conversation.messages;
     lastUsage = null;
     liveTrace = [];
+    liveParts = [];
     liveTraceElement = null;
     clearStreaming();
     persistConversations();
@@ -4050,19 +5956,24 @@ const createIcon = (iconSource, className) => {
     const activeConversation = findConversation(conversationId);
     if (activeConversation) activeConversation.lastUsage = null;
     liveTrace = [];
+    liveParts = [];
     liveTraceElement = null;
     streamingSanitize = true;
     clearStreaming();
+    setStatus('');
     addMessage('user', content);
     scrollToBottom(true);
     busy = true;
     updateComposer();
     setStatus(msg('status-thinking'));
+    const startTime = Date.now();
+    const requestMode = writeEnabled ? 'build' : 'plan';
+    const requestModel = config.model;
     const controller = new AbortController();
     const generation = ++requestGeneration;
     activeController = controller;
     try {
-      const result = await (0,_agent_loop_js__WEBPACK_IMPORTED_MODULE_14__.runAgent)({
+      const result = await (0,_agent_loop_js__WEBPACK_IMPORTED_MODULE_20__.runAgent)({
         vm,
         config,
         messages: chatMessages.map(message => ({
@@ -4071,6 +5982,7 @@ const createIcon = (iconSource, className) => {
         })),
         signal: controller.signal,
         requestApproval: requestToolApproval,
+        writeEnabled,
         onEvent: event => {
           if (!busy || generation !== requestGeneration || conversationId !== activeConversationId) return;
           if (event.type === 'thinking') {
@@ -4078,27 +5990,46 @@ const createIcon = (iconSource, className) => {
           } else if (event.type === 'stream-start') {
             clearStreaming();
             streamingSanitize = event.sanitize !== false;
-            setStatus(msg('status-streaming'));
+            setStatus(msg('status-thinking'));
+          } else if (event.type === 'reasoning-delta') {
+            if (typeof event.delta === 'string' && event.delta) {
+              streamingReasoning += event.delta;
+              updateStreaming();
+              setStatus('');
+            }
           } else if (event.type === 'stream-delta') {
             if (typeof event.delta === 'string' && event.delta) {
               streamingText += event.delta;
               updateStreaming();
-              setStatus(msg('status-streaming'));
+              setStatus('');
             }
           } else if (event.type === 'stream-end') {
-            if (!streamingText) setStatus(msg('status-thinking'));
-          } else if (event.type === 'tool-request') {
+            if (!streamingText && !streamingReasoning) setStatus(msg('status-thinking'));
+          } else if (event.type === 'assistant-step') {
+            if (event.content || event.reasoning) {
+              liveParts.push({
+                type: 'response',
+                content: event.content || '',
+                reasoning: event.reasoning || ''
+              });
+            }
             clearStreaming();
+            renderLiveTrace();
+          } else if (event.type === 'retry') {
+            clearStreaming();
+            setStatus(msg('status-retrying', {
+              attempt: event.attempt,
+              max: event.max
+            }));
+          } else if (event.type === 'tool-request') {
             const autoApproved = autoApproveTools;
-            liveTrace.push({
+            addLiveTool({
               id: event.id,
               name: event.name,
               args: event.args || {},
               status: autoApproved ? 'pending' : 'awaiting'
             });
-            setStatus(autoApproved ? getToolStatus(event.name) : msg('status-approval', {
-              name: getToolLabel(event.name)
-            }));
+            setStatus('');
             renderLiveTrace();
           } else if (event.type === 'tool-start') {
             const entry = findTraceEntry(event);
@@ -4106,14 +6037,14 @@ const createIcon = (iconSource, className) => {
               entry.status = 'pending';
               entry.args = event.args || entry.args || {};
             } else {
-              liveTrace.push({
+              addLiveTool({
                 id: event.id,
                 name: event.name,
                 args: event.args || {},
                 status: 'pending'
               });
             }
-            setStatus(getToolStatus(event.name));
+            setStatus('');
             renderLiveTrace();
           } else if (event.type === 'tool-end') {
             const entry = findTraceEntry(event);
@@ -4123,7 +6054,7 @@ const createIcon = (iconSource, className) => {
               entry.summary = event.summary;
               entry.preview = event.preview;
             } else {
-              liveTrace.push({
+              addLiveTool({
                 id: event.id,
                 name: event.name,
                 args: event.args || {},
@@ -4139,29 +6070,29 @@ const createIcon = (iconSource, className) => {
       });
       if (generation !== requestGeneration || conversationId !== activeConversationId) return;
       const trace = Array.isArray(result.trace) ? result.trace : [];
-      liveTrace = [];
-      liveTraceElement = null;
       clearStreaming();
       if (result.usage && typeof result.usage === 'object') {
         lastUsage = result.usage;
         const conversation = findConversation(conversationId);
         if (conversation) conversation.lastUsage = result.usage;
       }
-      if (trace.length > 0) addMessage('assistant', result.content, {
-        trace
-      });else addMessage('assistant', result.content);
-      updateContextUsage();
       setStatus('');
+      commitTrace(trace, result.content, false, '', {
+        mode: requestMode,
+        model: requestModel,
+        duration: Date.now() - startTime
+      });
+      updateContextUsage();
     } catch (error) {
       if (generation !== requestGeneration || conversationId !== activeConversationId) return;
-      const partial = streamingText ? streamingSanitize ? (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_12__.replaceInternalIds)(vm, streamingText) : streamingText : '';
-      clearStreaming();
-      if (error && error.name === 'AbortError') {
-        setStatus(msg('status-stopped'));
-      } else {
-        setStatus("".concat(msg('error-prefix'), " ").concat(error && error.message ? error.message : String(error)), true);
-      }
-      commitLiveTrace(partial, true);
+      const partial = streamingText ? streamingSanitize ? (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_18__.replaceInternalIds)(vm, streamingText) : streamingText : '';
+      const aborted = error && error.name === 'AbortError';
+      const notice = aborted ? msg('status-stopped') : "".concat(msg('error-prefix'), " ").concat(error && error.message ? error.message : String(error));
+      commitLiveTrace(partial, !aborted, notice, {
+        mode: requestMode,
+        model: requestModel,
+        duration: Date.now() - startTime
+      });
     } finally {
       activeController = null;
       // Only one request can be active, so this assignment is safe.
@@ -4181,7 +6112,6 @@ const createIcon = (iconSource, className) => {
     if (!wasOpen) return;
     if (headerElement) headerElement.style.display = '';
     if (chatContentElement) chatContentElement.style.display = '';
-    if (statusElement) statusElement.style.display = statusElement.textContent ? 'block' : 'none';
   };
 
   /**
@@ -4199,10 +6129,13 @@ const createIcon = (iconSource, className) => {
     if (!apiUrlInput) return;
     apiUrlInput.value = config.apiUrl;
     apiKeyInput.value = config.apiKey;
-    modelInput.value = config.model;
+    if (modelsInput) modelsInput.value = config.models || config.model || '';
     headersInput.value = JSON.stringify(config.headers || {}, null, 2);
     if (streamInput) streamInput.checked = config.stream !== false;
     if (autoApproveInput) autoApproveInput.checked = autoApproveTools;
+    if (temperatureInput) temperatureInput.value = String(config.temperature);
+    if (maxTokensInput) maxTokensInput.value = String(config.maxTokens);
+    if (retriesInput) retriesInput.value = String(config.retries);
     settingsErrorElement.textContent = '';
     settingsErrorElement.style.display = 'none';
   };
@@ -4217,11 +6150,11 @@ const createIcon = (iconSource, className) => {
       focusFrame = 0;
     }
     populateSettings();
+    if (sessionMenu) sessionMenu.open = false;
     conversationPaneOpen = false;
     updateConversationPane();
     if (headerElement) headerElement.style.display = 'none';
     if (chatContentElement) chatContentElement.style.display = 'none';
-    if (statusElement) statusElement.style.display = 'none';
     settingsPanel.style.display = 'flex';
     requestAnimationFrame(() => {
       if (apiUrlInput && settingsPanel.style.display !== 'none') apiUrlInput.focus();
@@ -4253,14 +6186,27 @@ const createIcon = (iconSource, className) => {
       settingsErrorElement.style.display = 'block';
       return;
     }
+    const rawModels = modelsInput ? modelsInput.value.trim() : config.models || '';
+    config.models = rawModels;
+    const modelList = getConfiguredModels();
+    let activeModel = config.model;
+    if (!modelList.includes(activeModel)) {
+      activeModel = modelList[0] || DEFAULT_CONFIG.model;
+    }
     config = {
       apiUrl: apiUrlInput.value.trim() || DEFAULT_CONFIG.apiUrl,
       apiKey: apiKeyInput.value.trim(),
-      model: modelInput.value.trim() || DEFAULT_CONFIG.model,
+      model: activeModel,
+      models: rawModels,
       headers,
-      stream: streamInput ? Boolean(streamInput.checked) : config.stream !== false
+      stream: streamInput ? Boolean(streamInput.checked) : config.stream !== false,
+      temperature: Math.max(0, Math.min(2, Number(temperatureInput.value))),
+      maxTokens: Math.max(1, Math.min(32000, Number(maxTokensInput.value) || DEFAULT_CONFIG.maxTokens)),
+      retries: Math.max(0, Math.min(5, Number(retriesInput.value))),
+      streamIdleTimeoutMs: typeof config.streamIdleTimeoutMs === 'number' ? config.streamIdleTimeoutMs : DEFAULT_CONFIG.streamIdleTimeoutMs
     };
     saveConfig(config);
+    updateModelSelector();
     closeSettingsPanel();
     setStatus(msg('settings-saved'));
   };
@@ -4276,8 +6222,10 @@ const createIcon = (iconSource, className) => {
     settingsHeader.className = 'sa-agent-settings-header';
     const backButton = document.createElement('button');
     backButton.type = 'button';
-    backButton.className = 'sa-agent-settings-back';
-    backButton.textContent = msg('back');
+    backButton.className = 'sa-agent-icon-button sa-agent-settings-back';
+    backButton.title = msg('back');
+    backButton.setAttribute('aria-label', msg('back'));
+    backButton.appendChild(createIcon(_lib_tw_recolor_build_icon_back_svg__WEBPACK_IMPORTED_MODULE_5__["default"], 'sa-agent-settings-back-icon'));
     backButton.addEventListener('click', closeSettingsPanel);
     const settingsTitle = document.createElement('span');
     settingsTitle.className = 'sa-agent-settings-title';
@@ -4296,6 +6244,7 @@ const createIcon = (iconSource, className) => {
     const addField = (labelText, field) => {
       const label = document.createElement('label');
       label.className = 'sa-agent-settings-field';
+      if (field.type === 'checkbox') label.classList.add('sa-agent-settings-field-toggle');
       const labelSpan = document.createElement('span');
       labelSpan.className = 'sa-agent-settings-label';
       labelSpan.textContent = labelText;
@@ -4313,28 +6262,37 @@ const createIcon = (iconSource, className) => {
     apiKeyInput.type = 'password';
     apiKeyInput.autocomplete = 'off';
     addField(msg('api-key'), apiKeyInput);
-    modelInput = document.createElement('input');
-    modelInput.className = 'sa-agent-settings-input';
-    modelInput.type = 'text';
-    modelInput.spellcheck = false;
-    addField(msg('model'), modelInput);
+    modelsInput = document.createElement('textarea');
+    modelsInput.className = 'sa-agent-settings-input sa-agent-settings-textarea';
+    modelsInput.style.minHeight = '70px';
+    modelsInput.spellcheck = false;
+    modelsInput.placeholder = 'gpt-4o-mini\ngpt-4o\nclaude-3-7-sonnet';
+    addField(msg('settings-models'), modelsInput);
+    temperatureInput = document.createElement('input');
+    temperatureInput.className = 'sa-agent-settings-input';
+    temperatureInput.type = 'number';
+    temperatureInput.min = '0';
+    temperatureInput.max = '2';
+    temperatureInput.step = '0.1';
+    addField(msg('settings-temperature'), temperatureInput);
+    maxTokensInput = document.createElement('input');
+    maxTokensInput.className = 'sa-agent-settings-input';
+    maxTokensInput.type = 'number';
+    maxTokensInput.min = '1';
+    maxTokensInput.max = '32000';
+    maxTokensInput.step = '100';
+    addField(msg('settings-max-tokens'), maxTokensInput);
+    retriesInput = document.createElement('input');
+    retriesInput.className = 'sa-agent-settings-input';
+    retriesInput.type = 'number';
+    retriesInput.min = '0';
+    retriesInput.max = '5';
+    retriesInput.step = '1';
+    addField(msg('settings-retries'), retriesInput);
     streamInput = document.createElement('input');
     streamInput.className = 'sa-agent-settings-checkbox';
     streamInput.type = 'checkbox';
     addField(msg('settings-stream'), streamInput);
-    autoApproveInput = document.createElement('input');
-    autoApproveInput.className = 'sa-agent-settings-checkbox';
-    autoApproveInput.type = 'checkbox';
-    autoApproveInput.checked = autoApproveTools;
-    autoApproveInput.addEventListener('change', () => {
-      autoApproveTools = autoApproveInput.checked;
-      if (autoApproveTools) {
-        Array.from(approvalResolvers.keys()).forEach(id => {
-          resolveToolApproval(id, true);
-        });
-      }
-    });
-    addField(msg('settings-auto-approve'), autoApproveInput);
     headersInput = document.createElement('textarea');
     headersInput.className = 'sa-agent-settings-input sa-agent-settings-textarea';
     headersInput.spellcheck = false;
@@ -4365,6 +6323,134 @@ const createIcon = (iconSource, className) => {
     settingsPanel.appendChild(form);
     chatContainer.appendChild(settingsPanel);
   };
+
+  // --- Editor write bridge -------------------------------------------------
+
+  /** Cached scratch-blocks namespace. */
+  let blocklyRef = null;
+  /** Serialises write operations so blocks never interleave. */
+  let writeQueue = Promise.resolve();
+
+  /**
+   * Load the scratch-blocks namespace exposed by addons.
+   * @returns {Promise<object>} Blockly.
+   */
+  const ensureBlockly = async () => {
+    if (blocklyRef) return blocklyRef;
+    const resolved = await addon.tab.traps.getBlockly();
+    // eslint-disable-next-line require-atomic-updates
+    blocklyRef = resolved;
+    return resolved;
+  };
+
+  /**
+   * Get the main editing workspace (the one that edits the current sprite).
+   * @param {object} Blockly scratch-blocks namespace.
+   * @returns {object|null} Workspace.
+   */
+  const getMainWorkspace = Blockly => {
+    const workspace = Blockly && typeof Blockly.getMainWorkspace === 'function' ? Blockly.getMainWorkspace() : null;
+    if (!workspace) return null;
+    // Scratch's workspace holds the editing workspace under targetWorkspace.
+    if (workspace.targetWorkspace) return workspace.targetWorkspace;
+    return workspace;
+  };
+
+  /**
+   * Delete a top-level script through Blockly so the VM stays in sync and the
+   * deletion is undoable.
+   * @param {object} Blockly scratch-blocks namespace.
+   * @param {object} workspace Main workspace.
+   * @param {string} scriptId Top-level block id.
+   * @returns {boolean} Whether a block was deleted.
+   */
+  const disposeScript = (Blockly, workspace, scriptId) => {
+    const block = typeof workspace.getBlockById === 'function' ? workspace.getBlockById(scriptId) : null;
+    if (!block) return false;
+    // The caller wraps the whole write in one undo group, so dispose here
+    // without touching the group state.
+    block.dispose(true);
+    return true;
+  };
+
+  /**
+   * Apply a write request coming from the agent tools.
+   * @param {string} xml Compiled block XML (may be empty).
+   * @param {object} meta Write instructions.
+   * @returns {Promise<object>} Result summary.
+   */
+  const applyWrite = function applyWrite(xml) {
+    let meta = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    const run = async () => {
+      const Blockly = await ensureBlockly();
+      if (!Blockly) throw new Error('scratch-blocks is not available.');
+      const workspace = getMainWorkspace(Blockly);
+      if (!workspace) throw new Error('The block workspace is not ready.');
+      const result = {
+        blockIds: [],
+        deleted: 0,
+        id: undefined
+      };
+      const hasBlocks = Boolean(xml && xml.trim());
+      const hasDeletes = Array.isArray(meta.deleteScriptIds) && meta.deleteScriptIds.length > 0;
+      const hasLocalDecl = Array.isArray(meta.declarations) && meta.declarations.some(decl => decl && decl.isLocal);
+      const needEditingTarget = hasBlocks || hasDeletes || hasLocalDecl;
+      const requestedTargetId = meta.targetId || (vm.editingTarget ? vm.editingTarget.id : null);
+      if (needEditingTarget && requestedTargetId && vm.editingTarget && requestedTargetId !== vm.editingTarget.id) {
+        vm.setEditingTarget(requestedTargetId);
+        // Let the GUI reload the workspace for the new editing target.
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      }
+      Blockly.Events.setGroup(true);
+      try {
+        // 1. Create declared variables/lists/broadcasts.
+        // workspace.createVariable only updates the Blockly variable map; firing
+        // a VarCreate event lets vm.blockListener mirror it into the VM (and
+        // keeps the creation on the undo stack).
+        if (Array.isArray(meta.declarations) && Blockly.Events.VarCreate) {
+          for (const decl of meta.declarations) {
+            if (!decl || !decl.name || !decl.id) continue;
+            const type = decl.type || '';
+            const isLocal = Boolean(decl.isLocal);
+            const isCloud = Boolean(decl.isCloud);
+            workspace.createVariable(decl.name, type, decl.id, isLocal, isCloud);
+            const model = workspace.getVariableById ? workspace.getVariableById(decl.id) : null;
+            if (model && typeof Blockly.Events.fire === 'function') {
+              Blockly.Events.fire(new Blockly.Events.VarCreate(model));
+            }
+          }
+        }
+
+        // 2. Rename a sprite.
+        if (meta.renameTarget) {
+          const targetId = meta.targetId || vm.editingTarget && vm.editingTarget.id;
+          if (targetId) vm.renameSprite(targetId, String(meta.renameTarget));
+        }
+
+        // 3. Delete requested scripts first (so replacing a script is safe).
+        if (Array.isArray(meta.deleteScriptIds)) {
+          for (const scriptId of meta.deleteScriptIds) {
+            if (disposeScript(Blockly, workspace, scriptId)) result.deleted++;
+          }
+        }
+
+        // 4. Load new blocks from XML.
+        if (xml && xml.trim()) {
+          const dom = Blockly.Xml.textToDom(xml);
+          const ids = Blockly.Xml.domToWorkspace(dom.documentElement || dom, workspace);
+          if (Array.isArray(ids)) result.blockIds = ids;
+        }
+      } finally {
+        Blockly.Events.setGroup(false);
+      }
+      return result;
+    };
+    const next = writeQueue.then(run, run);
+    // Keep the queue alive even if a write rejects.
+    writeQueue = next.catch(() => {});
+    return next;
+  };
+  (0,_agent_writer_js__WEBPACK_IMPORTED_MODULE_23__.setApplier)(applyWrite);
 
   /**
    * Build the conversation UI.
@@ -4485,8 +6571,24 @@ const createIcon = (iconSource, className) => {
       passive: true
     });
     statusElement = document.createElement('div');
-    statusElement.className = 'sa-agent-status';
-    statusElement.style.display = 'none';
+    statusElement.className = 'sa-agent-bubble sa-agent-status';
+    statusRow = document.createElement('div');
+    statusRow.className = 'sa-agent-message sa-agent-message-assistant sa-agent-status-row';
+    statusRow.appendChild(statusElement);
+    sessionMenu = document.createElement('details');
+    sessionMenu.className = 'sa-agent-session-menu';
+    const sessionSummary = document.createElement('summary');
+    sessionSummary.className = 'sa-agent-icon-button sa-agent-session-summary';
+    sessionSummary.appendChild(createIcon(_lib_tw_recolor_build_icon_more_svg__WEBPACK_IMPORTED_MODULE_9__["default"], 'sa-agent-icon'));
+    sessionSummary.title = msg('conversation-options');
+    sessionSummary.setAttribute('aria-label', msg('conversation-options'));
+    sessionMenu.appendChild(sessionSummary);
+    const sessionPanel = document.createElement('div');
+    sessionPanel.className = 'sa-agent-session-panel';
+    const sessionTitle = document.createElement('div');
+    sessionTitle.className = 'sa-agent-settings-label';
+    sessionTitle.textContent = msg('conversation-options');
+    sessionPanel.appendChild(sessionTitle);
     const contextBar = document.createElement('div');
     contextBar.className = 'sa-agent-context-bar';
     contextElement = document.createElement('span');
@@ -4496,12 +6598,41 @@ const createIcon = (iconSource, className) => {
     compressButton.className = 'sa-agent-button sa-agent-button-secondary sa-agent-compress-button';
     compressButton.textContent = msg('context-compress');
     compressButton.addEventListener('click', () => {
+      sessionMenu.open = false;
       compressContext().catch(() => {});
     });
     contextBar.appendChild(contextElement);
     contextBar.appendChild(compressButton);
+    sessionPanel.appendChild(contextBar);
+    const permissionLabel = document.createElement('label');
+    permissionLabel.className = 'sa-agent-session-permission';
+    const permissionText = document.createElement('span');
+    permissionText.textContent = msg('conversation-auto-approve');
+    autoApproveInput = document.createElement('input');
+    autoApproveInput.className = 'sa-agent-settings-checkbox';
+    autoApproveInput.type = 'checkbox';
+    autoApproveInput.checked = autoApproveTools;
+    autoApproveInput.addEventListener('change', () => setAutoApproveTools(autoApproveInput.checked));
+    permissionLabel.appendChild(permissionText);
+    permissionLabel.appendChild(autoApproveInput);
+    sessionPanel.appendChild(permissionLabel);
+    sessionMenu.appendChild(sessionPanel);
+    actions.insertBefore(sessionMenu, newConversationButton);
+    sessionMenu.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        sessionMenu.open = false;
+        sessionSummary.focus();
+      }
+    });
+    document.addEventListener('pointerdown', event => {
+      if (sessionMenu.open && !sessionMenu.contains(event.target)) sessionMenu.open = false;
+    });
     const composer = document.createElement('div');
     composer.className = 'sa-agent-composer';
+    const composerCard = document.createElement('div');
+    composerCard.className = 'sa-agent-composer-card';
     inputElement = document.createElement('textarea');
     inputElement.className = 'sa-agent-input';
     inputElement.rows = 1;
@@ -4516,8 +6647,36 @@ const createIcon = (iconSource, className) => {
         sendMessage(inputElement.value).catch(() => {});
       }
     });
-    const composerActions = document.createElement('div');
-    composerActions.className = 'sa-agent-composer-actions';
+    const composerToolbar = document.createElement('div');
+    composerToolbar.className = 'sa-agent-composer-toolbar';
+    const toolbarLeft = document.createElement('div');
+    toolbarLeft.className = 'sa-agent-composer-toolbar-left';
+    modeButton = document.createElement('button');
+    modeButton.type = 'button';
+    modeButton.className = 'sa-agent-mode-button';
+    modeButton.addEventListener('click', () => {
+      writeEnabled = !writeEnabled;
+      saveWriteEnabled(writeEnabled);
+      updateComposer();
+      updateModeUI();
+    });
+    toolbarLeft.appendChild(modeButton);
+    const modelSelectWrapper = document.createElement('div');
+    modelSelectWrapper.className = 'sa-agent-model-select-wrapper';
+    modelSelectElement = document.createElement('select');
+    modelSelectElement.className = 'sa-agent-model-select';
+    modelSelectElement.title = msg('model-switch');
+    modelSelectElement.setAttribute('aria-label', msg('model-switch'));
+    modelSelectElement.addEventListener('change', () => {
+      config.model = modelSelectElement.value;
+      saveConfig(config);
+    });
+    modelSelectWrapper.appendChild(modelSelectElement);
+    toolbarLeft.appendChild(modelSelectWrapper);
+    updateModeUI();
+    updateModelSelector();
+    const toolbarRight = document.createElement('div');
+    toolbarRight.className = 'sa-agent-composer-toolbar-right';
     stopButton = document.createElement('button');
     stopButton.type = 'button';
     stopButton.className = 'sa-agent-button sa-agent-button-secondary sa-agent-stop-button';
@@ -4526,15 +6685,18 @@ const createIcon = (iconSource, className) => {
     stopButton.addEventListener('click', stopRequest);
     sendButton = document.createElement('button');
     sendButton.type = 'button';
-    sendButton.className = 'sa-agent-button sa-agent-button-primary';
+    sendButton.className = 'sa-agent-button sa-agent-button-primary sa-agent-send-button';
     sendButton.textContent = msg('send');
     sendButton.addEventListener('click', () => {
       sendMessage(inputElement.value).catch(() => {});
     });
-    composerActions.appendChild(stopButton);
-    composerActions.appendChild(sendButton);
-    composer.appendChild(inputElement);
-    composer.appendChild(composerActions);
+    toolbarRight.appendChild(stopButton);
+    toolbarRight.appendChild(sendButton);
+    composerToolbar.appendChild(toolbarLeft);
+    composerToolbar.appendChild(toolbarRight);
+    composerCard.appendChild(inputElement);
+    composerCard.appendChild(composerToolbar);
+    composer.appendChild(composerCard);
     chatContentElement = document.createElement('div');
     chatContentElement.className = 'sa-agent-content';
     const conversationPane = document.createElement('aside');
@@ -4555,8 +6717,6 @@ const createIcon = (iconSource, className) => {
     const chatMain = document.createElement('div');
     chatMain.className = 'sa-agent-main';
     chatMain.appendChild(messagesElement);
-    chatMain.appendChild(statusElement);
-    chatMain.appendChild(contextBar);
     chatMain.appendChild(composer);
     chatContentElement.appendChild(conversationPane);
     chatContentElement.appendChild(chatMain);
@@ -4586,9 +6746,9 @@ const createIcon = (iconSource, className) => {
    */
   const isChatVisible = () => {
     if (currentPosition === POSITION_TYPES.SIDEBAR) {
-      return _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_9__["default"].isOpen() && _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_9__["default"].getActivePlugin() === PLUGIN_ID;
+      return _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_15__["default"].isOpen() && _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_15__["default"].getActivePlugin() === PLUGIN_ID;
     }
-    return _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__["default"].isOpen() && _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__["default"].getActivePlugin() === PLUGIN_ID;
+    return _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].isOpen() && _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].getActivePlugin() === PLUGIN_ID;
   };
 
   /**
@@ -4597,9 +6757,9 @@ const createIcon = (iconSource, className) => {
    */
   const openChatAt = position => {
     if (position === POSITION_TYPES.SIDEBAR) {
-      _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_9__["default"].switchTo(PLUGIN_ID);
+      _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_15__["default"].switchTo(PLUGIN_ID);
     } else {
-      _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__["default"].switchTo(PLUGIN_ID);
+      _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].switchTo(PLUGIN_ID);
     }
     updateToggleButtonState();
     requestAnimationFrame(() => {
@@ -4614,9 +6774,9 @@ const createIcon = (iconSource, className) => {
    */
   const closeChatAt = position => {
     if (position === POSITION_TYPES.SIDEBAR) {
-      if (_ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_9__["default"].getActivePlugin() === PLUGIN_ID) _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_9__["default"].close();
-    } else if (_ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__["default"].getActivePlugin() === PLUGIN_ID) {
-      _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__["default"].close();
+      if (_ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_15__["default"].getActivePlugin() === PLUGIN_ID) _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_15__["default"].close();
+    } else if (_ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].getActivePlugin() === PLUGIN_ID) {
+      _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].close();
     }
     updateToggleButtonState();
   };
@@ -4683,10 +6843,10 @@ const createIcon = (iconSource, className) => {
       });
       if (!placed) tabBar.appendChild(sidebarToggleButton);
     } else {
-      const buttonBar = _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__["default"].getButtonBar();
+      const buttonBar = _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].getButtonBar();
       if (buttonBar) buttonBar.appendChild(bottomToggleButton);
     }
-    _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__["default"].updateButtonBarVisibility();
+    _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].updateButtonBarVisibility();
     updateToggleButtonState();
   };
 
@@ -4695,11 +6855,21 @@ const createIcon = (iconSource, className) => {
    */
   const updateToggleButtonState = () => {
     if (!sidebarToggleButton || !bottomToggleButton) return;
-    const active = isChatVisible();
-    sidebarToggleButton.classList.toggle('sa-agent-toggle-active', active);
-    sidebarToggleButton.setAttribute('aria-selected', active ? 'true' : 'false');
-    bottomToggleButton.classList.toggle('sa-agent-toggle-active', active);
-    bottomToggleButton.setAttribute('aria-pressed', active ? 'true' : 'false');
+    const sidebarActive = _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_15__["default"].isOpen() && _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_15__["default"].getActivePlugin() === PLUGIN_ID;
+    const bottomActive = _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].isOpen() && _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].getActivePlugin() === PLUGIN_ID;
+    sidebarToggleButton.classList.toggle('sa-agent-toggle-active', sidebarActive);
+    sidebarToggleButton.classList.toggle('is-selected', sidebarActive);
+    sidebarToggleButton.setAttribute('aria-selected', sidebarActive ? 'true' : 'false');
+    const sidebarIcon = sidebarToggleButton.querySelector('.sa-agent-toggle-icon');
+    if (sidebarIcon) {
+      sidebarIcon.style.filter = sidebarActive ? 'grayscale(0%)' : 'grayscale(100%)';
+    }
+    bottomToggleButton.classList.toggle('sa-agent-toggle-active', bottomActive);
+    bottomToggleButton.setAttribute('aria-pressed', bottomActive ? 'true' : 'false');
+    const bottomIcon = bottomToggleButton.querySelector('.sa-agent-toggle-icon');
+    if (bottomIcon) {
+      bottomIcon.style.filter = bottomActive ? 'grayscale(0%)' : 'grayscale(100%)';
+    }
   };
 
   /**
@@ -4801,6 +6971,7 @@ const createIcon = (iconSource, className) => {
    */
   const handleDeactivate = () => {
     hideSettingsPanel();
+    if (sessionMenu) sessionMenu.open = false;
     if (positionPopup) positionPopup.style.display = 'none';
     if (positionPopupTimeout) {
       clearTimeout(positionPopupTimeout);
@@ -4812,12 +6983,16 @@ const createIcon = (iconSource, className) => {
     }
     if (inputElement) inputElement.blur();
     if (sidebarToggleButton) {
-      sidebarToggleButton.classList.remove('sa-agent-toggle-active');
+      sidebarToggleButton.classList.remove('sa-agent-toggle-active', 'is-selected');
       sidebarToggleButton.setAttribute('aria-selected', 'false');
+      const icon = sidebarToggleButton.querySelector('.sa-agent-toggle-icon');
+      if (icon) icon.style.filter = 'grayscale(100%)';
     }
     if (bottomToggleButton) {
       bottomToggleButton.classList.remove('sa-agent-toggle-active');
       bottomToggleButton.setAttribute('aria-pressed', 'false');
+      const icon = bottomToggleButton.querySelector('.sa-agent-toggle-icon');
+      if (icon) icon.style.filter = 'grayscale(100%)';
     }
     // The panel still reports this plugin as active during onDeactivate.
     requestAnimationFrame(updateToggleButtonState);
@@ -4839,13 +7014,45 @@ const createIcon = (iconSource, className) => {
     updateToggleButtonPlacement();
   };
   buildChatUI();
-  _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_9__["default"].register(PLUGIN_ID, chatContainer, {
-    onActivate: handleActivate,
-    onDeactivate: handleDeactivate
+  _ui_side_bar_side_bar_js__WEBPACK_IMPORTED_MODULE_15__["default"].register(PLUGIN_ID, chatContainer, {
+    onActivate: () => {
+      if (sidebarToggleButton) {
+        sidebarToggleButton.classList.add('sa-agent-toggle-active', 'is-selected');
+        sidebarToggleButton.setAttribute('aria-selected', 'true');
+        const icon = sidebarToggleButton.querySelector('.sa-agent-toggle-icon');
+        if (icon) icon.style.filter = 'grayscale(0%)';
+      }
+      handleActivate();
+    },
+    onDeactivate: () => {
+      if (sidebarToggleButton) {
+        sidebarToggleButton.classList.remove('sa-agent-toggle-active', 'is-selected');
+        sidebarToggleButton.setAttribute('aria-selected', 'false');
+        const icon = sidebarToggleButton.querySelector('.sa-agent-toggle-icon');
+        if (icon) icon.style.filter = 'grayscale(100%)';
+      }
+      handleDeactivate();
+    }
   });
-  _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__["default"].register(PLUGIN_ID, chatContainer, {
-    onActivate: handleActivate,
-    onDeactivate: handleDeactivate
+  _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].register(PLUGIN_ID, chatContainer, {
+    onActivate: () => {
+      if (bottomToggleButton) {
+        bottomToggleButton.classList.add('sa-agent-toggle-active');
+        bottomToggleButton.setAttribute('aria-pressed', 'true');
+        const icon = bottomToggleButton.querySelector('.sa-agent-toggle-icon');
+        if (icon) icon.style.filter = 'grayscale(0%)';
+      }
+      handleActivate();
+    },
+    onDeactivate: () => {
+      if (bottomToggleButton) {
+        bottomToggleButton.classList.remove('sa-agent-toggle-active');
+        bottomToggleButton.setAttribute('aria-pressed', 'false');
+        const icon = bottomToggleButton.querySelector('.sa-agent-toggle-icon');
+        if (icon) icon.style.filter = 'grayscale(100%)';
+      }
+      handleDeactivate();
+    }
   });
   sidebarToggleButton = document.createElement('button');
   sidebarToggleButton.type = 'button';
@@ -4858,7 +7065,6 @@ const createIcon = (iconSource, className) => {
   sidebarToggleButton.tabIndex = 0;
   sidebarToggleButton.setAttribute('role', 'tab');
   sidebarToggleButton.setAttribute('aria-selected', 'false');
-  sidebarToggleButton.title = msg('button');
   sidebarToggleButton.setAttribute('aria-label', msg('button'));
   sidebarToggleButton.appendChild(createIcon(_lib_tw_recolor_build_icon_svg__WEBPACK_IMPORTED_MODULE_0__["default"], 'sa-agent-toggle-icon'));
   sidebarToggleButton.addEventListener('click', () => {
@@ -4897,9 +7103,10 @@ const createIcon = (iconSource, className) => {
       cancelAnimationFrame(focusFrame);
       focusFrame = 0;
     }
-    const partial = streamingText ? streamingSanitize ? (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_12__.replaceInternalIds)(vm, streamingText) : streamingText : '';
-    clearStreaming();
-    commitLiveTrace(partial, true);
+    const partial = streamingText ? streamingSanitize ? (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_18__.replaceInternalIds)(vm, streamingText) : streamingText : '';
+    cancelCompression();
+    cancelAllApprovals();
+    commitLiveTrace(partial, false, busy ? msg('status-stopped') : '');
     saveCurrentHistory();
     if (activeController) activeController.abort();
     hideSettingsPanel();
@@ -4912,7 +7119,7 @@ const createIcon = (iconSource, className) => {
     for (const button of [sidebarToggleButton, bottomToggleButton]) {
       if (button && button.parentNode) button.parentNode.removeChild(button);
     }
-    _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_10__["default"].updateButtonBarVisibility();
+    _ui_bottom_panel_bottom_panel_js__WEBPACK_IMPORTED_MODULE_16__["default"].updateButtonBarVisibility();
   };
 
   /**
@@ -6178,6 +8385,7 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 }
 
 .sa-agent-header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -6210,6 +8418,53 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   flex-shrink: 0;
 }
 
+.sa-agent-session-menu {
+  position: static;
+}
+
+.sa-agent-session-summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.sa-agent-session-summary .sa-agent-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.sa-agent-session-summary::-webkit-details-marker {
+  display: none;
+}
+
+.sa-agent-session-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 240px;
+  max-width: calc(100% - 16px);
+  max-height: min(320px, 55vh);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 8px;
+  background: var(--ui-white);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.sa-agent-session-permission {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .sa-agent-conversation-toggle {
   flex-shrink: 0;
 }
@@ -6218,12 +8473,20 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   display: none;
 }
 
+.sa-agent-icon,
 .sa-agent-conversation-toggle-icon,
 .sa-agent-new-chat-button-icon {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
   filter: grayscale(100%);
+  transition: filter 0.2s ease;
+}
+
+.sa-agent-icon-button:hover .sa-agent-icon,
+.sa-agent-icon-button:hover .sa-agent-conversation-toggle-icon,
+.sa-agent-icon-button:hover .sa-agent-new-chat-button-icon {
+  filter: none !important;
 }
 
 .sa-agent-content {
@@ -6310,6 +8573,31 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   background: var(--ui-primary-transparent);
 }
 
+.sa-agent-conversation-item-confirming {
+  flex-wrap: wrap;
+}
+
+.sa-agent-delete-confirm {
+  flex: 0 0 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border-top: 1px solid var(--ui-black-transparent);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.sa-agent-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sa-agent-delete-accept {
+  color: #d93025;
+}
+
 .sa-agent-conversation-item-title {
   flex: 1;
   min-width: 0;
@@ -6370,6 +8658,11 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   height: 14px;
   flex-shrink: 0;
   filter: grayscale(100%);
+  transition: filter 0.2s ease;
+}
+
+.sa-agent-conversation-action:hover .sa-agent-conversation-action-icon {
+  filter: none !important;
 }
 
 .sa-agent-conversation-rename {
@@ -6421,6 +8714,11 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   height: 16px;
   flex-shrink: 0;
   filter: grayscale(100%);
+  transition: filter 0.2s ease;
+}
+
+button:hover .sa-agent-settings-icon {
+  filter: none !important;
 }
 
 .sa-agent-position-switch {
@@ -6458,6 +8756,11 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   height: 16px;
   flex-shrink: 0;
   filter: grayscale(100%);
+  transition: filter 0.2s ease;
+}
+
+.sa-agent-rotate-button:hover .sa-agent-rotate-icon {
+  filter: none !important;
 }
 
 .sa-agent-position-popup {
@@ -6515,10 +8818,12 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   height: 16px;
   flex-shrink: 0;
   filter: grayscale(100%);
+  transition: filter 0.2s ease;
 }
 
+.sa-agent-popup-button:hover .sa-agent-popup-icon,
 .sa-agent-popup-button.sa-agent-position-active .sa-agent-popup-icon {
-  filter: none;
+  filter: none !important;
 }
 
 .sa-agent-messages {
@@ -6533,8 +8838,8 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 }
 
 .addons-bottom-panel .sa-agent-messages,
-.addons-bottom-panel .sa-agent-status,
 .addons-bottom-panel .sa-agent-composer {
+  box-sizing: border-box;
   width: 100%;
   max-width: 960px;
   align-self: center;
@@ -6564,6 +8869,9 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   display: flex;
   flex-direction: column;
   max-width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+  gap: 6px;
 }
 
 .sa-agent-message-user {
@@ -6582,6 +8890,8 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 }
 
 .sa-agent-bubble {
+  box-sizing: border-box;
+  min-width: 0;
   max-width: 92%;
   padding: 8px 10px;
   border: 1px solid var(--ui-black-transparent);
@@ -6596,6 +8906,66 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   background: var(--looks-secondary);
   border-color: transparent;
   border-bottom-right-radius: 2px;
+}
+
+.sa-agent-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 3px;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+
+.sa-agent-message-user:hover .sa-agent-user-actions,
+.sa-agent-user-actions:focus-within {
+  opacity: 1;
+}
+
+.sa-agent-user-action-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-primary);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.sa-agent-user-action-btn:hover:not(:disabled) {
+  background: var(--ui-primary-transparent);
+  border-color: var(--ui-black-transparent);
+}
+
+.sa-agent-user-action-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.sa-agent-user-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sa-agent-user-action-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  filter: grayscale(100%);
+  transition: filter 0.15s ease;
+}
+
+.sa-agent-user-action-btn:hover:not(:disabled) .sa-agent-user-action-icon {
+  filter: none !important;
 }
 
 .sa-agent-message-assistant .sa-agent-bubble {
@@ -6759,10 +9129,91 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 92%;
-  margin-bottom: 6px;
+  width: 92%;
+  max-width: 640px;
+  min-width: 0;
+  margin: 2px 0 8px;
   font-size: 11px;
   line-height: 1.4;
+}
+
+.sa-agent-tool-stack {
+  min-width: 0;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 7px;
+  background: var(--ui-white);
+}
+
+.sa-agent-tool-stack-multiple:not([open]) {
+  margin-bottom: 6px;
+  box-shadow: 0 3px 0 -1px var(--ui-white), 0 3px 0 var(--ui-black-transparent),
+    0 6px 0 -1px var(--ui-white), 0 6px 0 var(--ui-black-transparent);
+}
+
+.sa-agent-tool-stack-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sa-agent-tool-stack-summary::-webkit-details-marker {
+  display: none;
+}
+
+.sa-agent-tool-stack-summary::before {
+  content: '▸';
+  flex-shrink: 0;
+}
+
+.sa-agent-tool-stack[open] > .sa-agent-tool-stack-summary::before {
+  content: '▾';
+}
+
+.sa-agent-tool-stack-summary > span:first-of-type {
+  flex-shrink: 0;
+}
+
+.sa-agent-tool-stack-state {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.65;
+}
+
+.sa-agent-tool-stack-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 6px 6px;
+}
+
+.sa-agent-reasoning {
+  box-sizing: border-box;
+  width: 92%;
+  min-width: 0;
+  border-left: 2px solid var(--ui-black-transparent);
+  padding-left: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.sa-agent-reasoning > summary {
+  padding: 4px 0;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.sa-agent-reasoning-body {
+  max-height: 280px;
+  overflow: auto;
+  padding: 6px 0;
+  overflow-wrap: anywhere;
+  opacity: 0.85;
 }
 
 .sa-agent-tool-row {
@@ -6912,6 +9363,14 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   animation: sa-agent-pulse 1s ease-in-out infinite;
 }
 
+.sa-agent-tool-write {
+  border-left: 2px solid var(--looks-secondary);
+}
+
+.sa-agent-session-write span {
+  font-weight: bold;
+}
+
 @keyframes sa-agent-pulse {
   0%,
   100% {
@@ -6938,7 +9397,6 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 
 .sa-agent-status {
   flex-shrink: 0;
-  padding: 4px 12px 0;
   font-size: 11px;
   line-height: 1.4;
   color: var(--text-primary);
@@ -6956,18 +9414,17 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-  padding: 4px 12px 0;
+  flex-wrap: wrap;
   font-size: 10px;
   color: var(--text-primary);
-  opacity: 0.7;
 }
 
 .sa-agent-context-text {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  opacity: 0.75;
 }
 
 .sa-agent-compress-button {
@@ -6978,65 +9435,240 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 }
 
 .sa-agent-composer {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
   flex-shrink: 0;
-  padding: 8px 12px 10px;
+  padding: 8px 10px 10px;
   border-top: 1px solid var(--ui-black-transparent);
   background: var(--ui-white);
 }
 
+.sa-agent-composer-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 6px;
+  background: var(--ui-white);
+  padding: 5px 6px 4px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sa-agent-composer-card:focus-within {
+  border-color: var(--looks-secondary);
+  box-shadow: 0 0 0 1px var(--looks-secondary);
+}
+
 .sa-agent-input {
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  min-height: 30px;
-  max-height: 66px;
-  padding: 6px 8px;
+  height: 20px;
+  min-height: 20px;
+  max-height: 160px;
+  padding: 0 4px;
   overflow-y: hidden;
   resize: none;
-  border: 1px solid var(--ui-black-transparent);
-  border-radius: 5px;
+  border: 0;
   outline: none;
   color: var(--text-primary);
-  background: var(--ui-white);
+  background: transparent;
   box-sizing: border-box;
   font-family: inherit;
   font-size: 12px;
-  line-height: 1.4;
-  transition: none;
+  line-height: 20px;
+  vertical-align: middle;
 }
 
-.sa-agent-input:focus {
+.sa-agent-input::placeholder {
+  color: var(--text-primary);
+  opacity: 0.45;
+  line-height: 20px;
+}
+
+.sa-agent-composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--ui-black-transparent);
+}
+
+.sa-agent-composer-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sa-agent-composer-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sa-agent-mode-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 4px;
+  color: var(--text-primary);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.sa-agent-mode-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  transition: filter 0.15s ease;
+}
+
+.sa-agent-mode-button:hover {
+  background: var(--ui-primary-transparent);
   border-color: var(--looks-secondary);
 }
 
-.sa-agent-composer-actions {
-  display: flex;
+.sa-agent-mode-button:active {
+  transform: scale(0.96);
+}
+
+.sa-agent-mode-button.sa-agent-mode-build {
+  color: #ffffff;
+  border-color: var(--looks-secondary);
+  background: var(--looks-secondary);
+  font-weight: 600;
+}
+
+.sa-agent-mode-button.sa-agent-mode-build .sa-agent-mode-icon {
+  filter: brightness(0) invert(1) !important;
+}
+
+.sa-agent-mode-button.sa-agent-mode-build:hover {
+  filter: brightness(1.08);
+}
+
+.sa-agent-mode-button.sa-agent-mode-plan {
+  color: var(--text-primary);
+  opacity: 0.85;
+}
+
+.sa-agent-mode-button.sa-agent-mode-plan .sa-agent-mode-icon {
+  filter: grayscale(100%);
+}
+
+.sa-agent-mode-button.sa-agent-mode-plan:hover .sa-agent-mode-icon {
+  filter: none !important;
+}
+
+.sa-agent-model-select-wrapper {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
+}
+
+.sa-agent-model-select {
+  height: 24px;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  padding: 0 18px 0 7px;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 4px;
+  outline: none;
+  color: var(--text-primary);
+  background-color: var(--ui-white);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.sa-agent-model-select:hover {
+  border-color: var(--looks-secondary);
+  background-color: var(--ui-primary-transparent);
+}
+
+.sa-agent-model-select:focus {
+  border-color: var(--looks-secondary);
+  box-shadow: 0 0 0 1px var(--looks-secondary);
+}
+
+/* 显式定义下拉展开选项的文字颜色与背景，杜绝因系统深浅色差异导致白底浅灰字或可读性差的问题 */
+.sa-agent-model-select option {
+  color: var(--text-primary) !important;
+  background-color: var(--ui-white) !important;
+  font-size: 12px;
+  font-weight: normal;
+  padding: 4px 8px;
+}
+
+.sa-agent-model-select option:checked {
+  color: var(--looks-secondary) !important;
+  background-color: var(--ui-primary-transparent) !important;
+  font-weight: 600;
+}
+
+.sa-agent-model-select-wrapper::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid var(--text-primary);
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.sa-agent-model-select-wrapper:hover::after {
+  opacity: 0.9;
 }
 
 .sa-agent-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
+  gap: 4px;
+  height: 24px;
+  min-height: 24px;
   padding: 0 10px;
   border: 1px solid var(--ui-black-transparent);
-  border-radius: 5px;
+  border-radius: 4px;
   cursor: pointer;
   font-family: inherit;
   font-size: 12px;
-  font-weight: bold;
+  font-weight: 600;
   white-space: nowrap;
-  transition: none;
+  transition: opacity 0.15s ease, background 0.15s ease, transform 0.1s ease;
 }
 
 .sa-agent-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.sa-agent-button:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .sa-agent-button-primary {
@@ -7047,6 +9679,7 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 
 .sa-agent-button-primary:hover:not(:disabled) {
   filter: brightness(1.08);
+  opacity: 0.95;
 }
 
 .sa-agent-button-secondary {
@@ -7060,6 +9693,57 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 
 .sa-agent-stop-button {
   color: #d93025;
+  border-color: rgba(217, 48, 37, 0.3);
+}
+
+.sa-agent-stop-button:hover:not(:disabled) {
+  background: rgba(217, 48, 37, 0.08);
+}
+
+.sa-agent-message-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-primary);
+  opacity: 0.65;
+}
+
+.sa-agent-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--ui-black-transparent);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.sa-agent-meta-icon {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
+.sa-agent-meta-mode-build {
+  color: var(--looks-secondary);
+  background: var(--ui-primary-transparent);
+  font-weight: 600;
+}
+
+.sa-agent-meta-mode-build .sa-agent-meta-icon {
+  filter: none !important;
+}
+
+.sa-agent-meta-mode-plan {
+  color: var(--text-primary);
+  background: var(--ui-black-transparent);
+}
+
+.sa-agent-meta-mode-plan .sa-agent-meta-icon {
+  filter: grayscale(100%);
 }
 
 .addons-side-bar .sa-agent-header {
@@ -7075,7 +9759,7 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 }
 
 .addons-side-bar .sa-agent-composer {
-  padding: 6px 8px 8px;
+  padding: 6px 6px 8px;
 }
 
 .addons-side-bar .sa-agent-message-role {
@@ -7087,12 +9771,17 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 }
 
 .addons-side-bar .sa-agent-button {
+  min-height: 24px;
   padding: 0 7px;
 }
 
 .addons-side-bar .sa-agent-input {
-  max-height: 62px;
-  font-size: 11px;
+  height: 20px;
+  min-height: 20px;
+  max-height: 120px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 20px;
 }
 
 .sa-agent-toggle-icon {
@@ -7138,28 +9827,36 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 }
 
 .addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active {
-  color: var(--looks-secondary);
-  background: var(--ui-white);
-  border-bottom: 2px solid var(--looks-secondary);
-  font-weight: bold;
+  color: var(--looks-secondary) !important;
+  background: var(--ui-white) !important;
+  border-bottom: 2px solid var(--looks-secondary) !important;
+  font-weight: bold !important;
 }
 
 .addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active:hover {
-  background: var(--ui-white);
+  background: var(--ui-white) !important;
 }
 
 .addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-label {
-  color: var(--looks-secondary);
+  color: var(--looks-secondary) !important;
+  font-weight: bold !important;
 }
 
 .addons-bottom-panel-button-bar .sa-agent-toggle-button .sa-agent-toggle-icon {
-  filter: grayscale(100%);
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  filter: grayscale(100%) !important;
+  transition: filter 0.2s ease !important;
 }
 
+/* 仅在激活状态下图标恢复主题色，hover 状态保持灰度 */
 .addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-icon {
-  filter: none;
+  filter: none !important;
 }
 
+/* VSCode 布局下的侧边栏按钮样式 - 严格对齐 SPA、AddToBar 与 Terminal 规范 */
+.sa-agent-toggle-tab.vscode-tab,
 [class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab {
   box-sizing: border-box;
   display: flex;
@@ -7177,43 +9874,70 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   border: 0 !important;
   border-radius: 0 !important;
   color: inherit;
-  background: transparent !important;
+  background-color: transparent !important;
   cursor: pointer;
   font-family: inherit;
   font-size: 0;
   line-height: 0;
   outline: none;
   appearance: none;
+  position: relative;
   transition: none;
 }
 
-[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):hover {
-  background: var(--ui-primary-transparent) !important;
+.sa-agent-toggle-tab.vscode-tab:hover,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:hover {
+  border-color: transparent !important;
 }
 
-[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):active {
-  background: var(--ui-primary-transparent) !important;
+/* VSCode 侧边栏按钮图标 - 默认未激活状态为 100% 灰度 */
+.sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon,
+.sa-agent-toggle-tab.vscode-tab img,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab img {
+  width: 22px;
+  height: auto;
+  margin: 0 !important;
+  filter: grayscale(100%);
+  -webkit-filter: grayscale(100%);
+  transition: filter 0.2s ease;
 }
 
+/* VSCode 侧边栏按钮 hover 状态：规范只提升亮度（brightness(150%)），保持灰度，不包含饱和度 */
+.sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover .sa-agent-toggle-icon,
+.sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover img,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover .sa-agent-toggle-icon,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover img {
+  filter: brightness(150%) grayscale(100%) !important;
+  -webkit-filter: brightness(150%) grayscale(100%) !important;
+}
+
+.sa-agent-toggle-tab.vscode-tab:focus-visible,
 [class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:focus-visible {
   outline: 2px solid var(--looks-secondary);
   outline-offset: -2px;
 }
 
-[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon {
-  width: 22px;
-  height: 22px;
-  margin: 0 !important;
-  filter: grayscale(100%);
+/* VSCode 布局下按钮激活/选中状态：背景变白，左侧呈现主题强调色指示条 */
+.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active,
+.sa-agent-toggle-tab.vscode-tab.is-selected,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected {
+  background-color: var(--ui-white) !important;
+  box-shadow: inset 3px 0px 0px 0px var(--looks-secondary) !important;
 }
 
-[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active {
-  background: var(--ui-white) !important;
-  box-shadow: inset 3px 0 0 var(--looks-secondary) !important;
-}
-
-[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon {
-  filter: grayscale(0%);
+/* 激活状态下图标恢复主题色（移除灰度，展现饱和度） */
+.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon,
+.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active img,
+.sa-agent-toggle-tab.vscode-tab.is-selected .sa-agent-toggle-icon,
+.sa-agent-toggle-tab.vscode-tab.is-selected img,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active img,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected .sa-agent-toggle-icon,
+[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected img {
+  filter: grayscale(0%) !important;
+  -webkit-filter: grayscale(0%) !important;
 }
 
 .sa-agent-settings-panel {
@@ -7239,24 +9963,40 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 }
 
 .sa-agent-settings-back {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 24px;
-  padding: 0 8px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0;
   border: 1px solid var(--ui-black-transparent);
   border-radius: 4px;
   color: var(--text-primary);
   background: transparent;
   cursor: pointer;
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 1;
-  transition: none;
+  transition: all 0.15s ease;
 }
 
 .sa-agent-settings-back:hover {
   background: var(--ui-primary-transparent);
+}
+
+.sa-agent-settings-back:active {
+  transform: scale(0.95);
+}
+
+.sa-agent-settings-back-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  filter: grayscale(100%);
+  transition: filter 0.2s ease;
+}
+
+.sa-agent-settings-back:hover .sa-agent-settings-back-icon {
+  filter: none !important;
 }
 
 .sa-agent-settings-title {
@@ -7286,6 +10026,14 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   gap: 4px;
 }
 
+.sa-agent-settings-field-toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
 .sa-agent-settings-label {
   font-size: 12px;
   font-weight: bold;
@@ -7312,6 +10060,7 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
 }
 
 .sa-agent-settings-checkbox {
+  flex-shrink: 0;
   width: 16px;
   height: 16px;
   margin: 2px 0;
@@ -7323,6 +10072,13 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   min-height: 100px;
   resize: vertical;
   font-family: 'Courier New', monospace;
+}
+
+.sa-agent-settings-select {
+  height: auto;
+  min-height: 28px;
+  padding: 4px 6px;
+  cursor: pointer;
 }
 
 .sa-agent-settings-note {
@@ -7343,22 +10099,107 @@ ___CSS_LOADER_EXPORT___.push([module.id, `.sa-agent-container {
   padding-top: 4px;
 }
 
+/* 内部滚动条统一规范：细长矩形（无圆角，现代 IDE 极简风格） */
+.sa-agent-container *::-webkit-scrollbar,
 .sa-agent-messages::-webkit-scrollbar,
-.sa-agent-settings-panel::-webkit-scrollbar {
-  width: 8px;
+.sa-agent-settings-panel::-webkit-scrollbar,
+.sa-agent-conversation-list::-webkit-scrollbar,
+.sa-agent-session-panel::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
 }
 
+.sa-agent-container *::-webkit-scrollbar-track,
 .sa-agent-messages::-webkit-scrollbar-track,
-.sa-agent-settings-panel::-webkit-scrollbar-track {
-  background: transparent;
+.sa-agent-settings-panel::-webkit-scrollbar-track,
+.sa-agent-conversation-list::-webkit-scrollbar-track,
+.sa-agent-session-panel::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
+.sa-agent-container *::-webkit-scrollbar-thumb,
 .sa-agent-messages::-webkit-scrollbar-thumb,
-.sa-agent-settings-panel::-webkit-scrollbar-thumb {
-  border-radius: 4px;
-  background: var(--ui-black-transparent);
+.sa-agent-settings-panel::-webkit-scrollbar-thumb,
+.sa-agent-conversation-list::-webkit-scrollbar-thumb,
+.sa-agent-session-panel::-webkit-scrollbar-thumb {
+  border-radius: 0 !important;
+  background: rgba(128, 128, 128, 0.35) !important;
+  transition: background 0.15s ease;
 }
-`, "",{"version":3,"sources":["webpack://./src/addons/addons/astras-copilot/agent.css"],"names":[],"mappings":"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","sourcesContent":[".sa-agent-container {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  height: 100%;\n  min-height: 0;\n  overflow: hidden;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  box-sizing: border-box;\n}\n\n.addons-side-bar .sa-agent-container {\n  margin: 0;\n}\n\n.addons-bottom-panel .sa-agent-container {\n  width: calc(100% + 20px);\n  height: calc(100% + 20px);\n  margin: -10px;\n}\n\n.sa-agent-header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 8px;\n  flex-shrink: 0;\n  padding: 6px 8px 6px 12px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-heading {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  font-size: 13px;\n  font-weight: bold;\n}\n\n.sa-agent-heading-text {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.sa-agent-header-actions {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  flex-shrink: 0;\n}\n\n.sa-agent-conversation-toggle {\n  flex-shrink: 0;\n}\n\n.sa-agent-container.sa-agent-wide .sa-agent-conversation-toggle {\n  display: none;\n}\n\n.sa-agent-conversation-toggle-icon,\n.sa-agent-new-chat-button-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-agent-content {\n  position: relative;\n  display: flex;\n  flex: 1;\n  min-height: 0;\n  overflow: hidden;\n}\n\n.sa-agent-main {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  min-width: 0;\n  min-height: 0;\n}\n\n.sa-agent-conversation-pane {\n  display: none;\n  flex-direction: column;\n  flex-shrink: 0;\n  width: 200px;\n  min-height: 0;\n  border-right: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-container.sa-agent-wide .sa-agent-conversation-pane {\n  display: flex;\n}\n\n.sa-agent-container.sa-agent-narrow.sa-agent-conversation-open .sa-agent-conversation-pane {\n  display: flex;\n  position: absolute;\n  inset: 0;\n  z-index: 10;\n  width: 100%;\n  border-right: 0;\n}\n\n.sa-agent-conversation-pane-header {\n  display: flex;\n  align-items: center;\n  flex-shrink: 0;\n  padding: 8px 10px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-conversation-pane-title {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: 11px;\n  font-weight: bold;\n  opacity: 0.65;\n}\n\n.sa-agent-conversation-list {\n  position: relative;\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding: 6px;\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n\n.sa-agent-conversation-item {\n  display: flex;\n  align-items: center;\n  gap: 2px;\n  min-width: 0;\n  border-radius: 4px;\n}\n\n.sa-agent-conversation-item:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-conversation-item-active {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-conversation-item-title {\n  flex: 1;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  padding: 6px 4px 6px 8px;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  text-align: left;\n}\n\n.sa-agent-conversation-item-active .sa-agent-conversation-item-title {\n  font-weight: bold;\n}\n\n.sa-agent-conversation-item-actions {\n  display: flex;\n  align-items: center;\n  flex-shrink: 0;\n  opacity: 0.65;\n}\n\n.sa-agent-conversation-item:hover .sa-agent-conversation-item-actions,\n.sa-agent-conversation-item:focus-within .sa-agent-conversation-item-actions {\n  opacity: 1;\n}\n\n.sa-agent-conversation-action {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 22px;\n  height: 22px;\n  padding: 0;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1;\n}\n\n.sa-agent-conversation-action:hover {\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-conversation-action-icon {\n  width: 14px;\n  height: 14px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-agent-conversation-rename {\n  box-sizing: border-box;\n  flex: 1;\n  min-width: 0;\n  height: 24px;\n  margin: 2px 0;\n  padding: 0 6px;\n  border: 1px solid var(--looks-secondary);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  font-family: inherit;\n  font-size: 12px;\n}\n\n.sa-agent-icon-button {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 14px;\n  line-height: 1;\n  transition: none;\n}\n\n.sa-agent-icon-button:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-icon-button:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.sa-agent-settings-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-agent-position-switch {\n  position: relative;\n  display: flex;\n  align-items: center;\n}\n\n.sa-agent-rotate-button {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  min-width: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1;\n  transition: none;\n}\n\n.sa-agent-rotate-button:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-rotate-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-agent-position-popup {\n  position: absolute;\n  top: 100%;\n  right: 0;\n  z-index: 20;\n  display: none;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 132px;\n  margin-top: 4px;\n  padding: 4px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: var(--ui-white);\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);\n}\n\n.sa-agent-popup-button {\n  box-sizing: border-box;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  width: 100%;\n  padding: 6px 10px;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  text-align: left;\n  transition: none;\n}\n\n.sa-agent-popup-button:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-popup-button:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.sa-agent-popup-button.sa-agent-position-active {\n  color: var(--looks-secondary);\n  background: var(--ui-primary-transparent);\n  font-weight: bold;\n}\n\n.sa-agent-popup-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-agent-popup-button.sa-agent-position-active .sa-agent-popup-icon {\n  filter: none;\n}\n\n.sa-agent-messages {\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding: 12px;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.addons-bottom-panel .sa-agent-messages,\n.addons-bottom-panel .sa-agent-status,\n.addons-bottom-panel .sa-agent-composer {\n  width: 100%;\n  max-width: 960px;\n  align-self: center;\n}\n\n.sa-agent-welcome {\n  margin: auto;\n  padding: 16px;\n  max-width: 420px;\n  text-align: center;\n  color: var(--text-primary);\n}\n\n.sa-agent-welcome-title {\n  margin-bottom: 8px;\n  font-size: 16px;\n  font-weight: bold;\n}\n\n.sa-agent-welcome-text {\n  font-size: 12px;\n  line-height: 1.5;\n  opacity: 0.8;\n}\n\n.sa-agent-message {\n  display: flex;\n  flex-direction: column;\n  max-width: 100%;\n}\n\n.sa-agent-message-user {\n  align-items: flex-end;\n}\n\n.sa-agent-message-assistant {\n  align-items: flex-start;\n}\n\n.sa-agent-message-role {\n  margin: 0 4px 4px;\n  font-size: 10px;\n  font-weight: bold;\n  opacity: 0.65;\n}\n\n.sa-agent-bubble {\n  max-width: 92%;\n  padding: 8px 10px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 8px;\n  font-size: 12px;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-message-user .sa-agent-bubble {\n  color: #ffffff;\n  background: var(--looks-secondary);\n  border-color: transparent;\n  border-bottom-right-radius: 2px;\n}\n\n.sa-agent-message-assistant .sa-agent-bubble {\n  color: var(--text-primary);\n  background: var(--ui-primary-transparent);\n  border-bottom-left-radius: 2px;\n}\n\n.sa-agent-text {\n  white-space: pre-wrap;\n}\n\n.sa-agent-streaming-bubble {\n  white-space: normal;\n}\n\n.sa-agent-streaming-bubble::after {\n  content: none;\n}\n\n.sa-agent-streaming-bubble .sa-agent-md > :last-child::after {\n  content: '▍';\n  margin-left: 1px;\n  opacity: 0.6;\n  animation: sa-agent-blink 1s steps(2, start) infinite;\n}\n\n@keyframes sa-agent-blink {\n  to {\n    visibility: hidden;\n  }\n}\n\n.sa-agent-md {\n  font-size: 12px;\n  line-height: 1.5;\n  white-space: normal;\n}\n\n.sa-agent-md > :first-child {\n  margin-top: 0;\n}\n\n.sa-agent-md > :last-child {\n  margin-bottom: 0;\n}\n\n.sa-agent-md p {\n  margin: 0 0 8px;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md h1,\n.sa-agent-md h2,\n.sa-agent-md h3,\n.sa-agent-md h4,\n.sa-agent-md h5,\n.sa-agent-md h6 {\n  margin: 12px 0 6px;\n  font-weight: bold;\n  line-height: 1.25;\n}\n\n.sa-agent-md h1 {\n  font-size: 16px;\n}\n\n.sa-agent-md h2 {\n  font-size: 15px;\n}\n\n.sa-agent-md h3 {\n  font-size: 14px;\n}\n\n.sa-agent-md h4 {\n  font-size: 13px;\n}\n\n.sa-agent-md h5,\n.sa-agent-md h6 {\n  font-size: 12px;\n}\n\n.sa-agent-md ul,\n.sa-agent-md ol {\n  margin: 4px 0 8px;\n  padding-left: 20px;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md li {\n  margin: 3px 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md blockquote {\n  margin: 6px 0;\n  padding: 2px 8px;\n  border-left: 3px solid var(--ui-black-transparent);\n  font-size: 12px;\n  line-height: 1.5;\n  opacity: 0.85;\n}\n\n.sa-agent-md a {\n  color: var(--looks-secondary);\n  text-decoration: underline;\n}\n\n.sa-agent-md code {\n  padding: 1px 4px;\n  border-radius: 3px;\n  background: rgba(0, 0, 0, 0.08);\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.4;\n}\n\n.sa-agent-md pre code {\n  padding: 0;\n  background: transparent;\n  font-size: inherit;\n}\n\n.sa-agent-message-user .sa-agent-md code {\n  background: rgba(0, 0, 0, 0.18);\n}\n\n.sa-agent-message-user .sa-agent-md a {\n  color: #ffffff;\n}\n\n.sa-agent-md-rule {\n  margin: 8px 0;\n  border: 0;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-code {\n  max-width: 100%;\n  margin: 6px 0;\n  padding: 8px;\n  overflow-x: auto;\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.08);\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.5;\n  white-space: pre;\n}\n\n.sa-agent-message-user .sa-agent-code {\n  background: rgba(0, 0, 0, 0.16);\n}\n\n.sa-agent-trace {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  max-width: 92%;\n  margin-bottom: 6px;\n  font-size: 11px;\n  line-height: 1.4;\n}\n\n.sa-agent-tool-row {\n  overflow: hidden;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: rgba(0, 0, 0, 0.03);\n}\n\n.sa-agent-tool {\n  display: block;\n}\n\n.sa-agent-tool-summary {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 5px 8px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.sa-agent-tool-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-tool-summary::marker {\n  content: '';\n}\n\n.sa-agent-tool-name {\n  min-width: 0;\n  overflow: hidden;\n  font-weight: bold;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.sa-agent-tool-status {\n  flex-shrink: 0;\n  opacity: 0.7;\n}\n\n.sa-agent-tool-expand,\n.sa-agent-tool-collapse {\n  flex-shrink: 0;\n  margin-left: auto;\n  opacity: 0.55;\n}\n\n.sa-agent-tool-collapse {\n  display: none;\n}\n\n.sa-agent-tool[open] .sa-agent-tool-expand {\n  display: none;\n}\n\n.sa-agent-tool[open] .sa-agent-tool-collapse {\n  display: inline;\n}\n\n.sa-agent-tool-body {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  padding: 6px 8px 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-tool-line {\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-tool-line-label {\n  margin-right: 4px;\n  font-weight: bold;\n  opacity: 0.6;\n}\n\n.sa-agent-tool-approval {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 6px;\n  padding: 6px 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n  background: rgba(0, 0, 0, 0.04);\n}\n\n.sa-agent-tool-approval-hint {\n  flex: 1 1 140px;\n  min-width: 0;\n  opacity: 0.75;\n}\n\n.sa-agent-tool-approval-button {\n  flex-shrink: 0;\n  padding: 3px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  background: var(--ui-white);\n  color: var(--text-primary);\n  font-size: 11px;\n  cursor: pointer;\n}\n\n.sa-agent-tool-approval-button:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-tool-allow {\n  border-color: var(--looks-secondary);\n  background: var(--looks-secondary);\n  color: #ffffff;\n}\n\n.sa-agent-tool-allow:hover {\n  background: var(--looks-secondary);\n  opacity: 0.9;\n}\n\n.sa-agent-tool-allow-all {\n  border-style: dashed;\n}\n\n.sa-agent-trace-dot {\n  width: 6px;\n  height: 6px;\n  flex-shrink: 0;\n  border-radius: 50%;\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-trace-ok .sa-agent-trace-dot {\n  background: #2e9e4f;\n}\n\n.sa-agent-trace-error .sa-agent-trace-dot,\n.sa-agent-trace-denied .sa-agent-trace-dot {\n  background: #d93025;\n}\n\n.sa-agent-trace-pending .sa-agent-trace-dot,\n.sa-agent-trace-awaiting .sa-agent-trace-dot {\n  background: var(--looks-secondary);\n  animation: sa-agent-pulse 1s ease-in-out infinite;\n}\n\n@keyframes sa-agent-pulse {\n  0%,\n  100% {\n    opacity: 0.25;\n  }\n  50% {\n    opacity: 1;\n  }\n}\n\n.sa-agent-trace-pre {\n  max-height: 160px;\n  margin: 4px 0 0;\n  padding: 6px;\n  overflow: auto;\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.06);\n  font-family: 'Courier New', monospace;\n  font-size: 10px;\n  line-height: 1.4;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-status {\n  flex-shrink: 0;\n  padding: 4px 12px 0;\n  font-size: 11px;\n  line-height: 1.4;\n  color: var(--text-primary);\n  opacity: 0.75;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-status.sa-agent-status-error {\n  color: #d93025;\n  opacity: 1;\n}\n\n.sa-agent-context-bar {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n  padding: 4px 12px 0;\n  font-size: 10px;\n  color: var(--text-primary);\n  opacity: 0.7;\n}\n\n.sa-agent-context-text {\n  flex: 1;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.sa-agent-compress-button {\n  min-height: 20px;\n  padding: 0 6px;\n  font-size: 10px;\n  flex-shrink: 0;\n}\n\n.sa-agent-composer {\n  display: flex;\n  align-items: flex-end;\n  gap: 8px;\n  flex-shrink: 0;\n  padding: 8px 12px 10px;\n  border-top: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-input {\n  flex: 1;\n  min-width: 0;\n  min-height: 30px;\n  max-height: 66px;\n  padding: 6px 8px;\n  overflow-y: hidden;\n  resize: none;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 5px;\n  outline: none;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  box-sizing: border-box;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1.4;\n  transition: none;\n}\n\n.sa-agent-input:focus {\n  border-color: var(--looks-secondary);\n}\n\n.sa-agent-composer-actions {\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  flex-shrink: 0;\n}\n\n.sa-agent-button {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  min-height: 30px;\n  padding: 0 10px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 5px;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  font-weight: bold;\n  white-space: nowrap;\n  transition: none;\n}\n\n.sa-agent-button:disabled {\n  opacity: 0.45;\n  cursor: not-allowed;\n}\n\n.sa-agent-button-primary {\n  color: #ffffff;\n  background: var(--looks-secondary);\n  border-color: transparent;\n}\n\n.sa-agent-button-primary:hover:not(:disabled) {\n  filter: brightness(1.08);\n}\n\n.sa-agent-button-secondary {\n  color: var(--text-primary);\n  background: transparent;\n}\n\n.sa-agent-button-secondary:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-stop-button {\n  color: #d93025;\n}\n\n.addons-side-bar .sa-agent-header {\n  padding: 6px 8px;\n}\n\n.addons-side-bar .sa-agent-heading {\n  font-size: 12px;\n}\n\n.addons-side-bar .sa-agent-messages {\n  padding: 8px;\n}\n\n.addons-side-bar .sa-agent-composer {\n  padding: 6px 8px 8px;\n}\n\n.addons-side-bar .sa-agent-message-role {\n  display: none;\n}\n\n.addons-side-bar .sa-agent-bubble {\n  max-width: 100%;\n}\n\n.addons-side-bar .sa-agent-button {\n  padding: 0 7px;\n}\n\n.addons-side-bar .sa-agent-input {\n  max-height: 62px;\n  font-size: 11px;\n}\n\n.sa-agent-toggle-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n}\n\n.sa-agent-toggle-label {\n  font-size: 12px;\n  color: var(--text-primary-transparent);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button {\n  box-sizing: border-box;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 6px;\n  height: 24px;\n  min-height: 24px;\n  margin: 0;\n  padding: 0 12px;\n  border: 0;\n  border-top: 2px solid transparent;\n  border-right: 1px solid var(--ui-black-transparent);\n  border-bottom: 0;\n  border-left: 2px solid transparent;\n  border-radius: 0;\n  color: var(--text-primary-transparent);\n  background: var(--ui-white);\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  font-weight: normal;\n  line-height: 1;\n  white-space: nowrap;\n  transition: none;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button:hover {\n  background: var(--ui-primary);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active {\n  color: var(--looks-secondary);\n  background: var(--ui-white);\n  border-bottom: 2px solid var(--looks-secondary);\n  font-weight: bold;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active:hover {\n  background: var(--ui-white);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-label {\n  color: var(--looks-secondary);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button .sa-agent-toggle-icon {\n  filter: grayscale(100%);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-icon {\n  filter: none;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab {\n  box-sizing: border-box;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  width: 40px;\n  height: 40px !important;\n  min-width: 40px;\n  min-height: 40px !important;\n  flex-grow: 0;\n  flex-shrink: 0;\n  padding: 5px 0 !important;\n  margin: 0 !important;\n  border: 0 !important;\n  border-radius: 0 !important;\n  color: inherit;\n  background: transparent !important;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 0;\n  line-height: 0;\n  outline: none;\n  appearance: none;\n  transition: none;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):hover {\n  background: var(--ui-primary-transparent) !important;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):active {\n  background: var(--ui-primary-transparent) !important;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:focus-visible {\n  outline: 2px solid var(--looks-secondary);\n  outline-offset: -2px;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon {\n  width: 22px;\n  height: 22px;\n  margin: 0 !important;\n  filter: grayscale(100%);\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active {\n  background: var(--ui-white) !important;\n  box-shadow: inset 3px 0 0 var(--looks-secondary) !important;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon {\n  filter: grayscale(0%);\n}\n\n.sa-agent-settings-panel {\n  display: none;\n  flex: 1;\n  flex-direction: column;\n  min-height: 0;\n  overflow-y: auto;\n  box-sizing: border-box;\n  padding: 10px 12px 12px;\n  color: var(--text-primary);\n  background: var(--ui-white);\n}\n\n.sa-agent-settings-header {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n  padding-bottom: 8px;\n  margin-bottom: 12px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-settings-back {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  min-height: 24px;\n  padding: 0 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1;\n  transition: none;\n}\n\n.sa-agent-settings-back:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-settings-title {\n  font-size: 13px;\n  font-weight: bold;\n}\n\n.addons-bottom-panel .sa-agent-settings-panel {\n  width: 100%;\n  max-width: 960px;\n  align-self: center;\n}\n\n.addons-side-bar .sa-agent-settings-panel {\n  padding: 8px;\n}\n\n.sa-agent-settings {\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.sa-agent-settings-field {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.sa-agent-settings-label {\n  font-size: 12px;\n  font-weight: bold;\n  color: var(--text-primary);\n}\n\n.sa-agent-settings-input {\n  box-sizing: border-box;\n  width: 100%;\n  min-height: 32px;\n  padding: 6px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  font-family: inherit;\n  font-size: 12px;\n  transition: none;\n}\n\n.sa-agent-settings-input:focus {\n  border-color: var(--looks-secondary);\n}\n\n.sa-agent-settings-checkbox {\n  width: 16px;\n  height: 16px;\n  margin: 2px 0;\n  align-self: flex-start;\n  cursor: pointer;\n}\n\n.sa-agent-settings-textarea {\n  min-height: 100px;\n  resize: vertical;\n  font-family: 'Courier New', monospace;\n}\n\n.sa-agent-settings-note {\n  font-size: 11px;\n  line-height: 1.4;\n  opacity: 0.7;\n}\n\n.sa-agent-settings-error {\n  color: #d93025;\n  font-size: 12px;\n}\n\n.sa-agent-settings-buttons {\n  display: flex;\n  justify-content: flex-end;\n  gap: 8px;\n  padding-top: 4px;\n}\n\n.sa-agent-messages::-webkit-scrollbar,\n.sa-agent-settings-panel::-webkit-scrollbar {\n  width: 8px;\n}\n\n.sa-agent-messages::-webkit-scrollbar-track,\n.sa-agent-settings-panel::-webkit-scrollbar-track {\n  background: transparent;\n}\n\n.sa-agent-messages::-webkit-scrollbar-thumb,\n.sa-agent-settings-panel::-webkit-scrollbar-thumb {\n  border-radius: 4px;\n  background: var(--ui-black-transparent);\n}\n"],"sourceRoot":""}]);
+
+.sa-agent-container *::-webkit-scrollbar-thumb:hover,
+.sa-agent-messages::-webkit-scrollbar-thumb:hover,
+.sa-agent-settings-panel::-webkit-scrollbar-thumb:hover,
+.sa-agent-conversation-list::-webkit-scrollbar-thumb:hover,
+.sa-agent-session-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.6) !important;
+}
+
+.sa-agent-container *::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+.sa-agent-container,
+.sa-agent-container * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+}
+
+.sa-agent-md-table-wrap {
+  max-width: 100%;
+  margin: 8px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sa-agent-md-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sa-agent-md-table th,
+.sa-agent-md-table td {
+  padding: 4px 8px;
+  border: 1px solid var(--ui-black-transparent);
+  text-align: left;
+  vertical-align: top;
+}
+
+.sa-agent-md-table th {
+  font-weight: bold;
+  background: var(--ui-primary-transparent);
+}
+
+.sa-agent-md-table tr:nth-child(even) td {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.sa-agent-md-table pre,
+.sa-agent-md-table code {
+  white-space: pre-wrap;
+}
+
+.sa-agent-md-task {
+  width: 14px;
+  height: 14px;
+  margin: 0 6px 0 0;
+  vertical-align: middle;
+  cursor: default;
+  accent-color: var(--looks-secondary);
+}
+
+.sa-agent-md-image {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px dashed var(--ui-black-transparent);
+  border-radius: 3px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+`, "",{"version":3,"sources":["webpack://./src/addons/addons/astras-copilot/agent.css"],"names":[],"mappings":"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","sourcesContent":[".sa-agent-container {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  height: 100%;\n  min-height: 0;\n  overflow: hidden;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  box-sizing: border-box;\n}\n\n.addons-side-bar .sa-agent-container {\n  margin: 0;\n}\n\n.addons-bottom-panel .sa-agent-container {\n  width: calc(100% + 20px);\n  height: calc(100% + 20px);\n  margin: -10px;\n}\n\n.sa-agent-header {\n  position: relative;\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 8px;\n  flex-shrink: 0;\n  padding: 6px 8px 6px 12px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-heading {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  font-size: 13px;\n  font-weight: bold;\n}\n\n.sa-agent-heading-text {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.sa-agent-header-actions {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  flex-shrink: 0;\n}\n\n.sa-agent-session-menu {\n  position: static;\n}\n\n.sa-agent-session-summary {\n  list-style: none;\n  cursor: pointer;\n}\n\n.sa-agent-session-summary .sa-agent-icon {\n  width: 16px;\n  height: 16px;\n}\n\n.sa-agent-session-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-session-panel {\n  position: absolute;\n  z-index: 20;\n  top: calc(100% + 6px);\n  right: 8px;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n  box-sizing: border-box;\n  width: 240px;\n  max-width: calc(100% - 16px);\n  max-height: min(320px, 55vh);\n  overflow: auto;\n  padding: 12px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 8px;\n  background: var(--ui-white);\n  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);\n}\n\n.sa-agent-session-permission {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.sa-agent-conversation-toggle {\n  flex-shrink: 0;\n}\n\n.sa-agent-container.sa-agent-wide .sa-agent-conversation-toggle {\n  display: none;\n}\n\n.sa-agent-icon,\n.sa-agent-conversation-toggle-icon,\n.sa-agent-new-chat-button-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-icon-button:hover .sa-agent-icon,\n.sa-agent-icon-button:hover .sa-agent-conversation-toggle-icon,\n.sa-agent-icon-button:hover .sa-agent-new-chat-button-icon {\n  filter: none !important;\n}\n\n.sa-agent-content {\n  position: relative;\n  display: flex;\n  flex: 1;\n  min-height: 0;\n  overflow: hidden;\n}\n\n.sa-agent-main {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  min-width: 0;\n  min-height: 0;\n}\n\n.sa-agent-conversation-pane {\n  display: none;\n  flex-direction: column;\n  flex-shrink: 0;\n  width: 200px;\n  min-height: 0;\n  border-right: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-container.sa-agent-wide .sa-agent-conversation-pane {\n  display: flex;\n}\n\n.sa-agent-container.sa-agent-narrow.sa-agent-conversation-open .sa-agent-conversation-pane {\n  display: flex;\n  position: absolute;\n  inset: 0;\n  z-index: 10;\n  width: 100%;\n  border-right: 0;\n}\n\n.sa-agent-conversation-pane-header {\n  display: flex;\n  align-items: center;\n  flex-shrink: 0;\n  padding: 8px 10px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-conversation-pane-title {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: 11px;\n  font-weight: bold;\n  opacity: 0.65;\n}\n\n.sa-agent-conversation-list {\n  position: relative;\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding: 6px;\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n\n.sa-agent-conversation-item {\n  display: flex;\n  align-items: center;\n  gap: 2px;\n  min-width: 0;\n  border-radius: 4px;\n}\n\n.sa-agent-conversation-item:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-conversation-item-active {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-conversation-item-confirming {\n  flex-wrap: wrap;\n}\n\n.sa-agent-delete-confirm {\n  flex: 0 0 100%;\n  box-sizing: border-box;\n  padding: 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n  font-size: 11px;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-delete-actions {\n  display: flex;\n  justify-content: flex-end;\n  gap: 6px;\n  margin-top: 8px;\n}\n\n.sa-agent-delete-accept {\n  color: #d93025;\n}\n\n.sa-agent-conversation-item-title {\n  flex: 1;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  padding: 6px 4px 6px 8px;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  text-align: left;\n}\n\n.sa-agent-conversation-item-active .sa-agent-conversation-item-title {\n  font-weight: bold;\n}\n\n.sa-agent-conversation-item-actions {\n  display: flex;\n  align-items: center;\n  flex-shrink: 0;\n  opacity: 0.65;\n}\n\n.sa-agent-conversation-item:hover .sa-agent-conversation-item-actions,\n.sa-agent-conversation-item:focus-within .sa-agent-conversation-item-actions {\n  opacity: 1;\n}\n\n.sa-agent-conversation-action {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 22px;\n  height: 22px;\n  padding: 0;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1;\n}\n\n.sa-agent-conversation-action:hover {\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-conversation-action-icon {\n  width: 14px;\n  height: 14px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-conversation-action:hover .sa-agent-conversation-action-icon {\n  filter: none !important;\n}\n\n.sa-agent-conversation-rename {\n  box-sizing: border-box;\n  flex: 1;\n  min-width: 0;\n  height: 24px;\n  margin: 2px 0;\n  padding: 0 6px;\n  border: 1px solid var(--looks-secondary);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  font-family: inherit;\n  font-size: 12px;\n}\n\n.sa-agent-icon-button {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 14px;\n  line-height: 1;\n  transition: none;\n}\n\n.sa-agent-icon-button:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-icon-button:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.sa-agent-settings-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\nbutton:hover .sa-agent-settings-icon {\n  filter: none !important;\n}\n\n.sa-agent-position-switch {\n  position: relative;\n  display: flex;\n  align-items: center;\n}\n\n.sa-agent-rotate-button {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  min-width: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1;\n  transition: none;\n}\n\n.sa-agent-rotate-button:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-rotate-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-rotate-button:hover .sa-agent-rotate-icon {\n  filter: none !important;\n}\n\n.sa-agent-position-popup {\n  position: absolute;\n  top: 100%;\n  right: 0;\n  z-index: 20;\n  display: none;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 132px;\n  margin-top: 4px;\n  padding: 4px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: var(--ui-white);\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);\n}\n\n.sa-agent-popup-button {\n  box-sizing: border-box;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  width: 100%;\n  padding: 6px 10px;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  text-align: left;\n  transition: none;\n}\n\n.sa-agent-popup-button:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-popup-button:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.sa-agent-popup-button.sa-agent-position-active {\n  color: var(--looks-secondary);\n  background: var(--ui-primary-transparent);\n  font-weight: bold;\n}\n\n.sa-agent-popup-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-popup-button:hover .sa-agent-popup-icon,\n.sa-agent-popup-button.sa-agent-position-active .sa-agent-popup-icon {\n  filter: none !important;\n}\n\n.sa-agent-messages {\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding: 12px;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.addons-bottom-panel .sa-agent-messages,\n.addons-bottom-panel .sa-agent-composer {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 960px;\n  align-self: center;\n}\n\n.sa-agent-welcome {\n  margin: auto;\n  padding: 16px;\n  max-width: 420px;\n  text-align: center;\n  color: var(--text-primary);\n}\n\n.sa-agent-welcome-title {\n  margin-bottom: 8px;\n  font-size: 16px;\n  font-weight: bold;\n}\n\n.sa-agent-welcome-text {\n  font-size: 12px;\n  line-height: 1.5;\n  opacity: 0.8;\n}\n\n.sa-agent-message {\n  display: flex;\n  flex-direction: column;\n  max-width: 100%;\n  min-width: 0;\n  flex-shrink: 0;\n  gap: 6px;\n}\n\n.sa-agent-message-user {\n  align-items: flex-end;\n}\n\n.sa-agent-message-assistant {\n  align-items: flex-start;\n}\n\n.sa-agent-message-role {\n  margin: 0 4px 4px;\n  font-size: 10px;\n  font-weight: bold;\n  opacity: 0.65;\n}\n\n.sa-agent-bubble {\n  box-sizing: border-box;\n  min-width: 0;\n  max-width: 92%;\n  padding: 8px 10px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 8px;\n  font-size: 12px;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-message-user .sa-agent-bubble {\n  color: #ffffff;\n  background: var(--looks-secondary);\n  border-color: transparent;\n  border-bottom-right-radius: 2px;\n}\n\n.sa-agent-user-actions {\n  display: flex;\n  align-items: center;\n  gap: 3px;\n  margin-top: 3px;\n  opacity: 0.5;\n  transition: opacity 0.15s ease;\n}\n\n.sa-agent-message-user:hover .sa-agent-user-actions,\n.sa-agent-user-actions:focus-within {\n  opacity: 1;\n}\n\n.sa-agent-user-action-btn {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  gap: 3px;\n  height: 20px;\n  padding: 0 5px;\n  border: 1px solid transparent;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 11px;\n  line-height: 1;\n  white-space: nowrap;\n  user-select: none;\n  transition: all 0.15s ease;\n}\n\n.sa-agent-user-action-btn:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n  border-color: var(--ui-black-transparent);\n}\n\n.sa-agent-user-action-btn:active:not(:disabled) {\n  transform: scale(0.96);\n}\n\n.sa-agent-user-action-btn:disabled {\n  opacity: 0.4;\n  cursor: not-allowed;\n}\n\n.sa-agent-user-action-icon {\n  width: 12px;\n  height: 12px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.15s ease;\n}\n\n.sa-agent-user-action-btn:hover:not(:disabled) .sa-agent-user-action-icon {\n  filter: none !important;\n}\n\n.sa-agent-message-assistant .sa-agent-bubble {\n  color: var(--text-primary);\n  background: var(--ui-primary-transparent);\n  border-bottom-left-radius: 2px;\n}\n\n.sa-agent-text {\n  white-space: pre-wrap;\n}\n\n.sa-agent-streaming-bubble {\n  white-space: normal;\n}\n\n.sa-agent-streaming-bubble::after {\n  content: none;\n}\n\n.sa-agent-streaming-bubble .sa-agent-md > :last-child::after {\n  content: '▍';\n  margin-left: 1px;\n  opacity: 0.6;\n  animation: sa-agent-blink 1s steps(2, start) infinite;\n}\n\n@keyframes sa-agent-blink {\n  to {\n    visibility: hidden;\n  }\n}\n\n.sa-agent-md {\n  font-size: 12px;\n  line-height: 1.5;\n  white-space: normal;\n}\n\n.sa-agent-md > :first-child {\n  margin-top: 0;\n}\n\n.sa-agent-md > :last-child {\n  margin-bottom: 0;\n}\n\n.sa-agent-md p {\n  margin: 0 0 8px;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md h1,\n.sa-agent-md h2,\n.sa-agent-md h3,\n.sa-agent-md h4,\n.sa-agent-md h5,\n.sa-agent-md h6 {\n  margin: 12px 0 6px;\n  font-weight: bold;\n  line-height: 1.25;\n}\n\n.sa-agent-md h1 {\n  font-size: 16px;\n}\n\n.sa-agent-md h2 {\n  font-size: 15px;\n}\n\n.sa-agent-md h3 {\n  font-size: 14px;\n}\n\n.sa-agent-md h4 {\n  font-size: 13px;\n}\n\n.sa-agent-md h5,\n.sa-agent-md h6 {\n  font-size: 12px;\n}\n\n.sa-agent-md ul,\n.sa-agent-md ol {\n  margin: 4px 0 8px;\n  padding-left: 20px;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md li {\n  margin: 3px 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md blockquote {\n  margin: 6px 0;\n  padding: 2px 8px;\n  border-left: 3px solid var(--ui-black-transparent);\n  font-size: 12px;\n  line-height: 1.5;\n  opacity: 0.85;\n}\n\n.sa-agent-md a {\n  color: var(--looks-secondary);\n  text-decoration: underline;\n}\n\n.sa-agent-md code {\n  padding: 1px 4px;\n  border-radius: 3px;\n  background: rgba(0, 0, 0, 0.08);\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.4;\n}\n\n.sa-agent-md pre code {\n  padding: 0;\n  background: transparent;\n  font-size: inherit;\n}\n\n.sa-agent-message-user .sa-agent-md code {\n  background: rgba(0, 0, 0, 0.18);\n}\n\n.sa-agent-message-user .sa-agent-md a {\n  color: #ffffff;\n}\n\n.sa-agent-md-rule {\n  margin: 8px 0;\n  border: 0;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-code {\n  max-width: 100%;\n  margin: 6px 0;\n  padding: 8px;\n  overflow-x: auto;\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.08);\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.5;\n  white-space: pre;\n}\n\n.sa-agent-message-user .sa-agent-code {\n  background: rgba(0, 0, 0, 0.16);\n}\n\n.sa-agent-trace {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  width: 92%;\n  max-width: 640px;\n  min-width: 0;\n  margin: 2px 0 8px;\n  font-size: 11px;\n  line-height: 1.4;\n}\n\n.sa-agent-tool-stack {\n  min-width: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 7px;\n  background: var(--ui-white);\n}\n\n.sa-agent-tool-stack-multiple:not([open]) {\n  margin-bottom: 6px;\n  box-shadow: 0 3px 0 -1px var(--ui-white), 0 3px 0 var(--ui-black-transparent),\n    0 6px 0 -1px var(--ui-white), 0 6px 0 var(--ui-black-transparent);\n}\n\n.sa-agent-tool-stack-summary {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding: 7px 9px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.sa-agent-tool-stack-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-tool-stack-summary::before {\n  content: '▸';\n  flex-shrink: 0;\n}\n\n.sa-agent-tool-stack[open] > .sa-agent-tool-stack-summary::before {\n  content: '▾';\n}\n\n.sa-agent-tool-stack-summary > span:first-of-type {\n  flex-shrink: 0;\n}\n\n.sa-agent-tool-stack-state {\n  min-width: 0;\n  margin-left: auto;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  opacity: 0.65;\n}\n\n.sa-agent-tool-stack-body {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  padding: 0 6px 6px;\n}\n\n.sa-agent-reasoning {\n  box-sizing: border-box;\n  width: 92%;\n  min-width: 0;\n  border-left: 2px solid var(--ui-black-transparent);\n  padding-left: 10px;\n  font-size: 11px;\n  line-height: 1.5;\n}\n\n.sa-agent-reasoning > summary {\n  padding: 4px 0;\n  cursor: pointer;\n  opacity: 0.75;\n}\n\n.sa-agent-reasoning-body {\n  max-height: 280px;\n  overflow: auto;\n  padding: 6px 0;\n  overflow-wrap: anywhere;\n  opacity: 0.85;\n}\n\n.sa-agent-tool-row {\n  overflow: hidden;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: rgba(0, 0, 0, 0.03);\n}\n\n.sa-agent-tool {\n  display: block;\n}\n\n.sa-agent-tool-summary {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 5px 8px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.sa-agent-tool-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-tool-summary::marker {\n  content: '';\n}\n\n.sa-agent-tool-name {\n  min-width: 0;\n  overflow: hidden;\n  font-weight: bold;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.sa-agent-tool-status {\n  flex-shrink: 0;\n  opacity: 0.7;\n}\n\n.sa-agent-tool-expand,\n.sa-agent-tool-collapse {\n  flex-shrink: 0;\n  margin-left: auto;\n  opacity: 0.55;\n}\n\n.sa-agent-tool-collapse {\n  display: none;\n}\n\n.sa-agent-tool[open] .sa-agent-tool-expand {\n  display: none;\n}\n\n.sa-agent-tool[open] .sa-agent-tool-collapse {\n  display: inline;\n}\n\n.sa-agent-tool-body {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  padding: 6px 8px 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-tool-line {\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-tool-line-label {\n  margin-right: 4px;\n  font-weight: bold;\n  opacity: 0.6;\n}\n\n.sa-agent-tool-approval {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 6px;\n  padding: 6px 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n  background: rgba(0, 0, 0, 0.04);\n}\n\n.sa-agent-tool-approval-hint {\n  flex: 1 1 140px;\n  min-width: 0;\n  opacity: 0.75;\n}\n\n.sa-agent-tool-approval-button {\n  flex-shrink: 0;\n  padding: 3px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  background: var(--ui-white);\n  color: var(--text-primary);\n  font-size: 11px;\n  cursor: pointer;\n}\n\n.sa-agent-tool-approval-button:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-tool-allow {\n  border-color: var(--looks-secondary);\n  background: var(--looks-secondary);\n  color: #ffffff;\n}\n\n.sa-agent-tool-allow:hover {\n  background: var(--looks-secondary);\n  opacity: 0.9;\n}\n\n.sa-agent-tool-allow-all {\n  border-style: dashed;\n}\n\n.sa-agent-trace-dot {\n  width: 6px;\n  height: 6px;\n  flex-shrink: 0;\n  border-radius: 50%;\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-trace-ok .sa-agent-trace-dot {\n  background: #2e9e4f;\n}\n\n.sa-agent-trace-error .sa-agent-trace-dot,\n.sa-agent-trace-denied .sa-agent-trace-dot {\n  background: #d93025;\n}\n\n.sa-agent-trace-pending .sa-agent-trace-dot,\n.sa-agent-trace-awaiting .sa-agent-trace-dot {\n  background: var(--looks-secondary);\n  animation: sa-agent-pulse 1s ease-in-out infinite;\n}\n\n.sa-agent-tool-write {\n  border-left: 2px solid var(--looks-secondary);\n}\n\n.sa-agent-session-write span {\n  font-weight: bold;\n}\n\n@keyframes sa-agent-pulse {\n  0%,\n  100% {\n    opacity: 0.25;\n  }\n  50% {\n    opacity: 1;\n  }\n}\n\n.sa-agent-trace-pre {\n  max-height: 160px;\n  margin: 4px 0 0;\n  padding: 6px;\n  overflow: auto;\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.06);\n  font-family: 'Courier New', monospace;\n  font-size: 10px;\n  line-height: 1.4;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-status {\n  flex-shrink: 0;\n  font-size: 11px;\n  line-height: 1.4;\n  color: var(--text-primary);\n  opacity: 0.75;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-status.sa-agent-status-error {\n  color: #d93025;\n  opacity: 1;\n}\n\n.sa-agent-context-bar {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n  flex-wrap: wrap;\n  font-size: 10px;\n  color: var(--text-primary);\n}\n\n.sa-agent-context-text {\n  flex: 1 1 100%;\n  min-width: 0;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n  opacity: 0.75;\n}\n\n.sa-agent-compress-button {\n  min-height: 20px;\n  padding: 0 6px;\n  font-size: 10px;\n  flex-shrink: 0;\n}\n\n.sa-agent-composer {\n  flex-shrink: 0;\n  padding: 8px 10px 10px;\n  border-top: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-composer-card {\n  display: flex;\n  flex-direction: column;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: var(--ui-white);\n  padding: 5px 6px 4px;\n  box-sizing: border-box;\n  transition: border-color 0.15s ease, box-shadow 0.15s ease;\n}\n\n.sa-agent-composer-card:focus-within {\n  border-color: var(--looks-secondary);\n  box-shadow: 0 0 0 1px var(--looks-secondary);\n}\n\n.sa-agent-input {\n  width: 100%;\n  min-width: 0;\n  height: 20px;\n  min-height: 20px;\n  max-height: 160px;\n  padding: 0 4px;\n  overflow-y: hidden;\n  resize: none;\n  border: 0;\n  outline: none;\n  color: var(--text-primary);\n  background: transparent;\n  box-sizing: border-box;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 20px;\n  vertical-align: middle;\n}\n\n.sa-agent-input::placeholder {\n  color: var(--text-primary);\n  opacity: 0.45;\n  line-height: 20px;\n}\n\n.sa-agent-composer-toolbar {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 8px;\n  padding-top: 4px;\n  margin-top: 4px;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-composer-toolbar-left {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  flex: 1;\n}\n\n.sa-agent-composer-toolbar-right {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  flex-shrink: 0;\n}\n\n.sa-agent-mode-button {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  height: 24px;\n  padding: 0 7px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 11px;\n  font-weight: 500;\n  white-space: nowrap;\n  user-select: none;\n  transition: all 0.15s ease;\n}\n\n.sa-agent-mode-icon {\n  width: 13px;\n  height: 13px;\n  flex-shrink: 0;\n  transition: filter 0.15s ease;\n}\n\n.sa-agent-mode-button:hover {\n  background: var(--ui-primary-transparent);\n  border-color: var(--looks-secondary);\n}\n\n.sa-agent-mode-button:active {\n  transform: scale(0.96);\n}\n\n.sa-agent-mode-button.sa-agent-mode-build {\n  color: #ffffff;\n  border-color: var(--looks-secondary);\n  background: var(--looks-secondary);\n  font-weight: 600;\n}\n\n.sa-agent-mode-button.sa-agent-mode-build .sa-agent-mode-icon {\n  filter: brightness(0) invert(1) !important;\n}\n\n.sa-agent-mode-button.sa-agent-mode-build:hover {\n  filter: brightness(1.08);\n}\n\n.sa-agent-mode-button.sa-agent-mode-plan {\n  color: var(--text-primary);\n  opacity: 0.85;\n}\n\n.sa-agent-mode-button.sa-agent-mode-plan .sa-agent-mode-icon {\n  filter: grayscale(100%);\n}\n\n.sa-agent-mode-button.sa-agent-mode-plan:hover .sa-agent-mode-icon {\n  filter: none !important;\n}\n\n.sa-agent-model-select-wrapper {\n  position: relative;\n  display: inline-flex;\n  align-items: center;\n  flex: 0 1 auto;\n  min-width: 0;\n  max-width: none;\n}\n\n.sa-agent-model-select {\n  height: 24px;\n  width: auto;\n  min-width: 0;\n  max-width: none;\n  padding: 0 18px 0 7px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background-color: var(--ui-white);\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 11px;\n  font-weight: 500;\n  white-space: nowrap;\n  appearance: none;\n  -webkit-appearance: none;\n  transition: border-color 0.15s ease, background-color 0.15s ease;\n}\n\n.sa-agent-model-select:hover {\n  border-color: var(--looks-secondary);\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-agent-model-select:focus {\n  border-color: var(--looks-secondary);\n  box-shadow: 0 0 0 1px var(--looks-secondary);\n}\n\n/* 显式定义下拉展开选项的文字颜色与背景，杜绝因系统深浅色差异导致白底浅灰字或可读性差的问题 */\n.sa-agent-model-select option {\n  color: var(--text-primary) !important;\n  background-color: var(--ui-white) !important;\n  font-size: 12px;\n  font-weight: normal;\n  padding: 4px 8px;\n}\n\n.sa-agent-model-select option:checked {\n  color: var(--looks-secondary) !important;\n  background-color: var(--ui-primary-transparent) !important;\n  font-weight: 600;\n}\n\n.sa-agent-model-select-wrapper::after {\n  content: '';\n  position: absolute;\n  right: 6px;\n  pointer-events: none;\n  width: 0;\n  height: 0;\n  border-left: 3.5px solid transparent;\n  border-right: 3.5px solid transparent;\n  border-top: 4px solid var(--text-primary);\n  opacity: 0.6;\n  transition: opacity 0.15s ease;\n}\n\n.sa-agent-model-select-wrapper:hover::after {\n  opacity: 0.9;\n}\n\n.sa-agent-button {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 4px;\n  height: 24px;\n  min-height: 24px;\n  padding: 0 10px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  font-weight: 600;\n  white-space: nowrap;\n  transition: opacity 0.15s ease, background 0.15s ease, transform 0.1s ease;\n}\n\n.sa-agent-button:disabled {\n  opacity: 0.45;\n  cursor: not-allowed;\n}\n\n.sa-agent-button:active:not(:disabled) {\n  transform: scale(0.96);\n}\n\n.sa-agent-button-primary {\n  color: #ffffff;\n  background: var(--looks-secondary);\n  border-color: transparent;\n}\n\n.sa-agent-button-primary:hover:not(:disabled) {\n  filter: brightness(1.08);\n  opacity: 0.95;\n}\n\n.sa-agent-button-secondary {\n  color: var(--text-primary);\n  background: transparent;\n}\n\n.sa-agent-button-secondary:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-stop-button {\n  color: #d93025;\n  border-color: rgba(217, 48, 37, 0.3);\n}\n\n.sa-agent-stop-button:hover:not(:disabled) {\n  background: rgba(217, 48, 37, 0.08);\n}\n\n.sa-agent-message-meta {\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  margin-top: 4px;\n  font-size: 10px;\n  color: var(--text-primary);\n  opacity: 0.65;\n}\n\n.sa-agent-meta-badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 3px;\n  padding: 1px 5px;\n  border-radius: 3px;\n  background: var(--ui-black-transparent);\n  font-size: 10px;\n  line-height: 1.3;\n}\n\n.sa-agent-meta-icon {\n  width: 11px;\n  height: 11px;\n  flex-shrink: 0;\n}\n\n.sa-agent-meta-mode-build {\n  color: var(--looks-secondary);\n  background: var(--ui-primary-transparent);\n  font-weight: 600;\n}\n\n.sa-agent-meta-mode-build .sa-agent-meta-icon {\n  filter: none !important;\n}\n\n.sa-agent-meta-mode-plan {\n  color: var(--text-primary);\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-meta-mode-plan .sa-agent-meta-icon {\n  filter: grayscale(100%);\n}\n\n.addons-side-bar .sa-agent-header {\n  padding: 6px 8px;\n}\n\n.addons-side-bar .sa-agent-heading {\n  font-size: 12px;\n}\n\n.addons-side-bar .sa-agent-messages {\n  padding: 8px;\n}\n\n.addons-side-bar .sa-agent-composer {\n  padding: 6px 6px 8px;\n}\n\n.addons-side-bar .sa-agent-message-role {\n  display: none;\n}\n\n.addons-side-bar .sa-agent-bubble {\n  max-width: 100%;\n}\n\n.addons-side-bar .sa-agent-button {\n  min-height: 24px;\n  padding: 0 7px;\n}\n\n.addons-side-bar .sa-agent-input {\n  height: 20px;\n  min-height: 20px;\n  max-height: 120px;\n  padding: 0 4px;\n  font-size: 12px;\n  line-height: 20px;\n}\n\n.sa-agent-toggle-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n}\n\n.sa-agent-toggle-label {\n  font-size: 12px;\n  color: var(--text-primary-transparent);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button {\n  box-sizing: border-box;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 6px;\n  height: 24px;\n  min-height: 24px;\n  margin: 0;\n  padding: 0 12px;\n  border: 0;\n  border-top: 2px solid transparent;\n  border-right: 1px solid var(--ui-black-transparent);\n  border-bottom: 0;\n  border-left: 2px solid transparent;\n  border-radius: 0;\n  color: var(--text-primary-transparent);\n  background: var(--ui-white);\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  font-weight: normal;\n  line-height: 1;\n  white-space: nowrap;\n  transition: none;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button:hover {\n  background: var(--ui-primary);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active {\n  color: var(--looks-secondary) !important;\n  background: var(--ui-white) !important;\n  border-bottom: 2px solid var(--looks-secondary) !important;\n  font-weight: bold !important;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active:hover {\n  background: var(--ui-white) !important;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-label {\n  color: var(--looks-secondary) !important;\n  font-weight: bold !important;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button .sa-agent-toggle-icon {\n  width: 16px !important;\n  height: 16px !important;\n  margin: 0 !important;\n  filter: grayscale(100%) !important;\n  transition: filter 0.2s ease !important;\n}\n\n/* 仅在激活状态下图标恢复主题色，hover 状态保持灰度 */\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-icon {\n  filter: none !important;\n}\n\n/* VSCode 布局下的侧边栏按钮样式 - 严格对齐 SPA、AddToBar 与 Terminal 规范 */\n.sa-agent-toggle-tab.vscode-tab,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab {\n  box-sizing: border-box;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  width: 40px;\n  height: 40px !important;\n  min-width: 40px;\n  min-height: 40px !important;\n  flex-grow: 0;\n  flex-shrink: 0;\n  padding: 5px 0 !important;\n  margin: 0 !important;\n  border: 0 !important;\n  border-radius: 0 !important;\n  color: inherit;\n  background-color: transparent !important;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 0;\n  line-height: 0;\n  outline: none;\n  appearance: none;\n  position: relative;\n  transition: none;\n}\n\n.sa-agent-toggle-tab.vscode-tab:hover,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:hover {\n  border-color: transparent !important;\n}\n\n/* VSCode 侧边栏按钮图标 - 默认未激活状态为 100% 灰度 */\n.sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab img {\n  width: 22px;\n  height: auto;\n  margin: 0 !important;\n  filter: grayscale(100%);\n  -webkit-filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n/* VSCode 侧边栏按钮 hover 状态：规范只提升亮度（brightness(150%)），保持灰度，不包含饱和度 */\n.sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover img {\n  filter: brightness(150%) grayscale(100%) !important;\n  -webkit-filter: brightness(150%) grayscale(100%) !important;\n}\n\n.sa-agent-toggle-tab.vscode-tab:focus-visible,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:focus-visible {\n  outline: 2px solid var(--looks-secondary);\n  outline-offset: -2px;\n}\n\n/* VSCode 布局下按钮激活/选中状态：背景变白，左侧呈现主题强调色指示条 */\n.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active,\n.sa-agent-toggle-tab.vscode-tab.is-selected,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected {\n  background-color: var(--ui-white) !important;\n  box-shadow: inset 3px 0px 0px 0px var(--looks-secondary) !important;\n}\n\n/* 激活状态下图标恢复主题色（移除灰度，展现饱和度） */\n.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active img,\n.sa-agent-toggle-tab.vscode-tab.is-selected .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab.is-selected img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected img {\n  filter: grayscale(0%) !important;\n  -webkit-filter: grayscale(0%) !important;\n}\n\n.sa-agent-settings-panel {\n  display: none;\n  flex: 1;\n  flex-direction: column;\n  min-height: 0;\n  overflow-y: auto;\n  box-sizing: border-box;\n  padding: 10px 12px 12px;\n  color: var(--text-primary);\n  background: var(--ui-white);\n}\n\n.sa-agent-settings-header {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n  padding-bottom: 8px;\n  margin-bottom: 12px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-settings-back {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  min-width: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  transition: all 0.15s ease;\n}\n\n.sa-agent-settings-back:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-settings-back:active {\n  transform: scale(0.95);\n}\n\n.sa-agent-settings-back-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-settings-back:hover .sa-agent-settings-back-icon {\n  filter: none !important;\n}\n\n.sa-agent-settings-title {\n  font-size: 13px;\n  font-weight: bold;\n}\n\n.addons-bottom-panel .sa-agent-settings-panel {\n  width: 100%;\n  max-width: 960px;\n  align-self: center;\n}\n\n.addons-side-bar .sa-agent-settings-panel {\n  padding: 8px;\n}\n\n.sa-agent-settings {\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.sa-agent-settings-field {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.sa-agent-settings-field-toggle {\n  flex-direction: row;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  cursor: pointer;\n}\n\n.sa-agent-settings-label {\n  font-size: 12px;\n  font-weight: bold;\n  color: var(--text-primary);\n}\n\n.sa-agent-settings-input {\n  box-sizing: border-box;\n  width: 100%;\n  min-height: 32px;\n  padding: 6px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  font-family: inherit;\n  font-size: 12px;\n  transition: none;\n}\n\n.sa-agent-settings-input:focus {\n  border-color: var(--looks-secondary);\n}\n\n.sa-agent-settings-checkbox {\n  flex-shrink: 0;\n  width: 16px;\n  height: 16px;\n  margin: 2px 0;\n  align-self: flex-start;\n  cursor: pointer;\n}\n\n.sa-agent-settings-textarea {\n  min-height: 100px;\n  resize: vertical;\n  font-family: 'Courier New', monospace;\n}\n\n.sa-agent-settings-select {\n  height: auto;\n  min-height: 28px;\n  padding: 4px 6px;\n  cursor: pointer;\n}\n\n.sa-agent-settings-note {\n  font-size: 11px;\n  line-height: 1.4;\n  opacity: 0.7;\n}\n\n.sa-agent-settings-error {\n  color: #d93025;\n  font-size: 12px;\n}\n\n.sa-agent-settings-buttons {\n  display: flex;\n  justify-content: flex-end;\n  gap: 8px;\n  padding-top: 4px;\n}\n\n/* 内部滚动条统一规范：细长矩形（无圆角，现代 IDE 极简风格） */\n.sa-agent-container *::-webkit-scrollbar,\n.sa-agent-messages::-webkit-scrollbar,\n.sa-agent-settings-panel::-webkit-scrollbar,\n.sa-agent-conversation-list::-webkit-scrollbar,\n.sa-agent-session-panel::-webkit-scrollbar {\n  width: 4px !important;\n  height: 4px !important;\n}\n\n.sa-agent-container *::-webkit-scrollbar-track,\n.sa-agent-messages::-webkit-scrollbar-track,\n.sa-agent-settings-panel::-webkit-scrollbar-track,\n.sa-agent-conversation-list::-webkit-scrollbar-track,\n.sa-agent-session-panel::-webkit-scrollbar-track {\n  background: transparent !important;\n}\n\n.sa-agent-container *::-webkit-scrollbar-thumb,\n.sa-agent-messages::-webkit-scrollbar-thumb,\n.sa-agent-settings-panel::-webkit-scrollbar-thumb,\n.sa-agent-conversation-list::-webkit-scrollbar-thumb,\n.sa-agent-session-panel::-webkit-scrollbar-thumb {\n  border-radius: 0 !important;\n  background: rgba(128, 128, 128, 0.35) !important;\n  transition: background 0.15s ease;\n}\n\n.sa-agent-container *::-webkit-scrollbar-thumb:hover,\n.sa-agent-messages::-webkit-scrollbar-thumb:hover,\n.sa-agent-settings-panel::-webkit-scrollbar-thumb:hover,\n.sa-agent-conversation-list::-webkit-scrollbar-thumb:hover,\n.sa-agent-session-panel::-webkit-scrollbar-thumb:hover {\n  background: rgba(128, 128, 128, 0.6) !important;\n}\n\n.sa-agent-container *::-webkit-scrollbar-corner {\n  background: transparent !important;\n}\n\n.sa-agent-container,\n.sa-agent-container * {\n  scrollbar-width: thin;\n  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;\n}\n\n.sa-agent-md-table-wrap {\n  max-width: 100%;\n  margin: 8px 0;\n  overflow-x: auto;\n  -webkit-overflow-scrolling: touch;\n}\n\n.sa-agent-md-table {\n  width: max-content;\n  min-width: 100%;\n  border-collapse: collapse;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md-table th,\n.sa-agent-md-table td {\n  padding: 4px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  text-align: left;\n  vertical-align: top;\n}\n\n.sa-agent-md-table th {\n  font-weight: bold;\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-md-table tr:nth-child(even) td {\n  background: rgba(0, 0, 0, 0.04);\n}\n\n.sa-agent-md-table pre,\n.sa-agent-md-table code {\n  white-space: pre-wrap;\n}\n\n.sa-agent-md-task {\n  width: 14px;\n  height: 14px;\n  margin: 0 6px 0 0;\n  vertical-align: middle;\n  cursor: default;\n  accent-color: var(--looks-secondary);\n}\n\n.sa-agent-md-image {\n  display: inline-block;\n  padding: 1px 6px;\n  border: 1px dashed var(--ui-black-transparent);\n  border-radius: 3px;\n  font-size: 12px;\n  opacity: 0.85;\n}\n"],"sourceRoot":""}]);
 // Exports
 module.exports = ___CSS_LOADER_EXPORT___;
 
@@ -7523,6 +10364,58 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ },
 
+/***/ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-branch.svg"
+/*!****************************************************************************************!*\
+  !*** ./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-branch.svg ***!
+  \****************************************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+
+    const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <line x1=\"6\" y1=\"3\" x2=\"6\" y2=\"15\"></line>\n  <circle cx=\"18\" cy=\"6\" r=\"3\"></circle>\n  <circle cx=\"6\" cy=\"18\" r=\"3\"></circle>\n  <path d=\"M18 9a9 9 0 0 1-9 9\"></path>\n</svg>\n";
+
+    const getSRC = () => {
+        const recolored = typeof Recolor === 'object' ? (
+            original.replace(/#855cd6/gi, Recolor.primary)
+        ) : original;
+        return 'data:image/svg+xml;,' + encodeURIComponent(recolored);
+    };
+
+    /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (getSRC);
+
+
+/***/ },
+
+/***/ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-build.svg"
+/*!***************************************************************************************!*\
+  !*** ./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-build.svg ***!
+  \***************************************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+
+    const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"m15 12-8.5 8.5a2.12 2.12 0 1 1-3-3L12 9\"></path>\n  <path d=\"M17.64 15 22 10.64\"></path>\n  <path d=\"m20.91 9.26-1.4-1.4a2.78 2.78 0 0 0-3.93 0L14.5 9\"></path>\n  <path d=\"m9 14.5 1.14-1.08a2.78 2.78 0 0 0 0-3.93l-1.4-1.4\"></path>\n  <path d=\"M14 6.5 17.5 3\"></path>\n</svg>\n";
+
+    const getSRC = () => {
+        const recolored = typeof Recolor === 'object' ? (
+            original.replace(/#855cd6/gi, Recolor.primary)
+        ) : original;
+        return 'data:image/svg+xml;,' + encodeURIComponent(recolored);
+    };
+
+    /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (getSRC);
+
+
+/***/ },
+
 /***/ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-list.svg"
 /*!**************************************************************************************!*\
   !*** ./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-list.svg ***!
@@ -7536,6 +10429,58 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 
     const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <line x1=\"4\" y1=\"6\" x2=\"20\" y2=\"6\"></line>\n  <line x1=\"4\" y1=\"12\" x2=\"20\" y2=\"12\"></line>\n  <line x1=\"4\" y1=\"18\" x2=\"20\" y2=\"18\"></line>\n</svg>\n";
+
+    const getSRC = () => {
+        const recolored = typeof Recolor === 'object' ? (
+            original.replace(/#855cd6/gi, Recolor.primary)
+        ) : original;
+        return 'data:image/svg+xml;,' + encodeURIComponent(recolored);
+    };
+
+    /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (getSRC);
+
+
+/***/ },
+
+/***/ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-more.svg"
+/*!**************************************************************************************!*\
+  !*** ./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-more.svg ***!
+  \**************************************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+
+    const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <circle cx=\"12\" cy=\"12\" r=\"1.5\" fill=\"#855cd6\"></circle>\n  <circle cx=\"19\" cy=\"12\" r=\"1.5\" fill=\"#855cd6\"></circle>\n  <circle cx=\"5\" cy=\"12\" r=\"1.5\" fill=\"#855cd6\"></circle>\n</svg>\n";
+
+    const getSRC = () => {
+        const recolored = typeof Recolor === 'object' ? (
+            original.replace(/#855cd6/gi, Recolor.primary)
+        ) : original;
+        return 'data:image/svg+xml;,' + encodeURIComponent(recolored);
+    };
+
+    /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (getSRC);
+
+
+/***/ },
+
+/***/ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-plan.svg"
+/*!**************************************************************************************!*\
+  !*** ./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-plan.svg ***!
+  \**************************************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+
+    const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\"></rect>\n  <path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"></path>\n  <path d=\"m9 14 2 2 4-4\"></path>\n</svg>\n";
 
     const getSRC = () => {
         const recolored = typeof Recolor === 'object' ? (
@@ -7588,6 +10533,32 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 
     const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M12 20h9\"></path>\n  <path d=\"M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z\"></path>\n</svg>\n";
+
+    const getSRC = () => {
+        const recolored = typeof Recolor === 'object' ? (
+            original.replace(/#855cd6/gi, Recolor.primary)
+        ) : original;
+        return 'data:image/svg+xml;,' + encodeURIComponent(recolored);
+    };
+
+    /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (getSRC);
+
+
+/***/ },
+
+/***/ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-retry.svg"
+/*!***************************************************************************************!*\
+  !*** ./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-retry.svg ***!
+  \***************************************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+
+    const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"></path>\n  <path d=\"M3 3v5h5\"></path>\n  <path d=\"M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16\"></path>\n  <path d=\"M16 16h5v5\"></path>\n</svg>\n";
 
     const getSRC = () => {
         const recolored = typeof Recolor === 'object' ? (
@@ -7666,6 +10637,32 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 
     const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <polyline points=\"3 6 5 6 21 6\"></polyline>\n  <path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"></path>\n  <line x1=\"10\" y1=\"11\" x2=\"10\" y2=\"17\"></line>\n  <line x1=\"14\" y1=\"11\" x2=\"14\" y2=\"17\"></line>\n</svg>\n";
+
+    const getSRC = () => {
+        const recolored = typeof Recolor === 'object' ? (
+            original.replace(/#855cd6/gi, Recolor.primary)
+        ) : original;
+        return 'data:image/svg+xml;,' + encodeURIComponent(recolored);
+    };
+
+    /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (getSRC);
+
+
+/***/ },
+
+/***/ "./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-undo.svg"
+/*!**************************************************************************************!*\
+  !*** ./src/lib/tw-recolor/build.js!./src/addons/addons/astras-copilot/icon-undo.svg ***!
+  \**************************************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+
+    const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <path d=\"M3 7v6h6\"></path>\n  <path d=\"M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13\"></path>\n</svg>\n";
 
     const getSRC = () => {
         const recolored = typeof Recolor === 'object' ? (
