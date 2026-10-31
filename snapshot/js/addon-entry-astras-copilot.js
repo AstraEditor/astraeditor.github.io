@@ -93,6 +93,7 @@ const BLOCK_INPUTS = {
   looks_changesizeby: ['CHANGE'],
   looks_setsizeto: ['SIZE'],
   looks_goforwardbackward: ['NUM'],
+  looks_goforwardbackwardlayers: ['NUM'],
   motion_movesteps: ['STEPS'],
   motion_gotoxy: ['X', 'Y'],
   motion_goto: ['TO'],
@@ -233,7 +234,9 @@ const SHADOW_FIELD = {
   event_broadcast_menu: 'BROADCAST_OPTION',
   sound_sounds_menu: 'SOUND_MENU',
   sensing_of_object_menu: 'OBJECT',
-  colour_picker: 'COLOUR'
+  colour_picker: 'COLOUR',
+  note: 'NOTE',
+  matrix: 'MATRIX'
 };
 
 /** Menu shadows whose value should default to a project resource when omitted. */
@@ -276,7 +279,93 @@ const defaultLiteralFor = (opcode, inputName, ctx) => {
     if (resource === 'backdrop' && ctx.defaultBackdrop) return ctx.defaultBackdrop;
     if (resource === 'sound' && ctx.defaultSound) return ctx.defaultSound;
   }
+  if (inputName === 'BROADCAST_INPUT' && ctx && ctx.defaultBroadcast) return ctx.defaultBroadcast;
   return '';
+};
+
+/**
+ * Build the default shadow that should sit underneath a reporter in a value
+ * input. Without it, unplugging the reporter leaves an empty socket instead of
+ * restoring the normal input box.
+ * @param {string} opcode Parent block opcode.
+ * @param {string} inputName Input name.
+ * @param {object} ctx Resolution context.
+ * @returns {object|null} Shadow element, or null when no shadow is appropriate.
+ */
+const makeDefaultShadowForInput = (opcode, inputName, ctx) => {
+  if (BOOLEAN_INPUTS.has(inputName)) return null;
+  const literal = defaultLiteralFor(opcode, inputName, ctx);
+  const shadowType = pickShadowType(opcode, inputName, literal);
+  if (!shadowType) return null;
+  // Do not create an empty broadcast just to provide a shadow.
+  if (shadowType === 'event_broadcast_menu' && !literal) return null;
+  const value = shadowType === 'colour_picker' && !literal ? '#000000' : literal;
+  return makeExplicitShadow(shadowType, value, undefined, ctx);
+};
+
+/**
+ * Default literal for a shadow type chosen by the compiler for an extension
+ * reporter input.
+ * @param {string} shadowType Shadow type.
+ * @returns {string} Literal value.
+ */
+const defaultLiteralForShadowType = shadowType => {
+  if (shadowType === 'colour_picker') return '#000000';
+  if (shadowType === 'note') return '60';
+  if (shadowType.startsWith('math_')) return '0';
+  return '';
+};
+
+/**
+ * Build the shadow underneath a reporter input, preferring the compiler's
+ * explicit extension shadow hint.
+ * @param {string} opcode Parent block opcode.
+ * @param {string} inputName Input name.
+ * @param {object} value Reporter descriptor.
+ * @param {object} ctx Resolution context.
+ * @returns {object|null} Shadow element.
+ */
+const makeShadowForReporterValue = (opcode, inputName, value, ctx) => {
+  if (value && typeof value.__defaultShadow === 'string') {
+    return makeExplicitShadow(value.__defaultShadow, defaultLiteralForShadowType(value.__defaultShadow), undefined, ctx);
+  }
+  return makeDefaultShadowForInput(opcode, inputName, ctx);
+};
+
+/**
+ * Build a field node, resolving variable/list/broadcast names to ids.
+ * @param {string} fieldName Field name.
+ * @param {*} value Field value.
+ * @param {object} ctx Resolution context.
+ * @returns {object} Field element node.
+ */
+const makeFieldNode = (fieldName, value, ctx) => {
+  let rawValue = value;
+  let scope = null;
+  if (value && typeof value === 'object' && typeof value.__name === 'string') {
+    rawValue = value.__name;
+    scope = value.__scope || null;
+  }
+  let attrs = {
+    name: fieldName
+  };
+  let text = String(rawValue === undefined || rawValue === null ? '' : rawValue);
+  if (fieldName === 'VARIABLE' || fieldName === 'LIST' || fieldName === 'BROADCAST_OPTION') {
+    const resolved = ctx && ctx.resolveField ? ctx.resolveField(fieldName, rawValue, scope) : null;
+    if (resolved) {
+      attrs = {
+        name: fieldName,
+        id: resolved.id,
+        variabletype: resolved.type || ''
+      };
+      text = resolved.name;
+    }
+  }
+  return {
+    tag: 'field',
+    attrs,
+    text
+  };
 };
 const makeShadow = (opcode, inputName, value, ctx) => {
   const shadowType = pickShadowType(opcode, inputName, value);
@@ -288,43 +377,50 @@ const makeShadow = (opcode, inputName, value, ctx) => {
     attrs: {
       type: shadowType
     },
-    children: [{
-      tag: 'field',
-      attrs: {
-        name: fieldName
-      },
-      text: String(text)
-    }]
+    children: [makeFieldNode(fieldName, text, ctx)]
   };
 };
-const makeFieldBlock = (opcode, fieldName, value, ctx) => {
-  let fieldAttrs = {
-    name: fieldName
-  };
-  let text = String(value === undefined || value === null ? '' : value);
-  if (fieldName === 'VARIABLE' || fieldName === 'LIST' || fieldName === 'BROADCAST_OPTION') {
-    const resolved = ctx && ctx.resolveField ? ctx.resolveField(fieldName, value) : null;
-    if (resolved) {
-      fieldAttrs = {
-        name: fieldName,
-        id: resolved.id,
-        variabletype: resolved.type || ''
-      };
-      text = resolved.name;
-    }
+
+/**
+ * Build a shadow with an explicitly chosen type (used by the Scrathon compiler).
+ * Broadcast inputs resolve their variable id through the context so the VM
+ * learns about the broadcast; extension menu inputs may pass an explicit field
+ * name (the menu name). All other types store a plain literal.
+ * @param {string} shadowType Shadow block type.
+ * @param {*} value Literal value.
+ * @param {string} [explicitField] Explicit field name (extension menus).
+ * @param {object} ctx Resolution context.
+ * @returns {object} Shadow element node.
+ */
+const makeExplicitShadow = (shadowType, value, explicitField, ctx) => {
+  const fieldName = explicitField || SHADOW_FIELD[shadowType] || 'TEXT';
+  if (fieldName === 'BROADCAST_OPTION') {
+    return makeFieldShadow('event_broadcast_menu', fieldName, value, ctx);
   }
+  let text = value === undefined || value === null ? '' : String(value);
+  if (shadowType.startsWith('math_')) text = String(Number(value) || 0);
   return {
-    tag: 'block',
+    tag: 'shadow',
     attrs: {
-      type: opcode
+      type: shadowType
     },
-    children: [{
-      tag: 'field',
-      attrs: fieldAttrs,
-      text
-    }]
+    children: [makeFieldNode(fieldName, text, ctx)]
   };
 };
+const makeFieldShadow = (opcode, fieldName, value, ctx) => ({
+  tag: 'shadow',
+  attrs: {
+    type: opcode
+  },
+  children: [makeFieldNode(fieldName, value, ctx)]
+});
+const makeFieldBlock = (opcode, fieldName, value, ctx) => ({
+  tag: 'block',
+  attrs: {
+    type: opcode
+  },
+  children: [makeFieldNode(fieldName, value, ctx)]
+});
 const serializeMutation = mutation => {
   const attrs = {};
   for (const _ref of Object.entries(mutation)) {
@@ -358,7 +454,38 @@ const buildBlock = (desc, ctx, warnings) => {
     children: []
   };
 
-  // 1. Pre-create default value inputs so the block is structurally complete.
+  // 1. Mutation first. Procedure calls create their argument inputs and
+  //    statement connections from the mutation, so it must be applied before
+  //    Blockly parses the <value> and <next> children.
+  if (isPlainObject(desc.mutation)) {
+    if (opcode === 'procedures_definition') {
+      blockEl.children.push({
+        tag: 'statement',
+        attrs: {
+          name: 'custom_block'
+        },
+        children: [{
+          tag: 'shadow',
+          attrs: {
+            type: 'procedures_prototype'
+          },
+          children: [{
+            tag: 'mutation',
+            attrs: serializeMutation(desc.mutation),
+            children: []
+          }]
+        }]
+      });
+    } else {
+      blockEl.children.push({
+        tag: 'mutation',
+        attrs: serializeMutation(desc.mutation),
+        children: []
+      });
+    }
+  }
+
+  // 2. Pre-create default value inputs so the block is structurally complete.
   const required = BLOCK_INPUTS[opcode] || [];
   const providedInputs = isPlainObject(desc.inputs) ? desc.inputs : {};
   for (const inputName of required) {
@@ -373,7 +500,7 @@ const buildBlock = (desc, ctx, warnings) => {
     });
   }
 
-  // 2. Explicit inputs.
+  // 3. Explicit inputs.
   for (const _ref3 of Object.entries(providedInputs)) {
     var _ref4 = _slicedToArray(_ref3, 2);
     const inputName = _ref4[0];
@@ -386,11 +513,23 @@ const buildBlock = (desc, ctx, warnings) => {
       children: []
     };
     if (isPlainObject(value) && typeof value.opcode === 'string') {
+      // Keep the normal input box underneath the reporter so unplugging it
+      // restores the shadow instead of leaving an empty socket.
+      const shadow = makeShadowForReporterValue(opcode, inputName, value, ctx);
+      if (shadow) valueEl.children.push(shadow);
       valueEl.children.push(buildBlock(value, ctx, warnings));
     } else if (isPlainObject(value) && 'variable' in value) {
+      const shadow = makeDefaultShadowForInput(opcode, inputName, ctx);
+      if (shadow) valueEl.children.push(shadow);
       valueEl.children.push(makeFieldBlock('data_variable', 'VARIABLE', value.variable, ctx));
     } else if (isPlainObject(value) && 'list' in value) {
+      const shadow = makeDefaultShadowForInput(opcode, inputName, ctx);
+      if (shadow) valueEl.children.push(shadow);
       valueEl.children.push(makeFieldBlock('data_listcontents', 'LIST', value.list, ctx));
+    } else if (isPlainObject(value) && typeof value.__shadow === 'string') {
+      // Explicit shadow type (used by the Scrathon compiler for extension menus
+      // and broadcast inputs whose shadow type is not in the static tables).
+      valueEl.children.push(makeExplicitShadow(value.__shadow, value.value, value.__field, ctx));
     } else if (value === null || value === undefined) {
       if (!BOOLEAN_INPUTS.has(inputName)) {
         valueEl.children.push(makeShadow(opcode, inputName, '', ctx));
@@ -401,38 +540,14 @@ const buildBlock = (desc, ctx, warnings) => {
     blockEl.children.push(valueEl);
   }
 
-  // 3. Fields (dropdown / variable / list / broadcast).
+  // 4. Fields (dropdown / variable / list / broadcast).
   if (isPlainObject(desc.fields)) {
     for (const _ref5 of Object.entries(desc.fields)) {
       var _ref6 = _slicedToArray(_ref5, 2);
       const fieldName = _ref6[0];
       const value = _ref6[1];
-      const field = {
-        tag: 'field',
-        attrs: {
-          name: fieldName
-        },
-        text: String(value !== null && value !== void 0 ? value : '')
-      };
-      if (fieldName === 'VARIABLE' || fieldName === 'LIST' || fieldName === 'BROADCAST_OPTION') {
-        const resolved = ctx && ctx.resolveField ? ctx.resolveField(fieldName, value) : null;
-        if (resolved) {
-          field.attrs.id = resolved.id;
-          field.attrs.variabletype = resolved.type || '';
-          field.text = resolved.name;
-        }
-      }
-      blockEl.children.push(field);
+      blockEl.children.push(makeFieldNode(fieldName, value, ctx));
     }
-  }
-
-  // 4. Mutation (custom blocks / advanced blocks).
-  if (isPlainObject(desc.mutation)) {
-    blockEl.children.push({
-      tag: 'mutation',
-      attrs: serializeMutation(desc.mutation),
-      children: []
-    });
   }
 
   // 5. Substack / else branch.
@@ -477,7 +592,9 @@ const buildStack = (descriptors, ctx, warnings) => {
   const elements = descriptors.filter(Boolean).map(desc => buildBlock(desc, ctx, warnings));
   if (elements.length === 0) return null;
   for (let i = elements.length - 1; i > 0; i--) {
-    elements[i - 1].children.unshift({
+    // Append the next link after fields/inputs/mutation. Procedure calls in
+    // particular only gain their nextConnection when their mutation is applied.
+    elements[i - 1].children.push({
       tag: 'next',
       attrs: {},
       children: [elements[i]]
@@ -599,6 +716,7 @@ const describeCoreBlocks = function describeCoreBlocks() {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   buildRequestBody: () => (/* binding */ buildRequestBody),
 /* harmony export */   callChatCompletion: () => (/* binding */ callChatCompletion)
 /* harmony export */ });
 function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
@@ -922,58 +1040,39 @@ const readStreamingResponse = async (response, onDelta, onReasoning, idleTimeout
 };
 
 /**
- * HTTP status codes that warrant retrying the request.
- */
-const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
-
-/**
- * Whether an error is transient and worth retrying.
+ * Whether an error should be retried.
+ * API request errors (such as HTTP 404, 502, or application errors with status code) must NOT be retried.
+ * User aborts must NOT be retried.
+ * Other errors (empty response, network timeout, stream drops, parse error, etc.) must be retried.
  * @param {Error} error Error to inspect.
  * @returns {boolean} Whether the request should be retried.
  */
 const isRetryableError = error => {
   if (!error) return false;
+  // User explicitly aborted the request
   if (error.name === 'AbortError') return false;
-  if (error.name === 'TimeoutError') return true;
-  if (Number.isInteger(error.status)) {
-    // status 0 means the API reported an application error, not an HTTP status.
-    if (error.status === 0) return false;
-    return RETRYABLE_STATUS.has(error.status);
-  }
-  // Network failures and unparseable responses are transient by default.
+  // API request errors: HTTP status codes (e.g. 404, 502, 500) or application errors (status 0)
+  if (Number.isInteger(error.status)) return false;
+  // All other errors (empty response, network timeout, stream failures, etc.) must be retried
   return true;
 };
 
 /**
- * Perform one chat-completions attempt.
+ * Build the chat-completions request body.
+ * Shared by the real request path and the settings preview so both always match.
  * @param {object} options Options.
  * @param {object} options.config Agent configuration.
  * @param {Array<object>} options.messages Chat messages.
- * @param {Array<object>} options.tools Tool definitions.
- * @param {AbortSignal} options.signal Abort signal.
- * @param {Function} [options.onDelta] Content delta callback.
- * @param {Function} [options.onReasoning] Reasoning-content delta callback.
- * @returns {Promise<object>} Assistant message.
+ * @param {Array<object>} [options.tools] Tool definitions.
+ * @param {boolean} [options.stream] Whether to stream; defaults to config.stream.
+ * @returns {object} Request body.
  */
-const attemptRequest = async _ref3 => {
+const buildRequestBody = _ref3 => {
   let config = _ref3.config,
     messages = _ref3.messages,
     tools = _ref3.tools,
-    signal = _ref3.signal,
-    onDelta = _ref3.onDelta,
-    onReasoning = _ref3.onReasoning;
-  let url;
-  try {
-    url = new URL(config.apiUrl);
-  } catch (error) {
-    throw new Error('API URL is invalid.');
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('API URL must use HTTP or HTTPS.');
-  }
-  const wantsStream = config.stream !== false;
-  const headers = buildHeaders(config);
-  if (wantsStream) headers.Accept = 'text/event-stream';
+    stream = _ref3.stream;
+  const wantsStream = typeof stream === 'boolean' ? stream : config.stream !== false;
   const body = {
     model: config.model,
     messages,
@@ -981,10 +1080,45 @@ const attemptRequest = async _ref3 => {
     max_tokens: Math.max(1, Math.min(32000, Number(config.maxTokens) || 3000)),
     stream: wantsStream
   };
+  if (config.reasoningEffort && config.reasoningEffort !== 'default') {
+    body.reasoning_effort = config.reasoningEffort;
+  }
   if (Array.isArray(tools) && tools.length > 0) {
     body.tools = tools;
     body.tool_choice = 'auto';
   }
+  return body;
+};
+
+/**
+ * Perform one chat-completions attempt.
+ * @param {object} options Options.
+ * @param {object} options.config Agent configuration.
+ * @param {URL} options.url Validated API URL.
+ * @param {Array<object>} options.messages Chat messages.
+ * @param {Array<object>} options.tools Tool definitions.
+ * @param {AbortSignal} options.signal Abort signal.
+ * @param {Function} [options.onDelta] Content delta callback.
+ * @param {Function} [options.onReasoning] Reasoning-content delta callback.
+ * @returns {Promise<object>} Assistant message.
+ */
+const attemptRequest = async _ref4 => {
+  let config = _ref4.config,
+    url = _ref4.url,
+    messages = _ref4.messages,
+    tools = _ref4.tools,
+    signal = _ref4.signal,
+    onDelta = _ref4.onDelta,
+    onReasoning = _ref4.onReasoning;
+  const wantsStream = config.stream !== false;
+  const headers = buildHeaders(config);
+  if (wantsStream) headers.Accept = 'text/event-stream';
+  const body = buildRequestBody({
+    config,
+    messages,
+    tools,
+    stream: wantsStream
+  });
   const response = await fetch(url.toString(), {
     method: 'POST',
     headers,
@@ -999,6 +1133,7 @@ const attemptRequest = async _ref3 => {
   }
   const contentType = (response.headers.get('content-type') || '').toLowerCase();
   const isSse = contentType.includes('text/event-stream');
+  let result;
   if (contentType.includes('application/json') || !wantsStream && !isSse) {
     const data = await response.json();
     if (data && data.error) {
@@ -1008,10 +1143,19 @@ const attemptRequest = async _ref3 => {
     }
     const choice = data && Array.isArray(data.choices) ? data.choices[0] : null;
     if (!choice || !choice.message) throw new Error('The API returned no assistant message.');
-    return normalizeAssistantMessage(choice.message, data.usage);
+    result = normalizeAssistantMessage(choice.message, data.usage);
+  } else {
+    const idleTimeoutMs = Math.max(0, Number(config.streamIdleTimeoutMs) || 30000);
+    result = await readStreamingResponse(response, onDelta, onReasoning, idleTimeoutMs);
   }
-  const idleTimeoutMs = Math.max(0, Number(config.streamIdleTimeoutMs) || 30000);
-  return readStreamingResponse(response, onDelta, onReasoning, idleTimeoutMs);
+
+  // Treat empty assistant responses (no tool calls and no text content) as retryable errors
+  const hasToolCalls = Array.isArray(result.toolCalls) && result.toolCalls.length > 0;
+  const hasContent = typeof result.content === 'string' && result.content.trim().length > 0;
+  if (!hasToolCalls && !hasContent) {
+    throw new Error('The model returned an empty response.');
+  }
+  return result;
 };
 
 /**
@@ -1029,22 +1173,32 @@ const attemptRequest = async _ref3 => {
  * @param {Function} [options.onRetry] Retry notification callback.
  * @returns {Promise<object>} Assistant message.
  */
-const callChatCompletion = async _ref4 => {
-  let config = _ref4.config,
-    messages = _ref4.messages,
-    tools = _ref4.tools,
-    signal = _ref4.signal,
-    onDelta = _ref4.onDelta,
-    onReasoning = _ref4.onReasoning,
-    onRetry = _ref4.onRetry;
+const callChatCompletion = async _ref5 => {
+  let config = _ref5.config,
+    messages = _ref5.messages,
+    tools = _ref5.tools,
+    signal = _ref5.signal,
+    onDelta = _ref5.onDelta,
+    onReasoning = _ref5.onReasoning,
+    onRetry = _ref5.onRetry;
   if (!config.apiUrl) throw new Error('API URL is not configured.');
   if (!config.model) throw new Error('Model is not configured.');
+  let url;
+  try {
+    url = new URL(config.apiUrl);
+  } catch (error) {
+    throw new Error('API URL is invalid.');
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('API URL must use HTTP or HTTPS.');
+  }
   const retries = Number.isFinite(Number(config.retries)) ? Math.max(0, Math.min(5, Number(config.retries))) : 2;
   let attempt = 0;
   for (;;) {
     try {
       return await attemptRequest({
         config,
+        url,
         messages,
         tools,
         signal,
@@ -1679,6 +1833,9 @@ const countScriptBlocks = (target, rootId) => {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   MAX_CONTEXT_MESSAGES: () => (/* binding */ MAX_CONTEXT_MESSAGES),
+/* harmony export */   buildApiMessages: () => (/* binding */ buildApiMessages),
+/* harmony export */   buildRequestPreview: () => (/* binding */ buildRequestPreview),
+/* harmony export */   getActiveTools: () => (/* binding */ getActiveTools),
 /* harmony export */   runAgent: () => (/* binding */ runAgent)
 /* harmony export */ });
 /* harmony import */ var _client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./client.js */ "./src/addons/addons/astras-copilot/agent/client.js");
@@ -1686,6 +1843,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _prompt_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./prompt.js */ "./src/addons/addons/astras-copilot/agent/prompt.js");
 /* harmony import */ var _tools_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./tools.js */ "./src/addons/addons/astras-copilot/agent/tools.js");
 /* harmony import */ var _trace_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./trace.js */ "./src/addons/addons/astras-copilot/agent/trace.js");
+/* harmony import */ var _scrathon_diff_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./scrathon/diff.js */ "./src/addons/addons/astras-copilot/agent/scrathon/diff.js");
+
 
 
 
@@ -1761,6 +1920,63 @@ const throwIfAborted = signal => {
 };
 
 /**
+ * Build the system + conversation messages sent to the model.
+ * @param {object} options Options.
+ * @param {Array<object>} options.messages Chat history.
+ * @param {boolean} [options.writeEnabled] Whether edit tools are available.
+ * @returns {Array<object>} API messages.
+ */
+const buildApiMessages = _ref => {
+  let messages = _ref.messages,
+    _ref$writeEnabled = _ref.writeEnabled,
+    writeEnabled = _ref$writeEnabled === void 0 ? false : _ref$writeEnabled;
+  return [{
+    role: 'system',
+    content: (0,_prompt_js__WEBPACK_IMPORTED_MODULE_2__.buildSystemPrompt)({
+      writeEnabled
+    })
+  }, ...messages.filter(message => message && (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string' && message.content.trim().length > 0).slice(-MAX_CONTEXT_MESSAGES).map(message => ({
+    role: message.role,
+    content: message.content
+  }))];
+};
+
+/**
+ * Select the tool definitions exposed to the model.
+ * @param {boolean} [writeEnabled] Whether edit tools are available.
+ * @returns {Array<object>} Active tool definitions.
+ */
+const getActiveTools = function getActiveTools() {
+  let writeEnabled = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+  if (writeEnabled) return _tools_js__WEBPACK_IMPORTED_MODULE_3__.TOOL_DEFINITIONS;
+  return _tools_js__WEBPACK_IMPORTED_MODULE_3__.TOOL_DEFINITIONS.filter(definition => !_tools_js__WEBPACK_IMPORTED_MODULE_3__.WRITE_TOOL_NAMES.includes(definition.function.name));
+};
+
+/**
+ * Build the exact request body that the next send would use.
+ * Used by the settings panel's request preview.
+ * @param {object} options Options.
+ * @param {object} options.config Agent configuration.
+ * @param {Array<object>} options.messages Chat history.
+ * @param {boolean} [options.writeEnabled] Whether edit tools are available.
+ * @returns {object} Request body.
+ */
+const buildRequestPreview = _ref2 => {
+  let config = _ref2.config,
+    messages = _ref2.messages,
+    _ref2$writeEnabled = _ref2.writeEnabled,
+    writeEnabled = _ref2$writeEnabled === void 0 ? false : _ref2$writeEnabled;
+  return (0,_client_js__WEBPACK_IMPORTED_MODULE_0__.buildRequestBody)({
+    config,
+    messages: buildApiMessages({
+      messages,
+      writeEnabled
+    }),
+    tools: getActiveTools(writeEnabled)
+  });
+};
+
+/**
  * Run the Astra Copilot agent loop with approval-gated tools.
  * @param {object} options Options.
  * @param {object} options.vm Scratch VM.
@@ -1773,29 +1989,24 @@ const throwIfAborted = signal => {
  * @param {number} [options.maxSteps] Maximum tool steps.
  * @returns {Promise<object>} Final result.
  */
-const runAgent = async _ref => {
-  let vm = _ref.vm,
-    config = _ref.config,
-    messages = _ref.messages,
-    signal = _ref.signal,
-    onEvent = _ref.onEvent,
-    requestApproval = _ref.requestApproval,
-    _ref$writeEnabled = _ref.writeEnabled,
-    writeEnabled = _ref$writeEnabled === void 0 ? false : _ref$writeEnabled,
-    _ref$maxSteps = _ref.maxSteps,
-    maxSteps = _ref$maxSteps === void 0 ? 8 : _ref$maxSteps;
+const runAgent = async _ref3 => {
+  let vm = _ref3.vm,
+    config = _ref3.config,
+    messages = _ref3.messages,
+    signal = _ref3.signal,
+    onEvent = _ref3.onEvent,
+    requestApproval = _ref3.requestApproval,
+    _ref3$writeEnabled = _ref3.writeEnabled,
+    writeEnabled = _ref3$writeEnabled === void 0 ? false : _ref3$writeEnabled,
+    _ref3$maxSteps = _ref3.maxSteps,
+    maxSteps = _ref3$maxSteps === void 0 ? 8 : _ref3$maxSteps;
   const tools = (0,_tools_js__WEBPACK_IMPORTED_MODULE_3__.createScratchTools)(vm);
-  const activeTools = writeEnabled ? _tools_js__WEBPACK_IMPORTED_MODULE_3__.TOOL_DEFINITIONS : _tools_js__WEBPACK_IMPORTED_MODULE_3__.TOOL_DEFINITIONS.filter(definition => !_tools_js__WEBPACK_IMPORTED_MODULE_3__.WRITE_TOOL_NAMES.includes(definition.function.name));
-  const apiMessages = [{
-    role: 'system',
-    content: (0,_prompt_js__WEBPACK_IMPORTED_MODULE_2__.buildSystemPrompt)({
-      writeEnabled
-    })
-  }, ...messages.filter(message => message && (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string' && message.content.trim().length > 0).slice(-MAX_CONTEXT_MESSAGES).map(message => ({
-    role: message.role,
-    content: message.content
-  }))];
-  const stepLimit = Math.max(1, Math.min(12, Number(maxSteps) || 8));
+  const activeTools = getActiveTools(writeEnabled);
+  const apiMessages = buildApiMessages({
+    messages,
+    writeEnabled
+  });
+  const stepLimit = Math.max(1, Math.min(25, Number(maxSteps) || 16));
   const trace = [];
   const lastUserMessage = [...messages].reverse().find(message => message && message.role === 'user');
   const wantsIds = Boolean(lastUserMessage && asksForIds(lastUserMessage.content));
@@ -1877,6 +2088,14 @@ const runAgent = async _ref => {
         args,
         status: canRun ? 'awaiting' : 'pending'
       };
+      if (canRun && (toolName === 'apply_scripts' || toolName === 'delete_scripts')) {
+        try {
+          const diff = (0,_scrathon_diff_js__WEBPACK_IMPORTED_MODULE_5__.computeToolDiff)(vm, toolName, args);
+          if (diff) entry.diff = diff;
+        } catch (error) {
+          // Diff calculation is best effort and must not break the agent loop.
+        }
+      }
       trace.push(entry);
       const traceIndex = trace.length - 1;
       if (canRun) {
@@ -1885,6 +2104,7 @@ const runAgent = async _ref => {
           name: toolName,
           id: toolCall.id,
           args,
+          diff: entry.diff,
           traceIndex
         });
         let approved = false;
@@ -1894,6 +2114,7 @@ const runAgent = async _ref => {
             args,
             id: toolCall.id,
             traceIndex,
+            diff: entry.diff,
             signal
           }) : false;
         } catch (error) {
@@ -1915,6 +2136,7 @@ const runAgent = async _ref => {
             ok: false,
             denied: true,
             args,
+            diff: entry.diff,
             summary: entry.summary,
             preview: entry.preview,
             traceIndex
@@ -1946,8 +2168,9 @@ const runAgent = async _ref => {
         result = await handler(args);
       } catch (error) {
         succeeded = false;
+        const message = error && typeof error.format === 'function' ? error.format() : error && error.message ? error.message : String(error);
         result = {
-          error: error && error.message ? error.message : String(error)
+          error: message
         };
       }
       throwIfAborted(signal);
@@ -1961,6 +2184,7 @@ const runAgent = async _ref => {
         id: toolCall.id,
         ok: succeeded,
         args,
+        diff: entry.diff,
         summary: entry.summary,
         preview: entry.preview,
         traceIndex
@@ -1974,7 +2198,72 @@ const runAgent = async _ref => {
       });
     }
   }
-  throw new Error('The agent reached the maximum number of tool steps.');
+
+  // When stepLimit is reached, request one final plain-text completion without tools
+  // so the agent can provide a coherent explanation of what was done and what remains.
+  try {
+    emitEvent(onEvent, {
+      type: 'thinking',
+      step: stepLimit + 1
+    });
+    emitEvent(onEvent, {
+      type: 'stream-start',
+      step: stepLimit + 1,
+      sanitize: !wantsIds
+    });
+    const finalResponse = await (0,_client_js__WEBPACK_IMPORTED_MODULE_0__.callChatCompletion)({
+      config,
+      messages: [...apiMessages, {
+        role: 'user',
+        content: 'You have reached the tool step limit. Please summarize the actions you took and provide your final response to the user.'
+      }],
+      tools: undefined,
+      signal,
+      onDelta: delta => emitEvent(onEvent, {
+        type: 'stream-delta',
+        delta,
+        step: stepLimit + 1
+      }),
+      onReasoning: delta => emitEvent(onEvent, {
+        type: 'reasoning-delta',
+        delta,
+        step: stepLimit + 1
+      })
+    });
+    throwIfAborted(signal);
+    emitEvent(onEvent, {
+      type: 'stream-end',
+      step: stepLimit + 1
+    });
+    const content = finalResponse && finalResponse.content ? finalResponse.content.trim() : '';
+    const finalContent = wantsIds ? content : (0,_dsl_js__WEBPACK_IMPORTED_MODULE_1__.replaceInternalIds)(vm, content);
+    if (finalContent) {
+      emitEvent(onEvent, {
+        type: 'assistant-step',
+        step: stepLimit + 1,
+        content: finalContent,
+        reasoning: finalResponse.reasoning || ''
+      });
+      return {
+        content: finalContent,
+        usage: finalResponse.usage,
+        trace
+      };
+    }
+  } catch (error) {
+    if (signal && signal.aborted) throw createAbortError();
+  }
+  const fallbackMsg = 'The agent completed the maximum allowed tool steps. Please review the actions taken in the trace above.';
+  emitEvent(onEvent, {
+    type: 'assistant-step',
+    step: stepLimit + 1,
+    content: fallbackMsg,
+    reasoning: ''
+  });
+  return {
+    content: fallbackMsg,
+    trace
+  };
 };
 
 /***/ },
@@ -2409,16 +2698,5295 @@ const buildSystemPrompt = function buildSystemPrompt() {
   let _ref = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
     _ref$writeEnabled = _ref.writeEnabled,
     writeEnabled = _ref$writeEnabled === void 0 ? false : _ref$writeEnabled;
-  const lines = ['You are Astra Copilot, a coding copilot for Scratch 3 projects inside AstraEditor.', 'Your job is to help the user understand, debug, review, and improve the current Scratch project.', '', 'Tool policy:', '- Do not inspect the project automatically. Never read the project just because a conversation started.', '- Call a read-only tool only when the user asks you to inspect, explain, debug, review, compare, or modify project content, or when the answer genuinely cannot be given without project data.', '- For general Scratch questions, answer from your own knowledge without calling tools.', '- If the request is vague, ask a clarifying question instead of reading the whole project.', '- Use the narrowest and most suitable tool needed:', '  * Use get_project_summary when the user asks for high-level structure, sprite counts, global variables, or loaded extensions.', '  * Use list_targets to list all sprites and identify the currently selected sprite.', '  * Use get_target to view details of a specific sprite (costumes, sounds, local variables).', '  * Use list_scripts to inspect the list of scripts and their hat blocks in a sprite.', '  * Use get_script to retrieve the complete Scratch DSL code of a specific script.', '  * Use search_blocks to locate specific blocks by opcode, text, or variable.', '  * Use get_runtime_state when asked if the project is running or to check active thread execution.', '  * Use get_extension_source when the user asks how a loaded extension works to read its block metadata and source code.', '  * Use block_catalog to look up exact opcodes, default fields, and input signatures.', '- Every tool call requires explicit user approval in the UI. If the user denies a call, do not retry it or work around the denial.', '- If a tool fails, explain the failure and ask how the user wants to proceed.', ''];
+  const lines = ['You are Astra Copilot, a coding copilot for Scratch 3 projects inside AstraEditor.', 'Your job is to help the user understand, debug, review, and improve the current Scratch project.', '', 'Tool policy:', '- Do not inspect the project automatically. Never read the project just because a conversation started.', '- Call a read-only tool only when the user asks you to inspect, explain, debug, review, compare, or modify project content, or when the answer genuinely cannot be given without project data.', '- For general Scratch questions, answer from your own knowledge without calling tools.', '- If the request is vague, ask a clarifying question instead of reading the whole project.', '- Use the narrowest and most suitable tool needed:', '  * Use get_project_summary when the user asks for high-level structure, sprite counts, global variables, or loaded extensions.', '  * Use list_targets to list all sprites and identify the currently selected sprite.', '  * Use get_target to view details of a specific sprite (costumes, sounds, local variables).', '  * Use list_scripts to inspect the list of scripts and their hat blocks in a sprite.', '  * Use get_script to retrieve the complete code of a specific script, in both plain-English DSL and Scrathon.', '  * Use search_blocks to locate specific blocks by opcode, text, or variable.', '  * Use get_runtime_state when asked if the project is running or to check active thread execution.', '  * Use get_extension_source when the user asks how a loaded extension works to read its block metadata and source code.', '  * Use block_catalog to look up exact Scrathon DSL instruction names, hat decorators, and argument signatures.', '- Every tool call requires explicit user approval in the UI. If the user denies a call, do not retry it or work around the denial.', '- If a tool fails, explain the failure and ask how the user wants to proceed.', ''];
   lines.push('Environment & Network boundaries:', '- You run completely locally within AstraEditor. You do NOT have internet access, web search engines, or URL fetching capabilities.', '- Never claim, assume, or pretend that you can browse the web, visit online links, or fetch live internet data.', '- Only call tools that are explicitly provided in your tool definitions. Never invent non-existent tool names.', '- For general Scratch, programming, logic, or math questions, answer directly from your own built-in pre-trained knowledge base.', '- For project-specific questions, rely strictly on the provided local Scratch inspection tools.', '');
   if (writeEnabled) {
-    lines.push('Editing the project (Build Mode is ACTIVE):', '- You may modify the project with apply_scripts, delete_scripts, create_variable and rename_target. These are real edits: the user sees them in the editor and can undo them with Ctrl+Z.', '- Before editing, inspect first: use list_scripts/get_script or get_target so you know the real sprite, script and block names. Never invent them.', '- Work in small, verifiable steps. Apply one clear change at a time, then briefly say what you changed.', '- Use block_catalog when unsure about an exact opcode or input name.', '- apply_scripts only ADDS the blocks you provide; it never deletes existing scripts. To remove code, use delete_scripts with IDs from list_scripts.', '- To change existing code, prefer adding a corrected script (and deleting the old one if asked) over guessing how to patch deeply nested blocks.', '- After editing, state which sprite changed and what the new behaviour is. Do not claim a change succeeded if a tool returned an error.', '- Still respect every approval prompt; the user can reject an edit and you must not retry it.', '');
+    lines.push('Editing the project (Build Mode is ACTIVE):', '- You may modify the project with apply_scripts, delete_scripts, create_variable and rename_target. These are real edits: the user sees them in the editor and can undo them with Ctrl+Z.', '- Before editing, inspect first: use list_scripts/get_script or get_target so you know the real sprite, script and block names. Never invent them.', '- Prefer writing code with apply_scripts\' `code` parameter using Scrathon (see "Scrathon syntax" below). It is strict and compiled 1:1 to blocks.', '- Work in small, verifiable steps. Apply one clear change at a time, then briefly say what you changed.', '- Use block_catalog when unsure about an exact Scrathon instruction name or signature.', '- apply_scripts only ADDS the blocks you provide; it never deletes existing scripts. To remove code, use delete_scripts with IDs from list_scripts.', '- To change existing code, prefer adding a corrected script (and deleting the old one if asked) over guessing how to patch deeply nested blocks.', '- After editing, state which sprite changed and what the new behaviour is. Do not claim a change succeeded if a tool returned an error.', '- Still respect every approval prompt; the user can reject an edit and you must not retry it.', '');
   } else {
-    lines.push('Plan Mode (Read-only mode is ACTIVE):', '- You are currently in Plan Mode. You cannot apply changes to the project directly. When suggesting a fix, review, or architecture, describe the exact sprite, script, and blocks the user should change, and do not claim that you changed anything.', '- If the user asks you to directly create, edit, or delete blocks/scripts in the project, explain that you are in Plan Mode and remind them to switch to "Build Mode" (构建模式) via the mode button at the bottom of the input card.', '');
+    lines.push('Plan Mode (Read-only mode is ACTIVE):', '- You are currently in Plan Mode. You cannot apply changes to the project directly. When suggesting a fix, review, or architecture, describe the exact sprite, script, and blocks the user should change, and do not claim that you changed anything.', '- When proposing code, write it in Scrathon (see "Scrathon syntax" below) so the user can paste it into apply_scripts.', '- If the user asks you to directly create, edit, or delete blocks/scripts in the project, explain that you are in Plan Mode and remind them to switch to "Build Mode" (构建模式) via the mode button at the bottom of the input card.', '');
   }
-  lines.push('Grounding:', '- Ground every claim about the project in tool results. Never invent sprite names, variables, scripts, or block contents.', '- Never include block IDs, script IDs, target IDs, or raw opcodes in your final reply. Refer to sprites by name and blocks by their visible labels (for example "when green flag clicked" or "set variable to"). Only include an ID if the user explicitly asks for one.', '- If the user explicitly asks to see an extension implementation, you may quote the relevant source code returned by get_extension_source.', '- Scripts are returned as readable Scratch DSL, one statement per line. Treat the DSL as code, not as internal identifiers.', '', 'Response style:', '- Be concise, direct, and practical, like a coding assistant.', '- When explaining a script, name the sprite and walk through the hat block and relevant blocks in order.', '- When finding a bug, state the cause, the affected sprite/script, and a concrete fix.', '- The UI displays tool activity automatically. Do not paste raw JSON or duplicate the entire tool output in your reply.', '- If the project does not contain the requested information, say so clearly.', '- Reply in the same language the user uses.', '- Format replies with Markdown (short paragraphs, lists, and fenced code blocks). Never output raw HTML.');
+  lines.push('Scrathon syntax (text form of Scratch blocks):', '- Indent with exactly 4 spaces. A hat decorator (@when_flag_clicked) is followed by `def <name>():` and an indented body.', '- Statements are `instruction(arg, arg)`. Control blocks end with a colon: repeat/forever/repeat_until/while/for_each, and if/elif/else.', '- Wrap every slot value in a typed sigil: ${n:...} number (never a name), ${s:"..."} string or broadcast name, ${b:...} boolean condition, ${c:"#RRGGBB"} colour, ${m:"..."} menu, ${v:"..."} / ${variable:"..."} variable, ${l:"..."} / ${list:"..."} list. Use ${s:"..."} for broadcast messages; the legacy ${msg:"..."} form is still accepted.', '- Bare names inside ${n:...}/${s:...} resolve to a custom-block parameter first, then a project variable.', '- Variable scope: ${v:"name"} uses/creates a global (stage) variable; ${v:local:"name"} uses/creates a private variable owned by the target sprite. Lists use ${l:"name"} / ${l:local:"name"}. The local: prefix is only valid on v/l sigils; ${n:...} is a number.', '- Variables and lists are dynamic reporters: ${v:...} and ${l:...} can be placed directly in any number, string or colour slot (for example move(${v:local:"speed"}) or say(${l:"inventory"})) and keep their scope. Do not write ${n:variableName} or ${s:variableName}; those lose the local/global distinction.', '- Variables and lists cannot fill boolean sockets or dropdown fields. For a boolean, write a comparison such as ${v:"score"} > ${n:0} or use ${b:...}. For a dropdown, use ${m:...}.', '- Variables and lists are distinct: use ${v:...} or the full-word ${variable:...} for variables, and ${l:...} or the full-word ${list:...} for lists. Never use ${n:...} for a name; ${n:list"name"} is invalid.', '- Expressions use infix operators (+ - * / % < > == and/or/not). >=, <= and != are lowered automatically.', '- Extension blocks use module.opcode(...) and require an `import <module>` line at the very top of the script (for example `import pen` then `pen.clear()`, `pen.penDown()`). Supported built-in extensions include `pen`, `music`, `text2speech`, and `translate`. Always query `block_catalog` for exact signatures when using extensions.', '- Custom blocks: `@custom_block(warp=True)` then `def name(${n:x}, ${b:flag}):`. Call them as `name(${n:1}, ${b:True})`.', '- Diagnostics are strict: an unknown instruction, a type mismatch or an unimported extension is a compile error that names the line. Fix the code and retry.', '- Use Scrathon_doc for the full language reference, scrathon_example for a complete tested template, and block_catalog for signatures, parameter types, return types, and dropdown menu options.', '- Common instructions quick-reference (use block_catalog to look up full list):', '  * Hats: @when_flag_clicked, @when_key_pressed(${m:key}), @when_this_sprite_clicked, @when_broadcast(${s:name}), @when_i_start_as_clone', '  * Motion: move(${n:steps}), turn_right(${n:deg}), turn_left(${n:deg}), go_to_xy(${n:x}, ${n:y}), go_to(${m:target}), glide_to_xy(${n:sec}, ${n:x}, ${n:y}), point_in_direction(${n:deg}), point_towards(${m:target}), change_x(${n:dx}), set_x(${n:x}), change_y(${n:dy}), set_y(${n:y}), bounce_on_edge()', '  * Looks: say(${s:msg}), say_for_secs(${s:msg}, ${n:sec}), think(${s:msg}), switch_costume(${m:costume}), next_costume(), switch_backdrop(${m:backdrop}), next_backdrop(), show(), hide(), change_size_by(${n:ds}), set_size_to(${n:s}), clear_graphic_effects()', '  * Sound: start_sound(${m:sound}), play_sound_until_done(${m:sound}), stop_all_sounds(), change_volume_by(${n:dv}), set_volume_to(${n:vol})', '  * Control: wait(${n:sec}), wait_until(${b:cond}), repeat(${n:count}):, forever():, if ${b:cond}:, elif ${b:cond}:, else:, repeat_until(${b:cond}):, stop(${m:option})', '  * Sensing: touching(${m:obj}), key_pressed(${m:key}), distance_to(${m:obj}), ask_and_wait(${s:prompt}), reset_timer()', '  * Variables/Lists: set_var(${v:name}, ${s:val}), set_var(${v:local:name}, ${s:val}) for a sprite-private variable, change_var(${v:name}, ${n:val}), list_add(${l:name}, ${s:item}), list_add(${l:local:name}, ${s:item}), list_delete(${l:name}, ${n:idx}), list_delete_all(${l:name})', '  * Events: broadcast(${s:name}), broadcast_and_wait(${s:name})', '  * Operators/Expressions: random(${n:1}, ${n:10}), join(${s:a}, ${s:b}), round(${n:val})', '- Scrathon Examples:', '  * Standard Scratch script (movement, loops, variables, conditions):', '    @when_flag_clicked', '    def main():', '        set_var(${v:"score"}, ${n:0})', '        go_to_xy(${n:0}, ${n:0})', '        point_in_direction(${n:90})', '        repeat(${n:10}):', '            move(${n:10})', '            turn_right(${n:36})', '            change_var(${v:"score"}, ${n:1})', '        if ${b:score >= 10}:', '            say(${s:"Goal reached!"})', '  * Using built-in extensions (Pen & Music with import and typed sigils):', '    import pen', '    import music', '    @when_flag_clicked', '    def draw_pattern():', '        pen.clear()', '        pen.penUp()', '        go_to_xy(${n:0}, ${n:0})', '        pen.setPenSizeTo(${n:3})', '        pen.setPenColorToColor(${c:"#FF4081"})', '        music.setInstrument(${m:"1"})', '        music.setTempo(${n:120})', '        pen.penDown()', '        repeat(${n:8}):', '            move(${n:50})', '            turn_right(${n:45})', '            pen.changePenColorParamBy(${m:"color"}, ${n:10})', '            music.playNoteForBeats(${n:60}, ${n:0.25})', '        pen.penUp()', '  * Custom block definition and call:', '    @custom_block(warp=True)', '    def draw_square(${n:size}):', '        repeat(${n:4}):', '            move(${n:size})', '            turn_right(${n:90})', '    @when_flag_clicked', '    def run():', '        draw_square(${n:60})', '');
+  lines.push('Grounding & Error Handling:', '- Ground every claim about the project in tool results. Never invent sprite names, variables, scripts, or block contents.', '- Tool error handling & self-correction: If a tool call (such as apply_scripts) returns an `error` in its result (such as a [Scrathon CompileError]), the operation FAILED and NO scripts were applied to the project! You MUST NEVER claim success, pretend the scripts were applied, or conclude the response. Instead, inspect the error message, line number, column, and fix suggestion, correct the Scrathon code or arguments, and call apply_scripts again in the next step to apply the corrected scripts.', '- Never include block IDs, script IDs, target IDs, or raw opcodes in your final reply. Refer to sprites by name and blocks by their visible labels (for example "when green flag clicked" or "set variable to"). Only include an ID if the user explicitly asks for one.', '- If the user explicitly asks to see an extension implementation, you may quote the relevant source code returned by get_extension_source.', '- Scripts are returned as readable Scratch DSL, one statement per line. Treat the DSL as code, not as internal identifiers.', '', 'Response style:', '- Be concise, direct, and practical, like a coding assistant.', '- When explaining a script, name the sprite and walk through the hat block and relevant blocks in order.', '- When finding a bug, state the cause, the affected sprite/script, and a concrete fix.', '- The UI displays tool activity automatically. Do not paste raw JSON or duplicate the entire tool output in your reply.', '- If the project does not contain the requested information, say so clearly.', '- Reply in the same language the user uses.', '- Format replies with Markdown (short paragraphs, lists, and fenced code blocks). Never output raw HTML.');
   return lines.join('\n');
 };
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/catalog.js"
+/*!********************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/catalog.js ***!
+  \********************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   resolveMenuOptions: () => (/* binding */ resolveMenuOptions)
+/* harmony export */ });
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+/**
+ * Catalog helpers: enrich Scrathon block entries with argument types and the
+ * options of dropdown / menu arguments.
+ *
+ * Core Scratch menus are static or project-local; extension menus come from
+ * the VM's extension metadata. The output is intentionally JSON-friendly so it
+ * can be returned directly from the `block_catalog` tool.
+ */
+
+const KEY_OPTIONS = ['space', 'up arrow', 'down arrow', 'right arrow', 'left arrow', 'any', ...'abcdefghijklmnopqrstuvwxyz'.split(''), ...'0123456789'.split('')];
+const LOOKS_EFFECTS = ['COLOR', 'FISHEYE', 'WHIRL', 'PIXELATE', 'MOSAIC', 'BRIGHTNESS', 'GHOST'];
+const MATH_OPERATORS = ['abs', 'floor', 'ceiling', 'sqrt', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'ln', 'log', 'e ^', '10 ^'];
+const OF_PROPERTIES = ['x position', 'y position', 'direction', 'costume #', 'costume name', 'size', 'volume', 'backdrop #', 'backdrop name'];
+
+/** Static core menu options keyed by argument name. */
+const STATIC_OPTIONS = {
+  STYLE: ['left-right', "don't rotate", 'all around'],
+  FRONT_BACK: ['front', 'back'],
+  FORWARD_BACKWARD: ['forward', 'backward'],
+  STOP_OPTION: ['all', 'this script', 'other scripts in sprite'],
+  DRAG_MODE: ['draggable', 'not draggable'],
+  CURRENTMENU: ['YEAR', 'MONTH', 'DATE', 'DAYOFWEEK', 'HOUR', 'MINUTE', 'SECOND'],
+  OPERATOR: MATH_OPERATORS,
+  PROPERTY: OF_PROPERTIES,
+  NUMBER_NAME: ['number', 'name'],
+  KEY_OPTION: KEY_OPTIONS,
+  WHENGREATERTHANMENU: ['LOUDNESS', 'TIMER'],
+  EFFECT: LOOKS_EFFECTS,
+  COLOR_PARAM: ['color', 'saturation', 'brightness', 'transparency']
+};
+
+/** Per-opcode overrides for argument names that share a name with another menu. */
+const OPCODE_OPTIONS = {
+  sound_seteffectto__EFFECT: ['PITCH', 'PAN'],
+  sound_changeeffectby__EFFECT: ['PITCH', 'PAN'],
+  looks_seteffectto__EFFECT: LOOKS_EFFECTS,
+  looks_changeeffectby__EFFECT: LOOKS_EFFECTS,
+  pen_setPenColorParamTo__COLOR_PARAM: ['color', 'saturation', 'brightness', 'transparency'],
+  pen_changePenColorParamBy__COLOR_PARAM: ['color', 'saturation', 'brightness', 'transparency']
+};
+
+/** Menu arguments whose options come from the current project. */
+const DYNAMIC_SOURCES = {
+  VARIABLE: 'variables',
+  LIST: 'lists',
+  BROADCAST_OPTION: 'broadcasts',
+  BROADCAST_INPUT: 'broadcasts',
+  COSTUME: 'costumes',
+  BACKDROP: 'backdrops',
+  SOUND_MENU: 'sounds',
+  TO: 'sprites',
+  TOWARDS: 'sprites',
+  TOUCHINGOBJECTMENU: 'sprites',
+  DISTANCETOMENU: 'sprites',
+  CLONE_OPTION: 'sprites',
+  OBJECT: 'sprites'
+};
+
+/** Special sprite-menu values for a specific block + argument. */
+const SPECIAL_SPRITE_OPTIONS = {
+  motion_goto__TO: ['_mouse_', '_random_'],
+  motion_glideto__TO: ['_mouse_', '_random_'],
+  motion_pointtowards__TOWARDS: ['_mouse_', '_random_'],
+  sensing_touchingobject__TOUCHINGOBJECTMENU: ['_mouse_', '_edge_'],
+  sensing_distanceto__DISTANCETOMENU: ['_mouse_'],
+  control_create_clone_of__CLONE_OPTION: ['_myself_'],
+  sensing_of__OBJECT: ['_stage_']
+};
+const toOptions = values => values.map(value => typeof value === 'string' ? {
+  label: value,
+  value
+} : value);
+const getStage = vm => {
+  return vm && vm.runtime && typeof vm.runtime.getTargetForStage === 'function' ? vm.runtime.getTargetForStage() : null;
+};
+const getEditingTarget = vm => {
+  return vm && vm.runtime && typeof vm.runtime.getEditingTarget === 'function' ? vm.runtime.getEditingTarget() : null;
+};
+const uniqueOptions = options => {
+  const seen = new Set();
+  const result = [];
+  for (const option of options) {
+    const key = "".concat(option.scope || '', ":").concat(option.value);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(option);
+  }
+  return result;
+};
+const collectVariables = (target, stage, type) => {
+  const holders = target && target !== stage ? [[target, 'local'], [stage, 'global']] : [[stage, 'global']];
+  const options = [];
+  for (const _ref of holders) {
+    var _ref2 = _slicedToArray(_ref, 2);
+    const holder = _ref2[0];
+    const scope = _ref2[1];
+    if (!holder) continue;
+    for (const variable of Object.values(holder.variables || {})) {
+      if (!variable || variable.type !== type) continue;
+      options.push({
+        label: "".concat(variable.name, " (").concat(scope, ")"),
+        value: variable.name,
+        scope
+      });
+    }
+  }
+  return uniqueOptions(options);
+};
+const collectBroadcasts = stage => {
+  const options = [];
+  for (const variable of Object.values(stage && stage.variables || {})) {
+    if (!variable || variable.type !== 'broadcast_msg') continue;
+    options.push({
+      label: variable.name,
+      value: variable.name,
+      scope: 'global'
+    });
+  }
+  return uniqueOptions(options);
+};
+const collectAssets = (holder, getter) => {
+  if (!holder || typeof holder[getter] !== 'function') return [];
+  return holder[getter]().map(asset => ({
+    label: asset.name,
+    value: asset.name
+  }));
+};
+const collectSprites = (vm, opcode, argName) => {
+  const special = SPECIAL_SPRITE_OPTIONS["".concat(opcode, "__").concat(argName)] || [];
+  const sprites = vm && vm.runtime && Array.isArray(vm.runtime.targets) ? vm.runtime.targets.filter(target => target && !target.isStage).map(target => target.getName()) : [];
+  return uniqueOptions([...special, ...sprites].map(name => ({
+    label: name,
+    value: name
+  })));
+};
+const resolveDynamic = (source, vm, target) => {
+  const stage = getStage(vm);
+  const current = target || getEditingTarget(vm) || stage;
+  switch (source) {
+    case 'variables':
+      return collectVariables(current, stage, '');
+    case 'lists':
+      return collectVariables(current, stage, 'list');
+    case 'broadcasts':
+      return collectBroadcasts(stage);
+    case 'costumes':
+      return collectAssets(current, 'getCostumes');
+    case 'backdrops':
+      return collectAssets(stage, 'getCostumes');
+    case 'sounds':
+      return collectAssets(current, 'getSounds');
+    case 'sprites':
+      return collectSprites(vm, '', '');
+    default:
+      return [];
+  }
+};
+
+/**
+ * Convert extension menu items into `{label, value}` objects.
+ * @param {*} items Menu items array, or a function returning one.
+ * @returns {Array<object>|null} Options, or null when the menu is dynamic.
+ */
+const normalizeExtensionItems = items => {
+  let resolved = items;
+  if (typeof resolved === 'function') {
+    try {
+      resolved = resolved();
+    } catch (error) {
+      return null;
+    }
+  }
+  if (!Array.isArray(resolved)) return null;
+  return resolved.map(item => {
+    if (typeof item === 'string') return {
+      label: item,
+      value: item
+    };
+    if (Array.isArray(item)) return {
+      label: String(item[0]),
+      value: String(item[1] === undefined ? item[0] : item[1])
+    };
+    if (item && typeof item === 'object') {
+      const value = item.value === undefined ? item.text : item.value;
+      return {
+        label: String(item.text === undefined ? value : item.text),
+        value: String(value)
+      };
+    }
+    return {
+      label: String(item),
+      value: String(item)
+    };
+  }).filter(option => option.value !== '');
+};
+
+/**
+ * Resolve the dropdown options for one argument.
+ * @param {object} args Arguments.
+ * @param {string} args.opcode Block opcode.
+ * @param {string} args.argName Argument name.
+ * @param {object} [args.menuInfo] Extension menu metadata.
+ * @param {object} [args.vm] Scratch VM.
+ * @param {object} [args.target] Current target.
+ * @returns {{options: Array<object>, dynamic?: boolean, note?: string}} Resolution.
+ */
+const resolveMenuOptions = _ref3 => {
+  let opcode = _ref3.opcode,
+    argName = _ref3.argName,
+    menuInfo = _ref3.menuInfo,
+    vm = _ref3.vm,
+    target = _ref3.target;
+  if (menuInfo) {
+    const options = normalizeExtensionItems(menuInfo.items);
+    if (options) return {
+      options
+    };
+    return {
+      options: [],
+      dynamic: true,
+      note: 'This extension menu is populated dynamically at runtime; its exact options depend on the project/extension state.'
+    };
+  }
+  const key = "".concat(opcode, "__").concat(argName);
+  if (OPCODE_OPTIONS[key]) return {
+    options: toOptions(OPCODE_OPTIONS[key])
+  };
+  if (STATIC_OPTIONS[argName]) return {
+    options: toOptions(STATIC_OPTIONS[argName])
+  };
+  const source = DYNAMIC_SOURCES[argName];
+  if (source) {
+    const options = resolveDynamic(source, vm, target);
+    if (source === 'sprites') {
+      return {
+        options: collectSprites(vm, opcode, argName)
+      };
+    }
+    return {
+      options,
+      dynamic: true
+    };
+  }
+  return {
+    options: []
+  };
+};
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/compiler.js"
+/*!*********************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/compiler.js ***!
+  \*********************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   STATIC_EXTENSION_BLOCKS: () => (/* binding */ STATIC_EXTENSION_BLOCKS),
+/* harmony export */   collectExtensionBlocks: () => (/* binding */ collectExtensionBlocks),
+/* harmony export */   collectProcedures: () => (/* binding */ collectProcedures),
+/* harmony export */   compileFile: () => (/* binding */ compileFile)
+/* harmony export */ });
+/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./error.js */ "./src/addons/addons/astras-copilot/agent/scrathon/error.js");
+/* harmony import */ var _parser_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./parser.js */ "./src/addons/addons/astras-copilot/agent/scrathon/parser.js");
+/* harmony import */ var _mappings_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./mappings.js */ "./src/addons/addons/astras-copilot/agent/scrathon/mappings.js");
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+/**
+ * Scrathon compiler.
+ *
+ * Lowers a parsed Scrathon AST into the block-descriptor tree that
+ * `block-xml.js` turns into scratch-blocks XML. Keeping this step separate
+ * means the XML emitter stays the single, already-tested place that knows about
+ * shadows, mutations and variable resolution.
+ *
+ * Design notes:
+ *   - Value sigils are strongly typed: `${n:...}` always becomes a numeric
+ *     shadow, `${s:...}` a text shadow, `${b:...}` a boolean reporter input.
+ *   - Bare identifiers inside `${n:...}` / `${s:...}` resolve first to a
+ *     surrounding custom-block parameter, then to a project variable.
+ *   - Extension calls use `module.opcode(...)` and are validated against the
+ *     runtime metadata the VM exposes; an unimported or unknown module is a
+ *     compile error.
+ */
+
+
+
+
+
+/** Human-readable label for a value tag. */
+const TAG_LABEL = {
+  n: 'number',
+  s: 'string',
+  b: 'boolean',
+  c: 'color',
+  m: 'menu',
+  v: 'variable',
+  l: 'list',
+  msg: 'broadcast'
+};
+
+/** Example syntax for a tag in diagnostics. */
+const tagSyntax = tag => {
+  if (tag === 'v') return '${v:...} or ${variable:...}';
+  if (tag === 'l') return '${l:...} or ${list:...}';
+  return "${".concat(tag, ":...}");
+};
+
+/**
+ * Tags whose slot type is enforced at compile time. Numeric and string slots
+ * stay permissive (Scratch casts freely between them) but menus, colours,
+ * booleans and resource references are strictly typed.
+ */
+const STRICT_TAGS = new Set(['b', 'c', 'm', 'v', 'l', 'msg']);
+
+/**
+ * Decide whether a tag mismatch is a compile error. Numeric and string slots
+ * are interchangeable in Scratch, so a mismatch involving either is allowed
+ * unless the other side is a strict tag.
+ * @param {string} expected Expected tag.
+ * @param {string} given Given tag.
+ * @returns {boolean} True if the mismatch should be rejected.
+ */
+const slotIsStrict = (expected, given) => STRICT_TAGS.has(expected) || STRICT_TAGS.has(given);
+
+/**
+ * Compile a parsed Scrathon file into block descriptors.
+ * @param {object} file Parsed file (see parser.js).
+ * @param {object} [options] Compiler options.
+ * @param {object} [options.vm] Scratch VM (for extension metadata).
+ * @returns {{scripts: Array<object>, imports: Array<string>, procedures: Map<string, object>}}
+ *   Result.
+ */
+const compileFile = function compileFile(file) {
+  let _ref = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {},
+    vm = _ref.vm;
+  const extensionBlocks = collectExtensionBlocks(vm);
+  const paramScopes = [];
+  const declaredImports = new Set((file.imports || []).map(name => String(name).trim()).filter(Boolean));
+  const procedures = collectProcedures(file.blocks || []);
+
+  /**
+   * Build a compile error anchored on an AST node.
+   * @param {string} type Diagnostic type.
+   * @param {string} message Message.
+   * @param {object} node AST node.
+   * @param {string} [suggestion] Fix suggestion.
+   * @returns {ScrathonError} Error.
+   */
+  const fail = function fail(type, message, node) {
+    let suggestion = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : '';
+    return new _error_js__WEBPACK_IMPORTED_MODULE_0__.ScrathonError({
+      type,
+      message,
+      line: node && node.line ? node.line : 0,
+      suggestion
+    });
+  };
+
+  /**
+   * Resolve a parameter in the active custom-block scope.
+   * @param {string} name Identifier.
+   * @returns {(object|null)} Parameter descriptor.
+   */
+  const lookupParam = name => {
+    for (let i = paramScopes.length - 1; i >= 0; i--) {
+      if (paramScopes[i].has(name)) return paramScopes[i].get(name);
+    }
+    return null;
+  };
+
+  /**
+   * Read the name out of a variable / list / broadcast sigil.
+   * @param {object} expr Inner expression node.
+   * @param {object} owner Owner node.
+   * @returns {string} Resource name.
+   */
+  const resourceName = (expr, owner) => {
+    if (expr.kind === 'string') return expr.value;
+    if (expr.kind === 'ident') return expr.name;
+    if (expr.kind === 'number') return String(expr.value);
+    throw fail('SyntaxError', 'Expected a name inside the sigil.', owner);
+  };
+
+  /**
+   * Compile a value sigil into a shadow literal, reporter block or resource.
+   * @param {object} sigil Sigil node.
+   * @param {object} owner Owner AST node.
+   * @param {object} [expected] Expected argument descriptor.
+   * @returns {*} Input value understood by block-xml.js.
+   */
+  const compileSigil = (sigil, owner, expected) => {
+    // Broadcast slots accept a plain string sigil (`${s:"..."}`) as well as
+    // the legacy `${msg:"..."}` form. Both resolve to the broadcast menu
+    // shadow / field id; broadcasts do not need localized message objects.
+    const broadcastString = Boolean(expected && expected.t === 'msg' && sigil.tag === 's');
+    const isResource = sigil.tag === 'v' || sigil.tag === 'l';
+
+    // Variables and lists are dynamic reporters: they can fill any value slot
+    // (number, string, colour) regardless of the slot's declared primitive
+    // type, because Scratch casts values at runtime. They still cannot fill
+    // boolean sockets or dropdown fields.
+    const resourceAllowed = isResource && (!expected || expected.t !== 'b' && expected.t !== 'm' && !(expected.k === 'field' && expected.t !== sigil.tag));
+    if (isResource && expected && !resourceAllowed) {
+      if (expected.t === 'b') {
+        throw fail('TypeMismatchError', "Slot \"".concat(expected.name, "\" is a boolean input and cannot accept a ").concat(TAG_LABEL[sigil.tag], " reporter. ") + 'Use a comparison or a boolean expression inside ${b:...}.', owner);
+      }
+      if (expected.t === 'm') {
+        throw fail('TypeMismatchError', "Slot \"".concat(expected.name, "\" is a dropdown menu and cannot accept a ").concat(TAG_LABEL[sigil.tag], ". ") + 'Use ${m:...} with a menu option.', owner);
+      }
+      throw fail('TypeMismatchError', "Slot \"".concat(expected.name, "\" expects a ").concat(TAG_LABEL[expected.t], " field (").concat(tagSyntax(expected.t), "), ") + "but received a ".concat(TAG_LABEL[sigil.tag], " sigil (").concat(tagSyntax(sigil.tag), ")."), owner);
+    }
+    if (!resourceAllowed && expected && expected.t && expected.t !== sigil.tag && !broadcastString && slotIsStrict(expected.t, sigil.tag)) {
+      throw fail('TypeMismatchError', "Slot \"".concat(expected.name, "\" expects a ").concat(TAG_LABEL[expected.t], " token (").concat(tagSyntax(expected.t), "), ") + "but received a ".concat(TAG_LABEL[sigil.tag], " token (").concat(tagSyntax(sigil.tag), ")."), owner);
+    }
+    if (sigil.tag === 'b') return compileBoolean(sigil.expr, owner);
+    const isField = Boolean(expected && expected.k === 'field');
+    const scopedName = name => sigil.scope ? {
+      __name: name,
+      __scope: sigil.scope
+    } : name;
+    if (sigil.tag === 'v') {
+      const name = scopedName(resourceName(sigil.expr, owner));
+      return isField ? name : {
+        opcode: 'data_variable',
+        fields: {
+          VARIABLE: name
+        }
+      };
+    }
+    if (sigil.tag === 'l') {
+      const name = scopedName(resourceName(sigil.expr, owner));
+      return isField ? name : {
+        opcode: 'data_listcontents',
+        fields: {
+          LIST: name
+        }
+      };
+    }
+    if (sigil.tag === 'msg') {
+      const name = resourceName(sigil.expr, owner);
+      return isField ? name : {
+        __shadow: 'event_broadcast_menu',
+        value: name
+      };
+    }
+    return compileLiteral(sigil.tag, sigil.expr, owner);
+  };
+
+  /**
+   * Compile a literal value tag (n/s/c/m) into a scalar or reporter block.
+   * @param {string} tag Value tag.
+   * @param {object} expr Expression node.
+   * @param {object} owner Owner node.
+   * @returns {*} Scalar or block descriptor.
+   */
+  const compileLiteral = (tag, expr, owner) => {
+    if (expr.kind === 'number') return expr.value;
+    if (expr.kind === 'string') return expr.value;
+    if (expr.kind === 'boolean') return expr.value;
+    if (tag === 'm') {
+      // Menu values are always plain option strings / numbers.
+      if (expr.kind === 'ident') return expr.name;
+    }
+    if (expr.kind === 'ident') {
+      const param = lookupParam(expr.name);
+      if (param) {
+        return {
+          opcode: param.tag === 'b' ? 'argument_reporter_boolean' : 'argument_reporter_string_number',
+          fields: {
+            VALUE: expr.name
+          }
+        };
+      }
+      // Bare identifier: treat as a project variable read.
+      return {
+        opcode: 'data_variable',
+        fields: {
+          VARIABLE: expr.name
+        }
+      };
+    }
+    return compileExpression(expr, owner);
+  };
+
+  /**
+   * Compile a boolean expression into a reporter block descriptor.
+   * @param {object} expr Expression node.
+   * @param {object} owner Owner node.
+   * @returns {object} Block descriptor.
+   */
+  const compileBoolean = (expr, owner) => {
+    if (expr.kind === 'boolean') return expr.value ? trueReporter() : falseReporter();
+    if (expr.kind === 'ident') {
+      const param = lookupParam(expr.name);
+      if (param) return {
+        opcode: 'argument_reporter_boolean',
+        fields: {
+          VALUE: expr.name
+        }
+      };
+    }
+    const block = compileExpression(expr, owner);
+    if (block && typeof block === 'object' && block.opcode) return block;
+    throw fail('TypeMismatchError', 'A boolean slot needs a comparison or a boolean reporter.', owner);
+  };
+
+  /**
+   * Compile an expression operand, preferring a scalar for literals.
+   * @param {object} expr Expression node.
+   * @param {object} owner Owner node.
+   * @returns {*} Scalar or block descriptor.
+   */
+  const compileOperand = (expr, owner) => {
+    if (expr.kind === 'number' || expr.kind === 'string') return expr.value;
+    return compileExpression(expr, owner);
+  };
+
+  /**
+   * Compile an arbitrary expression node into a block descriptor.
+   * @param {object} expr Expression node.
+   * @param {object} owner Owner node.
+   * @returns {object} Block descriptor.
+   */
+  const compileExpression = (expr, owner) => {
+    if (expr.kind === 'number' || expr.kind === 'string' || expr.kind === 'boolean') {
+      return {
+        opcode: 'text',
+        fields: {
+          TEXT: String(expr.value)
+        }
+      };
+    }
+    if (expr.kind === 'ident') {
+      const param = lookupParam(expr.name);
+      if (param) {
+        return {
+          opcode: param.tag === 'b' ? 'argument_reporter_boolean' : 'argument_reporter_string_number',
+          fields: {
+            VALUE: expr.name
+          }
+        };
+      }
+      return {
+        opcode: 'data_variable',
+        fields: {
+          VARIABLE: expr.name
+        }
+      };
+    }
+    if (expr.kind === 'sigil') return compileSigil(expr, owner);
+    if (expr.kind === 'unary') {
+      if (expr.op === '-') {
+        return {
+          opcode: 'operator_subtract',
+          inputs: {
+            NUM1: 0,
+            NUM2: compileOperand(expr.operand, owner)
+          }
+        };
+      }
+      if (expr.op === 'not') {
+        return {
+          opcode: 'operator_not',
+          inputs: {
+            OPERAND: compileBoolean(expr.operand, owner)
+          }
+        };
+      }
+    }
+    if (expr.kind === 'binary') {
+      const op = expr.op,
+        left = expr.left,
+        right = expr.right;
+      if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.LOGICAL_BINARY_OPS[op]) {
+        return {
+          opcode: _mappings_js__WEBPACK_IMPORTED_MODULE_2__.LOGICAL_BINARY_OPS[op],
+          inputs: {
+            OPERAND1: compileBoolean(left, owner),
+            OPERAND2: compileBoolean(right, owner)
+          }
+        };
+      }
+      // Compound comparisons Scratch has no block for are lowered to a
+      // negation of the complementary operator.
+      if (op === '>=') {
+        return {
+          opcode: 'operator_not',
+          inputs: {
+            OPERAND: {
+              opcode: 'operator_lt',
+              inputs: {
+                OPERAND1: compileOperand(left, owner),
+                OPERAND2: compileOperand(right, owner)
+              }
+            }
+          }
+        };
+      }
+      if (op === '<=') {
+        return {
+          opcode: 'operator_not',
+          inputs: {
+            OPERAND: {
+              opcode: 'operator_gt',
+              inputs: {
+                OPERAND1: compileOperand(left, owner),
+                OPERAND2: compileOperand(right, owner)
+              }
+            }
+          }
+        };
+      }
+      if (op === '!=') {
+        return {
+          opcode: 'operator_not',
+          inputs: {
+            OPERAND: {
+              opcode: 'operator_equals',
+              inputs: {
+                OPERAND1: compileOperand(left, owner),
+                OPERAND2: compileOperand(right, owner)
+              }
+            }
+          }
+        };
+      }
+      if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.COMPARISON_OPS[op]) {
+        return {
+          opcode: _mappings_js__WEBPACK_IMPORTED_MODULE_2__.COMPARISON_OPS[op],
+          inputs: {
+            OPERAND1: compileOperand(left, owner),
+            OPERAND2: compileOperand(right, owner)
+          }
+        };
+      }
+      if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.NUMERIC_BINARY_OPS[op]) {
+        return {
+          opcode: _mappings_js__WEBPACK_IMPORTED_MODULE_2__.NUMERIC_BINARY_OPS[op],
+          inputs: {
+            NUM1: compileOperand(left, owner),
+            NUM2: compileOperand(right, owner)
+          }
+        };
+      }
+      throw fail('SyntaxError', "Unsupported operator \"".concat(op, "\"."), owner);
+    }
+    if (expr.kind === 'call') return compileExpressionCall(expr, owner);
+    throw fail('SyntaxError', 'Unsupported expression.', owner);
+  };
+
+  /**
+   * Compile a call used inside an expression (`random`, `join`, `mouse_x`, ...).
+   * @param {object} expr Call node.
+   * @param {object} owner Owner node.
+   * @returns {object} Block descriptor.
+   */
+  const compileExpressionCall = (expr, owner) => {
+    if (expr.name.includes('.')) return compileExtensionCall(expr.name, expr.args, owner);
+    const opcode = _mappings_js__WEBPACK_IMPORTED_MODULE_2__.EXPRESSION_FUNCTIONS[expr.name];
+    if (opcode) {
+      return buildFromArgs(opcode, _mappings_js__WEBPACK_IMPORTED_MODULE_2__.EXPRESSION_FUNCTION_ARGS[expr.name] || [], expr.args, expr.name, owner);
+    }
+
+    // Reporter instructions (`touching`, `list_item`, `mouse_x`, ...) are valid
+    // inside expressions even though they live in the statement table.
+    const descriptor = _mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTIONS[expr.name];
+    if (descriptor && descriptor.reporter) {
+      return buildFromArgs(descriptor.opcode, descriptor.args, expr.args, expr.name, expr);
+    }
+    throw fail('UnknownInstructionError', "Unknown expression function \"".concat(expr.name, "\"."), owner, 'Use a built-in reporter like random(...), join(...) or a variable name.');
+  };
+
+  /**
+   * Build a block from an opcode, argument descriptors and argument nodes.
+   * @param {string} opcode Target opcode.
+   * @param {Array<object>} argDescriptors Argument descriptors.
+   * @param {Array<object>} argNodes Argument AST nodes.
+   * @param {string} name Instruction name for diagnostics.
+   * @param {object} owner Owner node.
+   * @returns {object} Block descriptor.
+   */
+  const buildFromArgs = (opcode, argDescriptors, argNodes, name, owner) => {
+    if (argNodes.length !== argDescriptors.length) {
+      throw fail('ArgumentCountError', "\"".concat(name, "\" expects ").concat(argDescriptors.length, " argument(s), got ").concat(argNodes.length, "."), owner);
+    }
+    const inputs = {};
+    const fields = {};
+    argDescriptors.forEach((descriptor, index) => {
+      const compiled = compileArgNode(argNodes[index], descriptor, owner);
+      if (descriptor.k === 'field') fields[descriptor.name] = compiled;else inputs[descriptor.name] = compiled;
+    });
+    const block = {
+      opcode
+    };
+    if (Object.keys(inputs).length > 0) block.inputs = inputs;
+    if (Object.keys(fields).length > 0) block.fields = fields;
+    return block;
+  };
+
+  /**
+   * Compile a single argument node against its descriptor.
+   * @param {object} argNode Argument AST node.
+   * @param {object} descriptor Argument descriptor.
+   * @param {object} owner Owner node.
+   * @returns {*} Compiled value (scalar, resource name, or block descriptor).
+   */
+  const compileArgNode = (argNode, descriptor, owner) => {
+    if (argNode.kind === 'sigil') return compileSigil(argNode, owner, descriptor);
+    if (descriptor.k === 'field') {
+      if (argNode.kind === 'ident') return argNode.name;
+      if (argNode.kind === 'string') return argNode.value;
+      if (argNode.kind === 'number') return argNode.value;
+    }
+    if (descriptor.t === 'b') return compileBoolean(argNode, owner);
+    if (descriptor.t === 'n' || descriptor.t === 's' || descriptor.t === 'c' || descriptor.t === 'm') {
+      return compileLiteral(descriptor.t, argNode, owner);
+    }
+    return compileExpression(argNode, owner);
+  };
+
+  /**
+   * Compile a `module.opcode(...)` extension call.
+   * @param {string} fullName Dotted name.
+   * @param {Array<object>} args Argument nodes.
+   * @param {object} owner Owner node.
+   * @returns {object} Block descriptor.
+   */
+  const compileExtensionCall = (fullName, args, owner) => {
+    const argNodes = (args || []).map(arg => typeof arg === 'string' ? parseArgExpression(arg, owner) : arg);
+    const _fullName$split = fullName.split('.'),
+      _fullName$split2 = _slicedToArray(_fullName$split, 2),
+      moduleName = _fullName$split2[0],
+      opcodeName = _fullName$split2[1];
+    if (!declaredImports.has(moduleName)) {
+      throw fail('UnimportedModuleError', "Extension \"".concat(moduleName, "\" is used but never imported."), owner, "import ".concat(moduleName));
+    }
+    let key = "".concat(moduleName, "_").concat(opcodeName);
+    let meta = extensionBlocks.get(key);
+    if (!meta) {
+      const lowerKey = key.toLowerCase();
+      for (const _ref2 of extensionBlocks.entries()) {
+        var _ref3 = _slicedToArray(_ref2, 2);
+        const k = _ref3[0];
+        const v = _ref3[1];
+        if (k.toLowerCase() === lowerKey) {
+          key = k;
+          meta = v;
+          break;
+        }
+      }
+    }
+    if (!meta) {
+      throw fail('UnknownInstructionError', "Extension \"".concat(moduleName, "\" has no block \"").concat(opcodeName, "\"."), owner);
+    }
+    const argumentEntries = Object.entries(meta.arguments || {});
+    if (argNodes.length !== argumentEntries.length) {
+      throw fail('ArgumentCountError', "\"".concat(fullName, "\" expects ").concat(argumentEntries.length, " argument(s), got ").concat(argNodes.length, "."), owner);
+    }
+    const inputs = {};
+    const fields = {};
+    argNodes.forEach((argNode, index) => {
+      const _argumentEntries$inde = _slicedToArray(argumentEntries[index], 2),
+        argName = _argumentEntries$inde[0],
+        argInfo = _argumentEntries$inde[1];
+      const type = argInfo && argInfo.type ? argInfo.type : 'string';
+      const sigil = argNode.kind === 'sigil' ? argNode : null;
+      if (argInfo && (argInfo.menu || argInfo.type === 'menu')) {
+        const menuName = argInfo.menu || argName;
+        const menuInfo = meta.menus ? meta.menus[menuName] : null;
+        // Menus that accept reporters can take a variable/list reporter directly.
+        if (sigil && (sigil.tag === 'v' || sigil.tag === 'l')) {
+          if (menuInfo && menuInfo.acceptReporters) {
+            const reporter = compileSigil(sigil, owner, {
+              t: undefined,
+              k: 'input',
+              name: argName
+            });
+            if (reporter && typeof reporter === 'object') {
+              reporter.__defaultShadow = "".concat(meta.categoryId, "_menu_").concat(menuName);
+            }
+            inputs[argName] = reporter;
+            return;
+          }
+          throw fail('TypeMismatchError', "Menu argument \"".concat(argName, "\" cannot accept a ").concat(TAG_LABEL[sigil.tag], ". Use ${m:...} with a menu option."), owner);
+        }
+        const value = sigil ? resourceName(sigil.expr, owner) : literalScalar(argNode, owner);
+        if (menuInfo && !menuInfo.acceptReporters) {
+          fields[argName] = value;
+        } else {
+          inputs[argName] = {
+            __shadow: "".concat(meta.categoryId, "_menu_").concat(menuName),
+            __field: menuName,
+            value
+          };
+        }
+        return;
+      }
+      if (type === 'boolean' && sigil && (sigil.tag === 'v' || sigil.tag === 'l')) {
+        throw fail('TypeMismatchError', "Argument \"".concat(argName, "\" is a boolean input and cannot accept a ").concat(TAG_LABEL[sigil.tag], " reporter."), owner);
+      }
+      if (type === 'boolean' || sigil && sigil.tag === 'b') {
+        inputs[argName] = compileBoolean(sigil ? sigil.expr : argNode, owner);
+        return;
+      }
+      const shadowType = EXTENSION_SHADOW[type] || 'text';
+      if (sigil) {
+        const compiled = compileSigil(sigil, owner, {
+          t: undefined,
+          k: 'input',
+          name: argName
+        });
+        if (compiled && typeof compiled === 'object' && typeof compiled.opcode === 'string') {
+          compiled.__defaultShadow = shadowType;
+        }
+        inputs[argName] = wrapShadowInput(shadowType, compiled);
+        return;
+      }
+      inputs[argName] = wrapShadowInput(shadowType, literalScalar(argNode, owner));
+    });
+    const block = {
+      opcode: key
+    };
+    if (Object.keys(inputs).length > 0) block.inputs = inputs;
+    if (Object.keys(fields).length > 0) block.fields = fields;
+    return block;
+  };
+
+  /**
+   * Compile a scalar literal from an AST node.
+   * @param {object} node AST node.
+   * @param {object} owner Owner node.
+   * @returns {*} Scalar.
+   */
+  const literalScalar = (node, owner) => {
+    if (node.kind === 'number') return node.value;
+    if (node.kind === 'string') return node.value;
+    if (node.kind === 'boolean') return node.value;
+    if (node.kind === 'ident') return node.name;
+    const block = compileExpression(node, owner);
+    return block;
+  };
+
+  /**
+   * Wrap a literal with an explicit shadow type when it is not already a block.
+   * @param {string} shadowType Shadow type.
+   * @param {*} value Scalar or block descriptor.
+   * @returns {*} Input value.
+   */
+  const wrapShadowInput = (shadowType, value) => {
+    if (value && typeof value === 'object' && typeof value.opcode === 'string') return value;
+    return {
+      __shadow: shadowType,
+      value: value === undefined || value === null ? '' : value
+    };
+  };
+  const resolveFunctionName = rawName => {
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTIONS[rawName]) return rawName;
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_FUNCTION.has(rawName)) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_FUNCTION.get(rawName);
+    const clean = rawName.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTION_ALIASES[clean]) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTION_ALIASES[clean];
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_FUNCTION.has(clean)) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_FUNCTION.get(clean);
+    const stripped = clean.replace(/_/g, '');
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTION_ALIASES[stripped]) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTION_ALIASES[stripped];
+    const snake = rawName.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTIONS[snake]) return snake;
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTION_ALIASES[snake]) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTION_ALIASES[snake];
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_FUNCTION.has(snake)) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_FUNCTION.get(snake);
+    return rawName;
+  };
+  const resolveHatName = rawName => {
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.HAT_DECORATORS[rawName]) return rawName;
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_HAT.has(rawName)) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_HAT.get(rawName);
+    const clean = rawName.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.HAT_ALIASES[clean]) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.HAT_ALIASES[clean];
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_HAT.has(clean)) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_HAT.get(clean);
+    const stripped = clean.replace(/_/g, '');
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.HAT_ALIASES[stripped]) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.HAT_ALIASES[stripped];
+    const snake = rawName.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.HAT_DECORATORS[snake]) return snake;
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.HAT_ALIASES[snake]) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.HAT_ALIASES[snake];
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_HAT.has(snake)) return _mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_HAT.get(snake);
+    return rawName;
+  };
+
+  /**
+   * Determine whether a compiled block descriptor is an isolated reporter/expression.
+   * Reporters have no statement notches and cannot be chained with next.
+   * @param {object} desc Block descriptor.
+   * @returns {boolean} True if reporter/expression.
+   */
+  const isReporterBlock = desc => {
+    if (!desc || typeof desc !== 'object') return false;
+    const opcode = desc.opcode;
+    if (!opcode) return false;
+    if (opcode === 'data_variable' || opcode === 'data_listcontents') return true;
+    if (opcode.startsWith('operator_')) return true;
+    if (opcode.startsWith('argument_reporter_')) return true;
+    const fnName = _mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_FUNCTION.get(opcode);
+    if (fnName && _mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTIONS[fnName] && _mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTIONS[fnName].reporter) return true;
+    return false;
+  };
+
+  /**
+   * Compile a plain statement call node.
+   * @param {object} node Call node.
+   * @returns {object} Block descriptor.
+   */
+  const compileStatement = node => {
+    if (node.name === 'pass') return null;
+    if (node.name.includes('.')) return compileExtensionCall(node.name, node.args, node);
+    const resolvedName = resolveFunctionName(node.name);
+    const descriptor = _mappings_js__WEBPACK_IMPORTED_MODULE_2__.FUNCTIONS[resolvedName];
+    if (descriptor) {
+      const argNodes = (node.args || []).map(raw => parseArgExpression(raw, node));
+      return buildFromArgs(descriptor.opcode, descriptor.args, argNodes, resolvedName, node);
+    }
+    if (_mappings_js__WEBPACK_IMPORTED_MODULE_2__.EXPRESSION_FUNCTIONS[node.name]) {
+      const argNodes = (node.args || []).map(raw => parseArgExpression(raw, node));
+      return buildFromArgs(_mappings_js__WEBPACK_IMPORTED_MODULE_2__.EXPRESSION_FUNCTIONS[node.name], _mappings_js__WEBPACK_IMPORTED_MODULE_2__.EXPRESSION_FUNCTION_ARGS[node.name] || [], argNodes, node.name, node);
+    }
+    if (procedures.has(node.name)) return compileProcedureCall(node);
+
+    // Standalone expression or variable reporter statement
+    if (!node.args || node.args.length === 0) {
+      try {
+        const expr = (0,_parser_js__WEBPACK_IMPORTED_MODULE_1__.parseExpression)(node.name, {
+          line: node.line,
+          text: node.name,
+          indent: 0
+        });
+        if (expr) {
+          return compileExpression(expr, node);
+        }
+      } catch (_err) {
+        // Not a valid standalone expression, fall through to diagnostic.
+      }
+    }
+    throw fail('UnknownInstructionError', "Unknown instruction \"".concat(node.name, "\"."), node, 'Check the Scrathon specification for the exact instruction name.');
+  };
+
+  /**
+   * Compile a call to a user-defined custom block.
+   * @param {object} node Call node.
+   * @returns {object} procedures_call descriptor.
+   */
+  const compileProcedureCall = node => {
+    const procedure = procedures.get(node.name);
+    const argNodes = node.args.map(raw => parseArgExpression(raw, node));
+    if (argNodes.length !== procedure.params.length) {
+      throw fail('ArgumentCountError', "\"".concat(node.name, "\" expects ").concat(procedure.params.length, " argument(s), got ").concat(argNodes.length, "."), node);
+    }
+    const inputs = {};
+    procedure.params.forEach((param, index) => {
+      const argNode = argNodes[index];
+      const id = procedure.argumentIds[index];
+      if (argNode.kind === 'sigil' && argNode.tag !== param.tag) {
+        throw fail('TypeMismatchError', "Argument ".concat(index + 1, " of \"").concat(node.name, "\" expects ").concat(TAG_LABEL[param.tag], " (").concat(tagSyntax(param.tag), "), ") + "but received ".concat(TAG_LABEL[argNode.tag], " (").concat(tagSyntax(argNode.tag), ")."), node);
+      }
+      if (param.tag === 'b') inputs[id] = compileBoolean(argNode.kind === 'sigil' ? argNode.expr : argNode, node);else if (argNode.kind === 'sigil') inputs[id] = compileLiteral(argNode.tag, argNode.expr, node);else inputs[id] = literalScalar(argNode, node);
+    });
+    return {
+      opcode: 'procedures_call',
+      mutation: {
+        proccode: procedure.proccode,
+        argumentids: JSON.stringify(procedure.argumentIds),
+        warp: 'false',
+        generateshadows: 'true'
+      },
+      inputs
+    };
+  };
+
+  /**
+   * Compile a hat decorator + body into a hat block descriptor.
+   * @param {object} node Hat node.
+   * @returns {object} Block descriptor.
+   */
+  const compileHat = node => {
+    const resolvedName = resolveHatName(node.name);
+    const descriptor = _mappings_js__WEBPACK_IMPORTED_MODULE_2__.HAT_DECORATORS[resolvedName];
+    if (!descriptor) {
+      throw fail('UnknownInstructionError', "Unknown event decorator \"@".concat(node.name, "\"."), node, 'See the event decorator table in the Scrathon specification.');
+    }
+    const argNodes = node.args.map(raw => parseArgExpression(raw, node));
+    const block = buildFromArgs(descriptor.opcode, descriptor.args, argNodes, resolvedName, node);
+    const body = compileStack(node.body);
+    if (body) block.next = body;
+    return block;
+  };
+
+  /**
+   * Compile a `@custom_block` definition into a procedures_definition block.
+   * @param {object} node Define node.
+   * @returns {object} Block descriptor.
+   */
+  const compileDefine = node => {
+    const procedure = procedures.get(node.name);
+    const scope = new Map();
+    node.params.forEach(param => scope.set(param.name, param));
+    paramScopes.push(scope);
+    let body;
+    try {
+      body = compileStack(node.body);
+    } finally {
+      paramScopes.pop();
+    }
+    const definition = {
+      opcode: 'procedures_definition',
+      mutation: {
+        proccode: procedure.proccode,
+        argumentids: JSON.stringify(procedure.argumentIds),
+        argumentnames: JSON.stringify(procedure.argumentNames),
+        argumentdefaults: JSON.stringify(procedure.argumentDefaults),
+        warp: String(Boolean(node.warp))
+      }
+    };
+    if (body) definition.next = body;
+    return definition;
+  };
+
+  /**
+   * Compile a body of statements into an array of block descriptors, the shape
+   * `block-xml.js` expects for `next` / `substack` / `substack2`.
+   * @param {Array<object>} nodes Statement nodes.
+   * @returns {(Array<object>|null)} Block descriptors, or null when empty.
+   */
+  const compileStack = nodes => {
+    if (!Array.isArray(nodes) || nodes.length === 0) return null;
+    const blocks = nodes.map(node => compileNode(node)).filter(Boolean);
+    return blocks.length === 0 ? null : blocks;
+  };
+
+  /**
+   * Compile a single AST node into a block descriptor.
+   * @param {object} node AST node.
+   * @returns {object} Block descriptor.
+   */
+  const compileNode = node => {
+    if (node.kind === 'hat') return compileHat(node);
+    if (node.kind === 'define') return compileDefine(node);
+    if (node.kind === 'if') {
+      const descriptor = node.elseBody ? _mappings_js__WEBPACK_IMPORTED_MODULE_2__.IF_ELSE_FUNCTION : _mappings_js__WEBPACK_IMPORTED_MODULE_2__.IF_FUNCTION;
+      const block = buildFromArgs(descriptor.opcode, descriptor.args, [node.condition], 'if', node);
+      block.substack = compileStack(node.body);
+      if (node.elseBody) block.substack2 = compileStack(node.elseBody);
+      return block;
+    }
+    if (node.kind === 'control') {
+      const resolvedName = _mappings_js__WEBPACK_IMPORTED_MODULE_2__.CONTROL_FUNCTIONS[node.name] ? node.name : _mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_CONTROL.get(node.name) || node.name;
+      const descriptor = _mappings_js__WEBPACK_IMPORTED_MODULE_2__.CONTROL_FUNCTIONS[resolvedName];
+      if (!descriptor) {
+        throw fail('UnknownInstructionError', "Unknown control instruction \"".concat(node.name, "\"."), node, 'Control blocks are repeat, forever, repeat_until, while and for_each.');
+      }
+      const argNodes = node.args.map(raw => parseArgExpression(raw, node));
+      const block = buildFromArgs(descriptor.opcode, descriptor.args, argNodes, resolvedName, node);
+      block.substack = compileStack(node.body);
+      return block;
+    }
+    if (node.kind === 'expr') return compileExpression(node.expr, node);
+    if (node.kind === 'call') return compileStatement(node);
+    throw fail('SyntaxError', "Unsupported statement \"".concat(node.kind, "\"."), node);
+  };
+
+  /**
+   * Parse a raw argument string into an AST node.
+   * @param {string} raw Raw argument.
+   * @param {object} owner Owner node.
+   * @returns {object} AST node.
+   */
+  const parseArgExpression = (raw, owner) => (0,_parser_js__WEBPACK_IMPORTED_MODULE_1__.parseExpression)(raw, {
+    line: owner.line,
+    text: raw,
+    indent: 0
+  });
+  const scripts = [];
+  let x = 60;
+  let y = 60;
+  const addScript = rootBlock => {
+    if (!rootBlock) return;
+    scripts.push({
+      x,
+      y,
+      blocks: [rootBlock]
+    });
+    y += 360;
+    if (y > 2000) {
+      y = 60;
+      x += 320;
+    }
+  };
+  const topLevelNodes = file.blocks || [];
+  let i = 0;
+  while (i < topLevelNodes.length) {
+    const node = topLevelNodes[i];
+    if (node.kind === 'hat' || node.kind === 'define') {
+      const compiled = compileNode(node);
+      if (compiled) addScript(compiled);
+      i++;
+    } else if (node.kind === 'script') {
+      const body = compileStack(node.body);
+      if (body && body.length > 0) {
+        for (let j = 0; j < body.length - 1; j++) body[j].next = body[j + 1];
+        addScript(body[0]);
+      }
+      i++;
+    } else {
+      const loose = [];
+      while (i < topLevelNodes.length) {
+        const cur = topLevelNodes[i];
+        if (cur.kind === 'hat' || cur.kind === 'define' || cur.kind === 'script') break;
+        const compiled = compileNode(cur);
+        if (compiled) {
+          if (isReporterBlock(compiled)) {
+            if (loose.length > 0) {
+              for (let j = 0; j < loose.length - 1; j++) loose[j].next = loose[j + 1];
+              addScript(loose[0]);
+              loose.length = 0;
+            }
+            addScript(compiled);
+          } else {
+            loose.push(compiled);
+          }
+        }
+        i++;
+      }
+      if (loose.length > 0) {
+        for (let j = 0; j < loose.length - 1; j++) loose[j].next = loose[j + 1];
+        addScript(loose[0]);
+      }
+    }
+  }
+  return {
+    scripts,
+    imports: Array.from(declaredImports),
+    procedures
+  };
+};
+
+/** A literal `true` reporter. */
+const trueReporter = () => ({
+  opcode: 'operator_equals',
+  inputs: {
+    OPERAND1: 1,
+    OPERAND2: 1
+  }
+});
+/** A literal `false` reporter. */
+const falseReporter = () => ({
+  opcode: 'operator_equals',
+  inputs: {
+    OPERAND1: 1,
+    OPERAND2: 0
+  }
+});
+
+/**
+ * Collect every `@custom_block` definition in a file so calls can be resolved
+ * even before the definition is compiled.
+ * @param {Array<object>} nodes Top-level AST nodes.
+ * @returns {Map<string, object>} Procedure name -> signature.
+ */
+const collectProcedures = nodes => {
+  const map = new Map();
+  for (const node of nodes || []) {
+    if (node.kind !== 'define') continue;
+    const argumentIds = node.params.map((param, index) => "".concat(node.name, "-arg-").concat(index, "-").concat(param.name));
+    map.set(node.name, {
+      name: node.name,
+      params: node.params,
+      argumentIds,
+      argumentNames: node.params.map(param => param.name),
+      argumentDefaults: node.params.map(() => ''),
+      proccode: buildProcCode(node)
+    });
+  }
+  return map;
+};
+
+/**
+ * Build the `proccode` string for a custom block definition.
+ * @param {object} node Define node.
+ * @returns {string} proccode.
+ */
+const buildProcCode = node => {
+  if (node.label) {
+    const fromLabel = procCodeFromLabel(node.label);
+    if (fromLabel) return fromLabel;
+  }
+  const parts = [node.name];
+  node.params.forEach(param => {
+    parts.push(param.tag === 'b' ? '%b' : param.tag === 'n' ? '%n' : '%s');
+  });
+  return parts.join(' ');
+};
+
+/**
+ * Turn a label template like "draw ${n:sides} sides" into a proccode.
+ * @param {string} label Label template (with surrounding quotes).
+ * @returns {string} proccode.
+ */
+const procCodeFromLabel = label => {
+  let text = String(label).trim();
+  if (text.startsWith('"') && text.endsWith('"') || text.startsWith("'") && text.endsWith("'")) {
+    text = text.slice(1, -1);
+  }
+  return text.replace(/\$\{([nsb]):([^}]+)\}/g, (match, tag) => tag === 'b' ? '%b' : tag === 'n' ? '%n' : '%s');
+};
+
+/** Which extension-argument types map to which shadow type. */
+const EXTENSION_SHADOW = {
+  number: 'math_number',
+  angle: 'math_angle',
+  integer: 'math_integer',
+  positiveInteger: 'math_positive_number',
+  positiveNumber: 'math_positive_number',
+  wholeNumber: 'math_whole_number',
+  string: 'text',
+  color: 'colour_picker',
+  note: 'note',
+  matrix: 'matrix',
+  boolean: null,
+  image: 'text'
+};
+const STATIC_EXTENSION_BLOCKS = {
+  // Pen extension
+  pen_clear: {
+    categoryId: 'pen',
+    arguments: {},
+    menus: {}
+  },
+  pen_stamp: {
+    categoryId: 'pen',
+    arguments: {},
+    menus: {}
+  },
+  pen_penDown: {
+    categoryId: 'pen',
+    arguments: {},
+    menus: {}
+  },
+  pen_penUp: {
+    categoryId: 'pen',
+    arguments: {},
+    menus: {}
+  },
+  pen_setPenColorToColor: {
+    categoryId: 'pen',
+    arguments: {
+      COLOR: {
+        type: 'color'
+      }
+    },
+    menus: {}
+  },
+  pen_changePenColorParamBy: {
+    categoryId: 'pen',
+    arguments: {
+      COLOR_PARAM: {
+        type: 'menu'
+      },
+      VALUE: {
+        type: 'number'
+      }
+    },
+    menus: {}
+  },
+  pen_setPenColorParamTo: {
+    categoryId: 'pen',
+    arguments: {
+      COLOR_PARAM: {
+        type: 'menu'
+      },
+      VALUE: {
+        type: 'number'
+      }
+    },
+    menus: {}
+  },
+  pen_setPenSizeTo: {
+    categoryId: 'pen',
+    arguments: {
+      SIZE: {
+        type: 'number'
+      }
+    },
+    menus: {}
+  },
+  pen_changePenSizeBy: {
+    categoryId: 'pen',
+    arguments: {
+      SIZE: {
+        type: 'number'
+      }
+    },
+    menus: {}
+  },
+  // Music extension
+  music_playDrumForBeats: {
+    categoryId: 'music',
+    arguments: {
+      DRUM: {
+        type: 'menu'
+      },
+      BEATS: {
+        type: 'number'
+      }
+    },
+    menus: {}
+  },
+  music_restForBeats: {
+    categoryId: 'music',
+    arguments: {
+      BEATS: {
+        type: 'number'
+      }
+    },
+    menus: {}
+  },
+  music_playNoteForBeats: {
+    categoryId: 'music',
+    arguments: {
+      NOTE: {
+        type: 'note'
+      },
+      BEATS: {
+        type: 'number'
+      }
+    },
+    menus: {}
+  },
+  music_setInstrument: {
+    categoryId: 'music',
+    arguments: {
+      INSTRUMENT: {
+        type: 'menu'
+      }
+    },
+    menus: {}
+  },
+  music_setTempo: {
+    categoryId: 'music',
+    arguments: {
+      TEMPO: {
+        type: 'number'
+      }
+    },
+    menus: {}
+  },
+  music_changeTempo: {
+    categoryId: 'music',
+    arguments: {
+      TEMPO: {
+        type: 'number'
+      }
+    },
+    menus: {}
+  },
+  music_getTempo: {
+    categoryId: 'music',
+    blockType: 'reporter',
+    arguments: {},
+    menus: {}
+  },
+  // Text2speech extension
+  text2speech_speakAndWait: {
+    categoryId: 'text2speech',
+    arguments: {
+      WORDS: {
+        type: 'string'
+      }
+    },
+    menus: {}
+  },
+  text2speech_setVoice: {
+    categoryId: 'text2speech',
+    arguments: {
+      VOICE: {
+        type: 'menu'
+      }
+    },
+    menus: {}
+  },
+  text2speech_setLanguage: {
+    categoryId: 'text2speech',
+    arguments: {
+      LANGUAGE: {
+        type: 'menu'
+      }
+    },
+    menus: {}
+  },
+  // Translate extension
+  translate_getTranslate: {
+    categoryId: 'translate',
+    blockType: 'reporter',
+    arguments: {
+      WORDS: {
+        type: 'string'
+      },
+      LANGUAGE: {
+        type: 'menu'
+      }
+    },
+    menus: {}
+  },
+  translate_getViewerLanguage: {
+    categoryId: 'translate',
+    blockType: 'reporter',
+    arguments: {},
+    menus: {}
+  }
+};
+
+/**
+ * Collect extension block metadata from the VM.
+ * @param {object} vm Scratch VM.
+ * @returns {Map<string, object>} opcode -> metadata.
+ */
+const collectExtensionBlocks = vm => {
+  const map = new Map();
+  // Pre-populate with standard built-in extension blocks so compilation works even before VM loads them
+  for (const _ref4 of Object.entries(STATIC_EXTENSION_BLOCKS)) {
+    var _ref5 = _slicedToArray(_ref4, 2);
+    const key = _ref5[0];
+    const value = _ref5[1];
+    map.set(key, value);
+  }
+  const categories = vm && vm.runtime && Array.isArray(vm.runtime._blockInfo) ? vm.runtime._blockInfo : [];
+  for (const category of categories) {
+    if (!category || !Array.isArray(category.blocks)) continue;
+    for (const entry of category.blocks) {
+      const info = entry && entry.info;
+      if (!info || typeof info.opcode !== 'string') continue;
+      map.set("".concat(category.id, "_").concat(info.opcode), {
+        categoryId: category.id,
+        blockType: info.blockType || null,
+        arguments: info.arguments || {},
+        menus: category.menuInfo || {}
+      });
+    }
+  }
+  return map;
+};
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/decompiler.js"
+/*!***********************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/decompiler.js ***!
+  \***********************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   createDecompiler: () => (/* binding */ createDecompiler)
+/* harmony export */ });
+/* harmony import */ var _mappings_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./mappings.js */ "./src/addons/addons/astras-copilot/agent/scrathon/mappings.js");
+/* harmony import */ var _compiler_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./compiler.js */ "./src/addons/addons/astras-copilot/agent/scrathon/compiler.js");
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+/**
+ * Scrathon decompiler.
+ *
+ * Walks a target's block graph and renders it back to Scrathon source. It is the
+ * exact inverse of `compiler.js`: it reads the same `mappings.js` tables, so the
+ * two directions cannot drift apart.
+ *
+ * The decompiler is best-effort and lossless for everything the compiler can
+ * emit. Blocks it does not recognise are rendered as a commented placeholder so
+ * the surrounding script still reads correctly.
+ */
+
+
+
+const INDENT_UNIT = 4;
+const MAX_DEPTH = 60;
+
+/** Generated `def` names for hat scripts, keyed by opcode. */
+const HAT_DEF_NAMES = {
+  event_whenflagclicked: 'on_flag_clicked',
+  event_whenkeypressed: 'on_key_pressed',
+  event_whenthisspriteclicked: 'on_sprite_clicked',
+  event_whenstageclicked: 'on_stage_clicked',
+  event_whenbackdropswitchesto: 'on_backdrop_switch',
+  event_whengreaterthan: 'on_greater_than',
+  event_whenbroadcastreceived: 'on_broadcast',
+  control_start_as_clone: 'on_start_as_clone'
+};
+
+/** Reverse map: opcode -> expression function name (`random`, `join`, ...). */
+const OPCODE_TO_EXPRESSION = (() => {
+  const map = new Map();
+  for (const _ref of Object.entries(_mappings_js__WEBPACK_IMPORTED_MODULE_0__.EXPRESSION_FUNCTIONS)) {
+    var _ref2 = _slicedToArray(_ref, 2);
+    const name = _ref2[0];
+    const opcode = _ref2[1];
+    map.set(opcode, name);
+  }
+  return map;
+})();
+
+/** Shadow opcodes that carry a numeric literal. */
+const NUMBER_SHADOWS = new Set(['math_number', 'math_positive_number', 'math_integer', 'math_whole_number', 'math_angle']);
+
+/** Infix operators keyed by opcode for expression rendering. */
+const INFIX = {
+  operator_add: '+',
+  operator_subtract: '-',
+  operator_multiply: '*',
+  operator_divide: '/',
+  operator_mod: '%',
+  operator_lt: '<',
+  operator_gt: '>',
+  operator_equals: '=='
+};
+
+/** Operand input names keyed by opcode. */
+const OPERAND_NAMES = {
+  operator_add: ['NUM1', 'NUM2'],
+  operator_subtract: ['NUM1', 'NUM2'],
+  operator_multiply: ['NUM1', 'NUM2'],
+  operator_divide: ['NUM1', 'NUM2'],
+  operator_mod: ['NUM1', 'NUM2'],
+  operator_lt: ['OPERAND1', 'OPERAND2'],
+  operator_gt: ['OPERAND1', 'OPERAND2'],
+  operator_equals: ['OPERAND1', 'OPERAND2']
+};
+
+/** Logical binary opcodes -> keyword. */
+const LOGICAL = {
+  operator_and: 'and',
+  operator_or: 'or'
+};
+
+/**
+ * Get a block from a target.
+ * @param {object} target Scratch target.
+ * @param {string} blockId Block id.
+ * @returns {object|undefined} Block.
+ */
+const getBlock = (target, blockId) => {
+  if (!target || !target.blocks || !blockId) return undefined;
+  if (typeof target.blocks.getBlock === 'function') return target.blocks.getBlock(blockId);
+  return target.blocks._blocks ? target.blocks._blocks[blockId] : undefined;
+};
+
+/**
+ * Determine whether a variable field is owned by the target (local) or the
+ * stage (global). Returns null when the owner cannot be determined, in which
+ * case the decompiler keeps the legacy unprefixed form.
+ * @param {object} target Scratch target.
+ * @param {object} field VM field descriptor.
+ * @returns {string|null} 'local', 'global', or null.
+ */
+const getVariableScope = (target, field) => {
+  if (!field || !field.id) return null;
+  if (target && target.isStage) return 'global';
+  const localVariables = target && target.variables;
+  if (localVariables && Object.prototype.hasOwnProperty.call(localVariables, field.id)) return 'local';
+  const stage = target && target.runtime && typeof target.runtime.getTargetForStage === 'function' ? target.runtime.getTargetForStage() : null;
+  if (stage && stage.variables && Object.prototype.hasOwnProperty.call(stage.variables, field.id)) return 'global';
+  return null;
+};
+
+/**
+ * Escape a string for a double-quoted Scrathon literal.
+ * @param {*} value Value.
+ * @returns {string} Escaped text.
+ */
+const escapeString = value => String(value === undefined || value === null ? '' : value).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\t/g, '\\t');
+
+/**
+ * Read the mutation from a procedures_definition block (via its prototype).
+ * @param {object} target Scratch target.
+ * @param {object} block procedures_definition block.
+ * @returns {object} Mutation.
+ */
+const definitionMutation = (target, block) => {
+  const prototype = block.inputs && block.inputs.custom_block && getBlock(target, block.inputs.custom_block.block);
+  return prototype && prototype.mutation || block.mutation || {};
+};
+
+/**
+ * Parse a JSON list stored on a mutation.
+ * @param {object} mutation Mutation.
+ * @param {string} key Field key.
+ * @returns {Array} Parsed list.
+ */
+const parseList = (mutation, key) => {
+  const raw = mutation && mutation[key];
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+/**
+ * Split a proccode into literal text and `%n`/`%b`/`%s` tokens.
+ * @param {string} proccode Procedure code.
+ * @returns {Array<string>} Tokens.
+ */
+const splitProcCode = proccode => String(proccode || '').split(/(%[nbs])/).filter(part => part !== '');
+
+/**
+ * The argument tags declared by a proccode, in order.
+ * @param {string} proccode Procedure code.
+ * @returns {Array<string>} Tags.
+ */
+const procCodeTags = proccode => splitProcCode(proccode).filter(part => /^%[nbs]$/.test(part)).map(part => part.slice(1));
+
+/**
+ * Build the `def name(...)` parameter list for a procedure.
+ * @param {string} proccode Procedure code.
+ * @param {Array<string>} argumentNames Argument display names.
+ * @returns {{name: string, params: Array<object>}} Name and typed params.
+ */
+const procedureSignature = (proccode, argumentNames) => {
+  const tokens = splitProcCode(proccode);
+  const name = tokens.length > 0 && !/^%[nbs]$/.test(tokens[0]) ? tokens[0].trim() : 'custom_block';
+  const tags = procCodeTags(proccode);
+  const params = tags.map((tag, index) => ({
+    tag,
+    name: argumentNames[index] || "arg".concat(index + 1)
+  }));
+  return {
+    name,
+    params
+  };
+};
+
+/**
+ * Whether a proccode is the plain `name %n %b ...` form (no inline labels).
+ * @param {string} proccode Procedure code.
+ * @param {string} name Procedure name.
+ * @returns {boolean} True when no label template is needed.
+ */
+const isPlainProcCode = (proccode, name) => {
+  const expected = [name, ...procCodeTags(proccode).map(tag => "%".concat(tag))].join(' ');
+  return String(proccode).trim() === expected;
+};
+
+/**
+ * Render a label template for a proccode with inline text.
+ * @param {string} proccode Procedure code.
+ * @param {Array<string>} argumentNames Argument display names.
+ * @returns {string} Quoted label template.
+ */
+const labelTemplate = (proccode, argumentNames) => {
+  const _tags = procCodeTags(proccode);
+  let index = 0;
+  const text = splitProcCode(proccode).map(part => {
+    if (/^%[nbs]$/.test(part)) {
+      const tag = part.slice(1);
+      const paramName = argumentNames[index] || "arg".concat(index + 1);
+      index++;
+      return "${".concat(tag, ":").concat(paramName, "}");
+    }
+    return part;
+  }).join('');
+  return "\"".concat(escapeString(text), "\"");
+};
+
+/**
+ * Create a decompiler bound to a target.
+ * @param {object} vm Scratch VM (unused, kept for symmetry with the compiler).
+ * @param {object} target Scratch target.
+ * @returns {object} Decompiler instance.
+ */
+const createDecompiler = (vm, target) => {
+  const lines = [];
+  let truncated = false;
+  const neededImports = new Set();
+  const extensionBlocks = (0,_compiler_js__WEBPACK_IMPORTED_MODULE_1__.collectExtensionBlocks)(vm);
+  const push = (indent, text) => lines.push("".concat(' '.repeat(indent * INDENT_UNIT)).concat(text));
+  const CORE_PREFIXES = new Set(['motion', 'looks', 'sound', 'event', 'events', 'control', 'sensing', 'operator', 'operators', 'data', 'procedures', 'argument', 'note', 'math', 'text', 'colour']);
+  const KNOWN_EXTENSION_MODULES = new Set(['pen', 'music', 'text2speech', 'translate', 'videosensing', 'wedo2', 'ev3', 'boost', 'makeymakey', 'microbit']);
+
+  /**
+   * Find metadata and module/method for an extension opcode.
+   * @param {string} opcode Block opcode.
+   * @returns {{moduleName: string, methodName: string, meta: object|null}|null} Match info.
+   */
+  const findExtensionMeta = opcode => {
+    if (!opcode || typeof opcode !== 'string') return null;
+    const idx = opcode.indexOf('_');
+    if (idx <= 0) return null;
+    const prefix = opcode.slice(0, idx).toLowerCase();
+    if (CORE_PREFIXES.has(prefix)) return null;
+    const meta = extensionBlocks.get(opcode);
+    if (meta) {
+      const moduleName = meta.categoryId || prefix;
+      const methodName = opcode.slice(idx + 1);
+      return {
+        moduleName,
+        methodName,
+        meta
+      };
+    }
+    const lower = opcode.toLowerCase();
+    for (const _ref3 of extensionBlocks.entries()) {
+      var _ref4 = _slicedToArray(_ref3, 2);
+      const key = _ref4[0];
+      const value = _ref4[1];
+      if (key.toLowerCase() === lower) {
+        const keyIdx = key.indexOf('_');
+        const moduleName = value.categoryId || (keyIdx > 0 ? key.slice(0, keyIdx) : key);
+        const methodName = keyIdx > 0 ? key.slice(keyIdx + 1) : key;
+        return {
+          moduleName,
+          methodName,
+          meta: value
+        };
+      }
+    }
+    const isKnownExt = KNOWN_EXTENSION_MODULES.has(prefix) || vm && vm.extensionManager && typeof vm.extensionManager.isExtensionLoaded === 'function' && vm.extensionManager.isExtensionLoaded(prefix);
+    if (isKnownExt) {
+      const moduleName = prefix;
+      const methodName = opcode.slice(idx + 1);
+      return {
+        moduleName,
+        methodName,
+        meta: null
+      };
+    }
+    return null;
+  };
+
+  /**
+   * Render an extension block call (statement or reporter).
+   * @param {object} block Block.
+   * @param {object} ext Extension metadata match.
+   * @param {number} depth Current depth.
+   * @returns {string} Method call string.
+   */
+  const renderExtensionCall = (block, ext, depth) => {
+    const moduleName = ext.moduleName,
+      methodName = ext.methodName,
+      meta = ext.meta;
+    neededImports.add(moduleName);
+    const args = [];
+    const argumentEntries = meta && meta.arguments ? Object.entries(meta.arguments) : null;
+    if (argumentEntries && argumentEntries.length > 0) {
+      for (const _ref5 of argumentEntries) {
+        var _ref6 = _slicedToArray(_ref5, 2);
+        const argName = _ref6[0];
+        const argInfo = _ref6[1];
+        const type = argInfo && argInfo.type ? argInfo.type : 'string';
+        if (block.fields && block.fields[argName]) {
+          const value = block.fields[argName].value;
+          args.push("${m:\"".concat(escapeString(value), "\"}"));
+          continue;
+        }
+        let tag = 's';
+        if (type === 'number' || type === 'note') tag = 'n';else if (type === 'color') tag = 'c';else if (type === 'boolean') tag = 'b';else if (type === 'menu' || argInfo && argInfo.menu) tag = 'm';
+        const input = block.inputs && block.inputs[argName];
+        args.push(renderInputSigil(input, tag, depth));
+      }
+    } else {
+      if (block.inputs) {
+        for (const _ref7 of Object.entries(block.inputs)) {
+          var _ref8 = _slicedToArray(_ref7, 2);
+          const inputName = _ref8[0];
+          const input = _ref8[1];
+          if (inputName === 'SUBSTACK' || inputName === 'SUBSTACK2') continue;
+          args.push(renderInputSigil(input, 's', depth));
+        }
+      }
+      if (block.fields) {
+        for (const _ref9 of Object.entries(block.fields)) {
+          var _ref0 = _slicedToArray(_ref9, 2);
+          const field = _ref0[1];
+          if (field && typeof field.value !== 'undefined') {
+            args.push("${m:\"".concat(escapeString(field.value), "\"}"));
+          }
+        }
+      }
+    }
+    return "".concat(moduleName, ".").concat(methodName, "(").concat(args.join(', '), ")");
+  };
+
+  /**
+   * Render a shadow block as a sigil literal.
+   * @param {object} shadow Shadow block.
+   * @param {string} [expectedTag] Expected tag for the slot (if known).
+   * @returns {string} Sigil.
+   */
+  const renderShadow = (shadow, expectedTag) => {
+    const opcode = shadow.opcode;
+    const fields = shadow.fields || {};
+    const fieldValue = name => fields[name] ? fields[name].value : '';
+    if (opcode === 'event_broadcast_menu' || expectedTag === 'msg') {
+      const val = fieldValue('BROADCAST_OPTION') || fieldValue(Object.keys(fields)[0]);
+      return "${s:\"".concat(escapeString(val), "\"}");
+    }
+    if (expectedTag === 'c' || opcode === 'colour_picker') {
+      const val = fieldValue('COLOUR') || fieldValue('TEXT') || fieldValue(Object.keys(fields)[0]);
+      return "${c:\"".concat(escapeString(val), "\"}");
+    }
+    if (expectedTag === 'm' || /_menu_/i.test(opcode) || /menu$/i.test(opcode)) {
+      const key = Object.keys(fields)[0];
+      const value = key ? fieldValue(key) : '';
+      return "${m:\"".concat(escapeString(value), "\"}");
+    }
+    if (NUMBER_SHADOWS.has(opcode)) return "${n:".concat(fieldValue('NUM') === '' ? '0' : fieldValue('NUM'), "}");
+    if (opcode === 'note') {
+      const val = fieldValue('NOTE') || fieldValue(Object.keys(fields)[0]);
+      return "${n:".concat(val === '' ? '60' : val, "}");
+    }
+    if (expectedTag === 'n') {
+      const val = fieldValue('NUM') || fieldValue('TEXT') || fieldValue(Object.keys(fields)[0]);
+      return "${n:".concat(val === '' ? '0' : val, "}");
+    }
+    if (opcode === 'text') return "${s:\"".concat(escapeString(fieldValue('TEXT')), "\"}");
+    // Unknown shadow: fall back to a text literal so the source stays valid.
+    const key = Object.keys(fields)[0];
+    return "${s:\"".concat(escapeString(key ? fieldValue(key) : ''), "\"}");
+  };
+
+  /**
+   * Render an expression operand (a scalar literal or a nested reporter).
+   * @param {object} input Input connection.
+   * @param {number} depth Current depth.
+   * @returns {string} Operand text.
+   */
+  const renderOperand = (input, depth) => {
+    if (!input || !input.block) return '0';
+    const child = getBlock(target, input.block);
+    if (!child) return '0';
+    if (child.shadow) {
+      const fields = child.fields || {};
+      if (NUMBER_SHADOWS.has(child.opcode)) return String(fields.NUM ? fields.NUM.value : 0);
+      if (child.opcode === 'note') return String(fields.NOTE ? fields.NOTE.value : 60);
+      if (child.opcode === 'text') return "\"".concat(escapeString(fields.TEXT ? fields.TEXT.value : ''), "\"");
+      const key = Object.keys(fields)[0];
+      return "\"".concat(escapeString(key ? fields[key].value : ''), "\"");
+    }
+    return renderExpression(child, depth + 1);
+  };
+
+  /**
+   * Render a reporter block as an expression string (no sigil).
+   * @param {object} block Block.
+   * @param {number} depth Current depth.
+   * @returns {string} Expression.
+   */
+  const renderExpression = (block, depth) => {
+    if (!block || depth > MAX_DEPTH) return '0';
+    const opcode = block.opcode;
+    const fields = block.fields || {};
+    const input = name => block.inputs && block.inputs[name];
+    if (opcode === 'data_variable') {
+      const field = fields.VARIABLE;
+      const name = String(field ? field.value : 'variable');
+      return getVariableScope(target, field) === 'local' ? "${v:local:\"".concat(escapeString(name), "\"}") : name;
+    }
+    if (opcode === 'data_listcontents') {
+      const field = fields.LIST;
+      const name = String(field ? field.value : 'list');
+      return getVariableScope(target, field) === 'local' ? "${l:local:\"".concat(escapeString(name), "\"}") : name;
+    }
+    if (opcode === 'argument_reporter_string_number' || opcode === 'argument_reporter_boolean') {
+      return String(fields.VALUE ? fields.VALUE.value : 'argument');
+    }
+    if (INFIX[opcode]) {
+      const _OPERAND_NAMES$opcode = _slicedToArray(OPERAND_NAMES[opcode], 2),
+        leftName = _OPERAND_NAMES$opcode[0],
+        rightName = _OPERAND_NAMES$opcode[1];
+      return "(".concat(renderOperand(input(leftName), depth), " ").concat(INFIX[opcode], " ").concat(renderOperand(input(rightName), depth), ")");
+    }
+    if (LOGICAL[opcode]) {
+      return "(".concat(renderOperand(input('OPERAND1'), depth), " ").concat(LOGICAL[opcode], " ").concat(renderOperand(input('OPERAND2'), depth), ")");
+    }
+    if (opcode === 'operator_not') return "not ".concat(renderOperand(input('OPERAND'), depth));
+    if (opcode === 'operator_mathop') {
+      const operator = fields.OPERATOR ? fields.OPERATOR.value : 'sqrt';
+      return "math(${m:\"".concat(escapeString(operator), "\"}, ${n:").concat(renderOperand(input('NUM'), depth), "})");
+    }
+    const expressionName = OPCODE_TO_EXPRESSION.get(opcode);
+    if (expressionName) {
+      const argDescriptors = _mappings_js__WEBPACK_IMPORTED_MODULE_0__.EXPRESSION_FUNCTION_ARGS[expressionName] || [];
+      const args = argDescriptors.map(argDescriptor => renderArgument(block, argDescriptor, depth));
+      return "".concat(expressionName, "(").concat(args.join(', '), ")");
+    }
+
+    // A statement-table reporter used inside an expression (`touching`, `mouse_x`).
+    const functionName = _mappings_js__WEBPACK_IMPORTED_MODULE_0__.OPCODE_TO_FUNCTION.get(opcode);
+    const descriptor = functionName ? _mappings_js__WEBPACK_IMPORTED_MODULE_0__.FUNCTIONS[functionName] : null;
+    if (descriptor && descriptor.reporter) {
+      const args = descriptor.args.map(argDescriptor => renderArgument(block, argDescriptor, depth));
+      return "".concat(functionName, "(").concat(args.join(', '), ")");
+    }
+    const ext = findExtensionMeta(opcode);
+    if (ext) {
+      return renderExtensionCall(block, ext, depth);
+    }
+    return "/* unsupported: ".concat(opcode, " */0");
+  };
+
+  /**
+   * Render an input value as a sigil.
+   * @param {object} input Input connection.
+   * @param {string} tag Expected tag.
+   * @param {number} depth Current depth.
+   * @returns {string} Sigil.
+   */
+  const renderInputSigil = (input, tag, depth) => {
+    // Broadcast inputs accept any reporter, but the legacy `msg` sigil only
+    // accepts a bare name. Render them with `s` so reporters round-trip.
+    const sigilTag = tag === 'msg' ? 's' : tag;
+    if (!input || !input.block) return "${".concat(sigilTag, ":").concat(sigilTag === 'n' ? '0' : '""', "}");
+    const child = getBlock(target, input.block);
+    if (!child) return "${".concat(sigilTag, ":").concat(sigilTag === 'n' ? '0' : '""', "}");
+    if (child.shadow) {
+      const rendered = renderShadow(child, tag);
+      return rendered;
+    }
+    // A variable/list reporter is a first-class value in number, string and
+    // colour slots; emit its resource sigil directly so scope round-trips.
+    if ((tag === 'n' || tag === 's' || tag === 'c') && (child.opcode === 'data_variable' || child.opcode === 'data_listcontents')) {
+      return renderResourceSigil(child);
+    }
+    return "${".concat(sigilTag, ":").concat(renderExpression(child, depth + 1), "}");
+  };
+
+  /**
+   * Render a variable or list reporter as a resource sigil.
+   * @param {object} block data_variable / data_listcontents block.
+   * @returns {string} Resource sigil.
+   */
+  const renderResourceSigil = block => {
+    const isVariable = block.opcode === 'data_variable';
+    const field = isVariable ? (block.fields || {}).VARIABLE : (block.fields || {}).LIST;
+    const name = String(field ? field.value : isVariable ? 'variable' : 'list');
+    const tag = isVariable ? 'v' : 'l';
+    const prefix = getVariableScope(target, field) === 'local' ? 'local:' : '';
+    return "${".concat(tag, ":").concat(prefix, "\"").concat(escapeString(name), "\"}");
+  };
+
+  /**
+   * Render a variable/list/broadcast/menu field as a sigil.
+   * @param {object} block Block.
+   * @param {object} descriptor Argument descriptor.
+   * @returns {string} Sigil.
+   */
+  const renderFieldSigil = (block, descriptor) => {
+    const field = block.fields && block.fields[descriptor.name];
+    const value = field ? field.value : '';
+    if (descriptor.t === 'v' || descriptor.t === 'l') {
+      const prefix = getVariableScope(target, field) === 'local' ? 'local:' : '';
+      return "${".concat(descriptor.t, ":").concat(prefix, "\"").concat(escapeString(value), "\"}");
+    }
+    if (descriptor.t === 'msg') return "${s:\"".concat(escapeString(value), "\"}");
+    if (descriptor.t === 'm') return "${m:\"".concat(escapeString(value), "\"}");
+    if (descriptor.t === 'n') return "${n:".concat(value === '' ? '0' : value, "}");
+    return "${s:\"".concat(escapeString(value), "\"}");
+  };
+
+  /**
+   * Render a single instruction argument.
+   * @param {object} block Block.
+   * @param {object} descriptor Argument descriptor.
+   * @param {number} depth Current depth.
+   * @returns {string} Sigil.
+   */
+  const renderArgument = (block, descriptor, depth) => {
+    if (descriptor.k === 'field') return renderFieldSigil(block, descriptor);
+    return renderInputSigil(block.inputs && block.inputs[descriptor.name], descriptor.t, depth);
+  };
+
+  /**
+   * Render a statement instruction (`name(args)`) from a block.
+   * @param {object} block Block.
+   * @param {string} name Instruction name.
+   * @param {object} descriptor Instruction descriptor.
+   * @param {number} depth Current depth.
+   * @returns {string} Statement text.
+   */
+  const renderCall = (block, name, descriptor, depth) => {
+    const args = (descriptor.args || []).map(argDescriptor => renderArgument(block, argDescriptor, depth));
+    return "".concat(name, "(").concat(args.join(', '), ")");
+  };
+
+  /**
+   * Emit the body of a C-block (SUBSTACK / SUBSTACK2).
+   * @param {object} block Block.
+   * @param {number} indent Indent level.
+   * @param {number} depth Current depth.
+   */
+  const emitSubstacks = (block, indent, depth) => {
+    const body = block.inputs && block.inputs.SUBSTACK;
+    if (body && body.block) emitStack(body.block, indent + 1, depth + 1);
+    const elseBody = block.inputs && block.inputs.SUBSTACK2;
+    if (elseBody && elseBody.block) {
+      push(indent, 'else:');
+      emitStack(elseBody.block, indent + 1, depth + 1);
+    }
+  };
+
+  /**
+   * Emit an `if` branch, flattening a lone nested `if` in the else branch into
+   * `elif`. A trailing `next` block prevents flattening because `elif` has
+   * different scoping from `else: if ...` followed by more statements.
+   * @param {object} block control_if / control_if_else block.
+   * @param {number} indent Indent level.
+   * @param {number} depth Current depth.
+   * @param {string} keyword "if" or "elif".
+   */
+  const emitIfBranch = (block, indent, depth, keyword) => {
+    push(indent, "".concat(keyword, " ").concat(renderInputSigil(block.inputs && block.inputs.CONDITION, 'b', depth), ":"));
+    const body = block.inputs && block.inputs.SUBSTACK;
+    if (body && body.block) emitStack(body.block, indent + 1, depth + 1);
+    const elseInput = block.inputs && block.inputs.SUBSTACK2;
+    if (!elseInput || !elseInput.block) return;
+    const elseBlock = getBlock(target, elseInput.block);
+    const canElif = elseBlock && !elseBlock.next && (elseBlock.opcode === 'control_if' || elseBlock.opcode === 'control_if_else');
+    if (canElif) {
+      emitIfBranch(elseBlock, indent, depth + 1, 'elif');
+      return;
+    }
+    push(indent, 'else:');
+    emitStack(elseInput.block, indent + 1, depth + 1);
+  };
+
+  /**
+   * Emit a statement, including its body and any chained next blocks.
+   * @param {string} blockId Block id.
+   * @param {number} indent Indent level.
+   * @param {number} depth Current depth.
+   */
+  const emitStack = (blockId, indent, depth) => {
+    if (!blockId || depth > MAX_DEPTH) {
+      truncated = true;
+      return;
+    }
+    const block = getBlock(target, blockId);
+    if (!block) return;
+    const opcode = block.opcode;
+    const controlName = _mappings_js__WEBPACK_IMPORTED_MODULE_0__.OPCODE_TO_CONTROL.get(opcode);
+    if (controlName) {
+      const descriptor = _mappings_js__WEBPACK_IMPORTED_MODULE_0__.CONTROL_FUNCTIONS[controlName];
+      const args = (descriptor && descriptor.args ? descriptor.args : []).map(entry => renderArgument(block, entry, depth));
+      push(indent, "".concat(controlName, "(").concat(args.join(', '), "):"));
+      emitSubstacks(block, indent, depth);
+      if (block.next) emitStack(block.next, indent, depth);
+      return;
+    }
+    if (opcode === 'control_if' || opcode === 'control_if_else') {
+      emitIfBranch(block, indent, depth, 'if');
+      if (block.next) emitStack(block.next, indent, depth);
+      return;
+    }
+    if (opcode === 'procedures_call') {
+      push(indent, renderProcedureCall(block, depth));
+      if (block.next) emitStack(block.next, indent, depth);
+      return;
+    }
+    const functionName = _mappings_js__WEBPACK_IMPORTED_MODULE_0__.OPCODE_TO_FUNCTION.get(opcode);
+    if (functionName) {
+      push(indent, renderCall(block, functionName, _mappings_js__WEBPACK_IMPORTED_MODULE_0__.FUNCTIONS[functionName], depth));
+    } else {
+      const ext = findExtensionMeta(opcode);
+      if (ext) {
+        push(indent, renderExtensionCall(block, ext, depth));
+      } else if (opcode === 'data_variable') {
+        const varName = block.fields && block.fields.VARIABLE ? block.fields.VARIABLE.value : 'variable';
+        push(indent, "${v:\"".concat(escapeString(varName), "\"}"));
+      } else if (opcode === 'data_listcontents') {
+        const listName = block.fields && block.fields.LIST ? block.fields.LIST.value : 'list';
+        push(indent, "${l:\"".concat(escapeString(listName), "\"}"));
+      } else if (OPCODE_TO_EXPRESSION.has(opcode)) {
+        push(indent, renderExpression(block, depth));
+      } else if (INFIX[opcode] || LOGICAL[opcode] || opcode === 'operator_not' || opcode === 'operator_mathop') {
+        push(indent, renderExpression(block, depth));
+      } else {
+        push(indent, "# unsupported block: ".concat(opcode));
+      }
+    }
+    if (block.next) emitStack(block.next, indent, depth);
+  };
+
+  /**
+   * Render a call to a user-defined custom block.
+   * @param {object} block procedures_call block.
+   * @param {number} depth Current depth.
+   * @returns {string} Call text.
+   */
+  const renderProcedureCall = (block, depth) => {
+    const mutation = block.mutation || {};
+    const proccode = mutation.proccode || 'custom_block';
+    const argumentIds = parseList(mutation, 'argumentids');
+    const _procedureSignature = procedureSignature(proccode, []),
+      name = _procedureSignature.name,
+      params = _procedureSignature.params;
+    const tags = params.map(param => param.tag);
+    const args = argumentIds.map((id, index) => {
+      const tag = tags[index] || 's';
+      return renderInputSigil(block.inputs && block.inputs[id], tag, depth);
+    });
+    return "".concat(name, "(").concat(args.join(', '), ")");
+  };
+
+  /**
+   * Emit a procedures_definition as a `@custom_block` + `def`.
+   * @param {object} block procedures_definition block.
+   * @param {number} indent Indent level.
+   * @param {number} depth Current depth.
+   */
+  const emitDefinition = (block, indent, depth) => {
+    const mutation = definitionMutation(target, block);
+    const proccode = mutation.proccode || 'custom_block';
+    const argumentNames = parseList(mutation, 'argumentnames');
+    const _procedureSignature2 = procedureSignature(proccode, argumentNames),
+      name = _procedureSignature2.name,
+      params = _procedureSignature2.params;
+    const warp = mutation.warp === 'true' || mutation.warp === true;
+    const label = isPlainProcCode(proccode, name) ? null : labelTemplate(proccode, argumentNames);
+    const decoratorArgs = [];
+    if (label) decoratorArgs.push(label);
+    if (warp) decoratorArgs.push('warp=True');
+    push(indent, "@custom_block".concat(decoratorArgs.length ? "(".concat(decoratorArgs.join(', '), ")") : ''));
+    const paramText = params.map(param => "${".concat(param.tag, ":").concat(param.name, "}")).join(', ');
+    push(indent, "def ".concat(name, "(").concat(paramText, "):"));
+    if (block.next) emitStack(block.next, indent + 1, depth + 1);else push(indent + 1, 'pass');
+  };
+
+  /**
+   * Emit a hat block as a `@decorator` + `def`.
+   * @param {object} block Hat block.
+   * @param {number} indent Indent level.
+   * @param {number} depth Current depth.
+   */
+  const emitHat = (block, indent, depth) => {
+    const opcode = block.opcode;
+    const hatName = _mappings_js__WEBPACK_IMPORTED_MODULE_0__.OPCODE_TO_HAT.get(opcode);
+    const descriptor = hatName ? _mappings_js__WEBPACK_IMPORTED_MODULE_0__.HAT_DECORATORS[hatName] : null;
+    const args = descriptor && descriptor.args ? descriptor.args.map(argDescriptor => renderArgument(block, argDescriptor, depth)) : [];
+    push(indent, "@".concat(hatName).concat(args.length ? "(".concat(args.join(', '), ")") : ''));
+    push(indent, "def ".concat(HAT_DEF_NAMES[opcode] || 'on_event', "():"));
+    if (block.next) emitStack(block.next, indent + 1, depth + 1);else push(indent + 1, 'pass');
+  };
+  return {
+    /**
+     * Get list of extension module names required by the decompiled scripts.
+     * @returns {Array<string>} Extension names.
+     */
+    getImports() {
+      return Array.from(neededImports);
+    },
+    /**
+     * Decompile a single script starting at a root block.
+     * @param {string} rootId Root block id.
+     * @returns {{code: string, truncated: boolean}} Result.
+     */
+    script(rootId) {
+      lines.length = 0;
+      truncated = false;
+      const block = getBlock(target, rootId);
+      if (!block) return {
+        code: '',
+        truncated: false
+      };
+      if (block.opcode === 'procedures_definition') emitDefinition(block, 0, 0);else if (_mappings_js__WEBPACK_IMPORTED_MODULE_0__.OPCODE_TO_HAT.has(block.opcode)) emitHat(block, 0, 0);else emitStack(rootId, 0, 0);
+      return {
+        code: lines.join('\n'),
+        truncated
+      };
+    },
+    /**
+     * Decompile every top-level script of the target into one Scrathon file.
+     * @returns {{code: string, scripts: number, truncated: boolean}} Result.
+     */
+    file() {
+      lines.length = 0;
+      truncated = false;
+      neededImports.clear();
+      const blocks = target && target.blocks && target.blocks._blocks ? target.blocks._blocks : {};
+      const roots = Object.values(blocks).filter(block => block && block.topLevel);
+      let count = 0;
+      for (const block of roots) {
+        if (block.opcode === 'procedures_definition') {
+          emitDefinition(block, 0, 0);
+        } else if (_mappings_js__WEBPACK_IMPORTED_MODULE_0__.OPCODE_TO_HAT.has(block.opcode)) {
+          emitHat(block, 0, 0);
+        } else {
+          var _FUNCTIONS$OPCODE_TO_;
+          const isReporter = block.opcode === 'data_variable' || block.opcode === 'data_listcontents' || OPCODE_TO_EXPRESSION.has(block.opcode) || Boolean(INFIX[block.opcode]) || Boolean(LOGICAL[block.opcode]) || block.opcode === 'operator_not' || block.opcode === 'operator_mathop' || _mappings_js__WEBPACK_IMPORTED_MODULE_0__.OPCODE_TO_FUNCTION.has(block.opcode) && Boolean((_FUNCTIONS$OPCODE_TO_ = _mappings_js__WEBPACK_IMPORTED_MODULE_0__.FUNCTIONS[_mappings_js__WEBPACK_IMPORTED_MODULE_0__.OPCODE_TO_FUNCTION.get(block.opcode)]) === null || _FUNCTIONS$OPCODE_TO_ === void 0 ? void 0 : _FUNCTIONS$OPCODE_TO_.reporter);
+          if (isReporter && !block.next) {
+            emitStack(block.id, 0, 0);
+          } else {
+            push(0, "def script_".concat(count + 1, "():"));
+            emitStack(block.id, 1, 0);
+          }
+        }
+        lines.push('');
+        count++;
+      }
+      const headerLines = [];
+      const name = target && typeof target.getName === 'function' ? target.getName() : target && target.name;
+      if (name) headerLines.push("target \"".concat(escapeString(name), "\""));
+      if (neededImports.size > 0) {
+        for (const mod of neededImports) {
+          headerLines.push("import ".concat(mod));
+        }
+      }
+      if (headerLines.length > 0) {
+        lines.unshift(...headerLines, '');
+      }
+      return {
+        code: lines.join('\n').trim(),
+        scripts: count,
+        truncated
+      };
+    }
+  };
+};
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/diff.js"
+/*!*****************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/diff.js ***!
+  \*****************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   buildSideBySideRows: () => (/* binding */ buildSideBySideRows),
+/* harmony export */   computeScopeDiff: () => (/* binding */ computeScopeDiff),
+/* harmony export */   computeToolDiff: () => (/* binding */ computeToolDiff),
+/* harmony export */   diffLines: () => (/* binding */ diffLines),
+/* harmony export */   groupHunks: () => (/* binding */ groupHunks),
+/* harmony export */   splitLines: () => (/* binding */ splitLines),
+/* harmony export */   splitScrathonScripts: () => (/* binding */ splitScrathonScripts)
+/* harmony export */ });
+/* harmony import */ var _parser_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./parser.js */ "./src/addons/addons/astras-copilot/agent/scrathon/parser.js");
+/* harmony import */ var _decompiler_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./decompiler.js */ "./src/addons/addons/astras-copilot/agent/scrathon/decompiler.js");
+/* harmony import */ var _mappings_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./mappings.js */ "./src/addons/addons/astras-copilot/agent/scrathon/mappings.js");
+/**
+ * Scrathon line-level diff engine and scope-aware script matcher.
+ *
+ * Implements a zero-dependency LCS (Longest Common Subsequence) diff algorithm
+ * and intelligent script slicing. Used to show side-by-side or unified red/green
+ * code diff reviews in the Astra Copilot chat approval cards before scripts are
+ * modified on the Scratch workspace.
+ */
+
+
+
+
+
+/**
+ * Split text into lines, normalizing line endings and trimming a trailing newline.
+ * @param {string} text Input text.
+ * @returns {Array<string>} Lines.
+ */
+const splitLines = text => {
+  if (typeof text !== 'string' || text.length === 0) return [];
+  // Strip trailing newline to avoid phantom empty line at EOF
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n$/, '');
+  if (normalized.length === 0) return [];
+  return normalized.split('\n');
+};
+
+/**
+ * Compute line-by-line diff between two strings using LCS.
+ * Produces unified entries with `{ type: 'same'|'add'|'del', line, oldLineNo, newLineNo }`.
+ *
+ * @param {string} oldText Original text.
+ * @param {string} newText Updated text.
+ * @returns {Array<{type: ('same'|'add'|'del'), line: string, oldLineNo: (number|null), newLineNo: (number|null)}>} Diff entries.
+ */
+const diffLines = (oldText, newText) => {
+  const a = splitLines(oldText);
+  const b = splitLines(newText);
+  const M = a.length;
+  const N = b.length;
+  if (M === 0 && N === 0) return [];
+  if (M === 0) {
+    return b.map((line, idx) => ({
+      type: 'add',
+      line,
+      oldLineNo: null,
+      newLineNo: idx + 1
+    }));
+  }
+  if (N === 0) {
+    return a.map((line, idx) => ({
+      type: 'del',
+      line,
+      oldLineNo: idx + 1,
+      newLineNo: null
+    }));
+  }
+
+  // DP table for Longest Common Subsequence (LCS)
+  const dp = Array.from({
+    length: M + 1
+  }, () => new Int32Array(N + 1));
+  for (let i = 0; i < M; i++) {
+    for (let j = 0; j < N; j++) {
+      if (a[i] === b[j]) {
+        dp[i + 1][j + 1] = dp[i][j] + 1;
+      } else {
+        dp[i + 1][j + 1] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+      }
+    }
+  }
+
+  // Backtrack from (M, N) to produce edit operations
+  let i = M;
+  let j = N;
+  const rawEdits = [];
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      rawEdits.push({
+        type: 'same',
+        line: a[i - 1]
+      });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      // By backtracking 'add' first when dp is equal, when reversed 'del' appears before 'add'
+      rawEdits.push({
+        type: 'add',
+        line: b[j - 1]
+      });
+      j--;
+    } else {
+      rawEdits.push({
+        type: 'del',
+        line: a[i - 1]
+      });
+      i--;
+    }
+  }
+  rawEdits.reverse();
+
+  // Assign 1-based line numbers
+  let oldLineNo = 1;
+  let newLineNo = 1;
+  return rawEdits.map(item => {
+    if (item.type === 'same') {
+      return {
+        type: 'same',
+        line: item.line,
+        oldLineNo: oldLineNo++,
+        newLineNo: newLineNo++
+      };
+    }
+    if (item.type === 'del') {
+      return {
+        type: 'del',
+        line: item.line,
+        oldLineNo: oldLineNo++,
+        newLineNo: null
+      };
+    }
+    return {
+      type: 'add',
+      line: item.line,
+      oldLineNo: null,
+      newLineNo: newLineNo++
+    };
+  });
+};
+
+/**
+ * Group diff entries into hunks with context lines, folding large blocks of unchanged lines.
+ *
+ * @param {Array<object>} diffEntries Diff entries from `diffLines`.
+ * @param {number} [contextSize=3] Lines of unchanged context before and after each change.
+ * @returns {Array<{oldStart: number, oldCount: number, newStart: number, newCount: number, header: string, lines: Array<object>}>} Hunks.
+ */
+const groupHunks = function groupHunks(diffEntries) {
+  let contextSize = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 3;
+  if (!Array.isArray(diffEntries) || diffEntries.length === 0) return [];
+
+  // Identify indices of changed lines ('add' or 'del')
+  const changeIndices = [];
+  for (let i = 0; i < diffEntries.length; i++) {
+    if (diffEntries[i].type !== 'same') changeIndices.push(i);
+  }
+
+  // No changes
+  if (changeIndices.length === 0) return [];
+
+  // Group change ranges: if distance between two changes <= 2 * contextSize, merge them
+  const groups = [];
+  let currentGroup = [changeIndices[0]];
+  for (let k = 1; k < changeIndices.length; k++) {
+    const idx = changeIndices[k];
+    const prevIdx = changeIndices[k - 1];
+    if (idx - prevIdx <= contextSize * 2) {
+      currentGroup.push(idx);
+    } else {
+      groups.push(currentGroup);
+      currentGroup = [idx];
+    }
+  }
+  groups.push(currentGroup);
+
+  // Convert groups into hunks with context
+  return groups.map(group => {
+    const firstChange = group[0];
+    const lastChange = group[group.length - 1];
+    const startIndex = Math.max(0, firstChange - contextSize);
+    const endIndex = Math.min(diffEntries.length - 1, lastChange + contextSize);
+    const lines = diffEntries.slice(startIndex, endIndex + 1);
+
+    // Calculate line counts and start numbers
+    let oldStart = 0;
+    let newStart = 0;
+    let oldCount = 0;
+    let newCount = 0;
+    for (const entry of lines) {
+      if (entry.oldLineNo !== null) {
+        if (oldStart === 0) oldStart = entry.oldLineNo;
+        oldCount++;
+      }
+      if (entry.newLineNo !== null) {
+        if (newStart === 0) newStart = entry.newLineNo;
+        newCount++;
+      }
+    }
+    if (oldStart === 0) oldStart = 1;
+    if (newStart === 0) newStart = 1;
+    return {
+      oldStart,
+      oldCount,
+      newStart,
+      newCount,
+      header: "@@ -".concat(oldStart, ",").concat(oldCount, " +").concat(newStart, ",").concat(newCount, " @@"),
+      lines
+    };
+  });
+};
+
+/**
+ * Split Scrathon source code into logical top-level script units.
+ *
+ * @param {string} source Scrathon source text.
+ * @returns {Array<{kind: string, name: string, args: Array<string>, line: number, code: string, id: (string|null)}>} Script units.
+ */
+const splitScrathonScripts = source => {
+  if (typeof source !== 'string' || source.trim() === '') return [];
+  let parsed;
+  try {
+    parsed = (0,_parser_js__WEBPACK_IMPORTED_MODULE_0__.parse)(source);
+  } catch (error) {
+    // If parse fails (e.g. partial code), return as a single opaque block
+    return [{
+      kind: 'raw',
+      name: 'script',
+      args: [],
+      line: 1,
+      code: source.trim(),
+      id: null
+    }];
+  }
+  const rawLines = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const blocks = parsed.blocks || [];
+  if (blocks.length === 0) return [];
+  const results = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    const nextBlock = blocks[i + 1];
+    const startLine = Math.max(1, block.line || 1);
+    // Find decorator lines before `def` if any
+    let sliceStart = startLine - 1;
+    while (sliceStart > 0 && rawLines[sliceStart - 1].trim().startsWith('@')) {
+      sliceStart--;
+    }
+    const sliceEnd = nextBlock ? Math.max(sliceStart + 1, (nextBlock.line || 1) - 1) : rawLines.length;
+
+    // Check for ID metadata comments like `# id:xxx` or `@id("xxx")`
+    const scriptLines = rawLines.slice(sliceStart, sliceEnd);
+    let explicitId = null;
+    for (const l of scriptLines) {
+      const match = l.match(/#\s*id:([^\s#]+)/) || l.match(/@id\(["']([^"']+)["']\)/);
+      if (match) {
+        explicitId = match[1];
+        break;
+      }
+    }
+    const scriptCode = scriptLines.join('\n').trim();
+    results.push({
+      kind: block.kind,
+      name: block.name,
+      args: block.args || (block.params ? block.params.map(p => p.name) : []),
+      line: sliceStart + 1,
+      code: scriptCode,
+      id: explicitId
+    });
+  }
+  return results;
+};
+
+/**
+ * Match an incoming Scrathon script against a list of target existing scripts.
+ *
+ * @param {object} incoming Incoming script unit from `splitScrathonScripts`.
+ * @param {Array<object>} targetScripts Existing scripts in the target.
+ * @param {Set<string>} usedScriptIds Script IDs already matched.
+ * @returns {object|null} Matched target script, or null if it's a new script.
+ */
+const matchScript = (incoming, targetScripts, usedScriptIds) => {
+  // 1. Explicit ID match
+  if (incoming.id) {
+    const match = targetScripts.find(s => s.id === incoming.id && !usedScriptIds.has(s.id));
+    if (match) return match;
+  }
+
+  // 2. Hat opcode or custom block procedure signature match
+  for (const existing of targetScripts) {
+    if (usedScriptIds.has(existing.id)) continue;
+    if (incoming.kind === 'hat') {
+      const existingHatName = _mappings_js__WEBPACK_IMPORTED_MODULE_2__.OPCODE_TO_HAT.get(existing.opcode);
+      if (existingHatName === incoming.name) {
+        // If hat has key arguments (e.g. key pressed or broadcast name), check if they match
+        if (existing.keyArg && incoming.args && incoming.args.length > 0) {
+          const incomingFirstArg = String(incoming.args[0]).replace(/["']/g, '').trim().toLowerCase();
+          const existingArg = String(existing.keyArg).replace(/["']/g, '').trim().toLowerCase();
+          if (incomingFirstArg === existingArg) return existing;
+        } else {
+          return existing;
+        }
+      }
+    } else if (incoming.kind === 'define') {
+      if (existing.opcode === 'procedures_definition' && existing.proccode) {
+        const procName = existing.proccode.split(/%[sb]/)[0].trim();
+        if (procName === incoming.name || existing.proccode === incoming.name) {
+          return existing;
+        }
+      }
+    }
+  }
+  return null;
+};
+
+/**
+ * Extract key discriminator argument from a Scratch hat block.
+ * @param {object} block Scratch block object.
+ * @returns {string|null} Key argument value.
+ */
+const extractKeyArg = block => {
+  if (!block || !block.fields) return null;
+  if (block.fields.KEY_OPTION) return block.fields.KEY_OPTION.value;
+  if (block.fields.BROADCAST_OPTION) return block.fields.BROADCAST_OPTION.value;
+  if (block.fields.WHENELEMENT) return block.fields.WHENELEMENT.value;
+  return null;
+};
+
+/**
+ * Compute scope-aware script diffs between existing target scripts and incoming Scrathon code.
+ * Only scripts that are actually being modified or added are included in the diff.
+ *
+ * @param {Array<object>} existingScripts Existing scripts `{ id, opcode, proccode, keyArg, code }`.
+ * @param {string} newSource Incoming Scrathon code.
+ * @param {object} [options] Options.
+ * @param {number} [options.contextSize=3] Context lines for hunks.
+ * @returns {{hasChanges: boolean, totalAdd: number, totalDel: number, scripts: Array<object>}} Diff result.
+ */
+const computeScopeDiff = function computeScopeDiff(existingScripts, newSource) {
+  let options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  const contextSize = options.contextSize !== undefined ? options.contextSize : 3;
+  const incomingScripts = splitScrathonScripts(newSource);
+  const usedScriptIds = new Set();
+  const scriptDiffs = [];
+  let totalAdd = 0;
+  let totalDel = 0;
+  for (const incoming of incomingScripts) {
+    const matched = matchScript(incoming, existingScripts, usedScriptIds);
+    let oldCode = '';
+    let scriptId = null;
+    let title = incoming.name || 'Script';
+    if (matched) {
+      usedScriptIds.add(matched.id);
+      oldCode = (matched.code || '').trim();
+      scriptId = matched.id;
+      title = matched.label || incoming.name || matched.id;
+    } else {
+      title = "[New] ".concat(incoming.name || 'Script');
+    }
+    const newCode = incoming.code.trim();
+    const diff = diffLines(oldCode, newCode);
+    const hunks = groupHunks(diff, contextSize);
+    let additions = 0;
+    let deletions = 0;
+    for (const d of diff) {
+      if (d.type === 'add') additions++;else if (d.type === 'del') deletions++;
+    }
+    const hasChanges = additions > 0 || deletions > 0;
+    if (hasChanges) {
+      totalAdd += additions;
+      totalDel += deletions;
+      scriptDiffs.push({
+        id: scriptId,
+        title,
+        isNew: !matched,
+        isDelete: false,
+        oldCode,
+        newCode,
+        diff,
+        hunks,
+        additions,
+        deletions,
+        hasChanges
+      });
+    }
+  }
+  return {
+    hasChanges: scriptDiffs.length > 0,
+    totalAdd,
+    totalDel,
+    scripts: scriptDiffs
+  };
+};
+
+/**
+ * Compute tool execution diff for write operations (`apply_scripts` or `delete_scripts`).
+ *
+ * @param {object} vm Scratch VM.
+ * @param {string} toolName Name of the tool ('apply_scripts' or 'delete_scripts').
+ * @param {object} args Arguments passed to the tool.
+ * @returns {object|null} Diff data payload.
+ */
+const computeToolDiff = (vm, toolName, args) => {
+  if (!vm || !vm.runtime) return null;
+
+  // Resolve target
+  let targetSelector = args.target;
+  if (!targetSelector && typeof args.code === 'string') {
+    const targetMatch = args.code.match(/^\s*target\s+["']([^"']+)["']/m);
+    if (targetMatch) {
+      targetSelector = targetMatch[1];
+    }
+  }
+  let target = null;
+  if (targetSelector && typeof vm.runtime.getTargetById === 'function') {
+    target = vm.runtime.getTargetById(targetSelector);
+  }
+  if (!target && targetSelector && Array.isArray(vm.runtime.targets)) {
+    const wanted = String(targetSelector).toLowerCase();
+    target = vm.runtime.targets.find(t => String(t.getName()).toLowerCase() === wanted);
+  }
+  if (!target && typeof vm.runtime.getEditingTarget === 'function') {
+    target = vm.runtime.getEditingTarget();
+  }
+  if (!target) return null;
+  const decompiler = (0,_decompiler_js__WEBPACK_IMPORTED_MODULE_1__.createDecompiler)(vm, target);
+  const blocks = target.blocks && target.blocks._blocks ? target.blocks._blocks : {};
+  const topLevelBlocks = Object.values(blocks).filter(b => b && b.topLevel && !b.shadow);
+  const existingScripts = topLevelBlocks.map(b => {
+    let proccode = null;
+    if (b.opcode === 'procedures_definition') {
+      const customBlock = b.inputs && b.inputs.custom_block && blocks[b.inputs.custom_block.block];
+      if (customBlock && customBlock.mutation) {
+        proccode = customBlock.mutation.proccode;
+      }
+    }
+    return {
+      id: b.id,
+      opcode: b.opcode,
+      proccode,
+      keyArg: extractKeyArg(b),
+      code: decompiler.script(b.id).code
+    };
+  });
+  const targetName = typeof target.getName === 'function' ? target.getName() : target.name;
+  if (toolName === 'apply_scripts') {
+    const code = typeof args.code === 'string' ? args.code : '';
+    if (!code.trim()) return null;
+    const scopeDiff = computeScopeDiff(existingScripts, code);
+    return {
+      tool: toolName,
+      target: targetName,
+      hasChanges: scopeDiff.hasChanges,
+      totalAdd: scopeDiff.totalAdd,
+      totalDel: scopeDiff.totalDel,
+      scripts: scopeDiff.scripts
+    };
+  }
+  if (toolName === 'delete_scripts') {
+    const ids = Array.isArray(args.scriptIds) ? args.scriptIds.filter(id => typeof id === 'string' && id) : args.scriptId ? [args.scriptId] : [];
+    if (ids.length === 0) return null;
+    let totalDel = 0;
+    const scriptDiffs = [];
+    for (const scriptId of ids) {
+      const existing = existingScripts.find(s => s.id === scriptId);
+      const oldCode = existing ? existing.code.trim() : '';
+      if (!oldCode) continue;
+      const diff = diffLines(oldCode, '');
+      const hunks = groupHunks(diff, 3);
+      const deletions = diff.filter(d => d.type === 'del').length;
+      totalDel += deletions;
+      scriptDiffs.push({
+        id: scriptId,
+        title: "[Delete] ".concat(existing.opcode || scriptId),
+        isNew: false,
+        isDelete: true,
+        oldCode,
+        newCode: '',
+        diff,
+        hunks,
+        additions: 0,
+        deletions,
+        hasChanges: deletions > 0
+      });
+    }
+    return {
+      tool: toolName,
+      target: targetName,
+      hasChanges: scriptDiffs.length > 0,
+      totalAdd: 0,
+      totalDel,
+      scripts: scriptDiffs
+    };
+  }
+  return null;
+};
+
+/**
+ * Convert unified diff entries (from diffLines or hunks) into paired side-by-side rows.
+ *
+ * Each row has:
+ * {
+ *   left: { lineNo: number|null, text: string, type: 'same'|'del'|'empty' },
+ *   right: { mark: ' '|'+'|'~'|'-', lineNo: number|null, text: string, type: 'same'|'add'|'mod'|'empty' }
+ * }
+ *
+ * @param {Array<object>} diffEntries Unified diff entries.
+ * @returns {Array<{left: {lineNo: (number|null), text: string, type: string}, right: {mark: string, lineNo: (number|null), text: string, type: string}}>} Side-by-side rows.
+ */
+const buildSideBySideRows = diffEntries => {
+  if (!Array.isArray(diffEntries) || diffEntries.length === 0) return [];
+  const rows = [];
+  let delQueue = [];
+  let addQueue = [];
+  const flushQueues = () => {
+    const M = delQueue.length;
+    const N = addQueue.length;
+    const maxLen = Math.max(M, N);
+    for (let k = 0; k < maxLen; k++) {
+      const del = k < M ? delQueue[k] : null;
+      const add = k < N ? addQueue[k] : null;
+      if (del && add) {
+        rows.push({
+          left: {
+            lineNo: del.oldLineNo,
+            text: del.line,
+            type: 'del'
+          },
+          right: {
+            mark: '~',
+            lineNo: add.newLineNo,
+            text: add.line,
+            type: 'mod'
+          }
+        });
+      } else if (del && !add) {
+        rows.push({
+          left: {
+            lineNo: del.oldLineNo,
+            text: del.line,
+            type: 'del'
+          },
+          right: {
+            mark: ' ',
+            lineNo: null,
+            text: '',
+            type: 'empty'
+          }
+        });
+      } else if (!del && add) {
+        rows.push({
+          left: {
+            lineNo: null,
+            text: '',
+            type: 'empty'
+          },
+          right: {
+            mark: '+',
+            lineNo: add.newLineNo,
+            text: add.line,
+            type: 'add'
+          }
+        });
+      }
+    }
+    delQueue = [];
+    addQueue = [];
+  };
+  for (const item of diffEntries) {
+    if (item.type === 'del') {
+      delQueue.push(item);
+    } else if (item.type === 'add') {
+      addQueue.push(item);
+    } else {
+      flushQueues();
+      const shifted = item.oldLineNo !== item.newLineNo;
+      rows.push({
+        left: {
+          lineNo: item.oldLineNo,
+          text: item.line,
+          type: 'same'
+        },
+        right: {
+          mark: shifted ? '~' : ' ',
+          lineNo: item.newLineNo,
+          text: item.line,
+          type: shifted ? 'mod' : 'same'
+        }
+      });
+    }
+  }
+  flushQueues();
+  return rows;
+};
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/error.js"
+/*!******************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/error.js ***!
+  \******************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   ScrathonError: () => (/* binding */ ScrathonError),
+/* harmony export */   toScrathonError: () => (/* binding */ toScrathonError)
+/* harmony export */ });
+/**
+ * Scrathon diagnostics.
+ *
+ * A `ScrathonError` carries the source location and an optional fix suggestion
+ * so the UI and tests can print the documented multi-line diagnostic format.
+ */
+
+const CARET = '^';
+const CODE_PREFIX = 'Code: ';
+
+/**
+ * A compile-time Scrathon error with source location and a fix suggestion.
+ */
+class ScrathonError extends Error {
+  /**
+   * @param {object} options Error options.
+   * @param {string} [options.type] Diagnostic type, e.g. "TypeMismatchError".
+   * @param {string} options.message Human readable message.
+   * @param {number} [options.line] 1-based line number.
+   * @param {number} [options.column] 1-based column number.
+   * @param {string} [options.code] Offending source line.
+   * @param {string} [options.suggestion] Suggested correct syntax.
+   */
+  constructor(_ref) {
+    let _ref$type = _ref.type,
+      type = _ref$type === void 0 ? 'SyntaxError' : _ref$type,
+      message = _ref.message,
+      _ref$line = _ref.line,
+      line = _ref$line === void 0 ? 0 : _ref$line,
+      _ref$column = _ref.column,
+      column = _ref$column === void 0 ? 0 : _ref$column,
+      _ref$code = _ref.code,
+      code = _ref$code === void 0 ? '' : _ref$code,
+      _ref$suggestion = _ref.suggestion,
+      suggestion = _ref$suggestion === void 0 ? '' : _ref$suggestion;
+    super(message);
+    this.name = 'ScrathonError';
+    this.type = type;
+    this.line = line;
+    this.column = column;
+    this.code = code;
+    this.suggestion = suggestion;
+  }
+
+  /**
+   * Render the error in the documented multi-line format.
+   * @param {string} [file] Source file label.
+   * @returns {string} Formatted diagnostic.
+   */
+  format() {
+    let file = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 'Scrathon.py';
+    const lines = ['[Scrathon CompileError]'];
+    if (this.line) {
+      lines.push("File: \"".concat(file, "\", Line ").concat(this.line, ", Column ").concat(this.column || 1));
+    }
+    if (this.code) {
+      lines.push("".concat(CODE_PREFIX).concat(this.code));
+      const pad = ' '.repeat(CODE_PREFIX.length + Math.max(0, (this.column || 1) - 1));
+      lines.push("".concat(pad).concat(CARET.repeat(Math.max(1, this.code.length))));
+    }
+    lines.push("".concat(this.type, ":"));
+    lines.push("  ".concat(this.message));
+    if (this.suggestion) {
+      lines.push('');
+      lines.push('Correct Syntax:');
+      lines.push("  ".concat(this.suggestion));
+    }
+    return lines.join('\n');
+  }
+}
+
+/**
+ * Coerce an arbitrary thrown value into a ScrathonError.
+ * @param {*} error Thrown value.
+ * @returns {ScrathonError} Scrathon error.
+ */
+const toScrathonError = error => {
+  if (error instanceof ScrathonError) return error;
+  const message = error && error.message ? error.message : String(error);
+  return new ScrathonError({
+    type: 'CompileError',
+    message
+  });
+};
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/example.js"
+/*!********************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/example.js ***!
+  \********************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   SCRATHON_EXAMPLE: () => (/* binding */ SCRATHON_EXAMPLE)
+/* harmony export */ });
+/**
+ * Complete, tested Scrathon feature-tour example.
+ *
+ * This is returned by the `scrathon_example` tool instead of being embedded in
+ * the system prompt. It deliberately uses the short explicit sigils (`${v:}`,
+ * `${l:}`, `${n:}`, `${s:}`, `${b:}`, `${c:}`, `${m:}`) so generated code stays
+ * compact while remaining unambiguous.
+ */
+const SCRATHON_EXAMPLE = ['import pen', 'import music', '', '# ---------- Custom blocks: n/s/b params, warp, recursion ----------', '@custom_block(warp=True)', 'def draw_polygon(${n:sides}, ${n:side_length}, ${s:label}, ${b:announce}):', '    pen.setPenSizeTo(${n:3})', '    pen.penDown()', '    repeat(${n:sides}):', '        move(${n:side_length})', '        turn_right(${n:360 / sides})', '    pen.penUp()', '    if ${b:announce}:', '        say(${s:label})', '', '@custom_block(warp=True)', 'def countdown(${n:remaining}):', '    if ${b:remaining > 0}:', '        say(${s:join("T-minus ", remaining)})', '        wait(${n:0.05})', '        countdown(${n:remaining - 1})', '    else:', '        say(${s:"Liftoff!"})', '', '# ---------- Main script ----------', '@when_flag_clicked', 'def main():', '    # variables: global + sprite-local; lists: global + sprite-local', '    set_var(${v:"score"}, ${n:0})', '    set_var(${v:local:"hp"}, ${n:100})', '    list_delete_all(${l:"inventory"})', '    list_add(${l:"inventory"}, ${s:"Sword"})', '    list_add(${l:local:"backpack"}, ${s:"Potion"})', '    set_size_to(${v:local:"hp"})  # variable reporter directly in a number slot', '    list_insert(${l:"inventory"}, ${n:1}, ${s:"Shield"})', '    set_var(${v:"first_item"}, ${s:list_item(${l:"inventory"}, ${n:1})})', '    set_var(${v:"item_count"}, ${n:list_length(${l:"inventory"})})', '    set_var(${v:"has_sword"}, ${s:list_contains(${l:"inventory"}, ${s:"Sword"})})', '', '    # ask + answer reporter; built-in sensing reporters', '    ask_and_wait(${s:"What is your name?"})', '    set_var(${v:"player_name"}, ${s:answer()})', '    say(${s:join("Hello, ", answer())})', '    set_var(${v:"days_since_2000"}, ${n:days_since_2000()})', '    set_var(${v:"now_year"}, ${n:current(${m:"YEAR"})})', '    set_var(${v:"timer_value"}, ${n:timer()})', '    set_var(${v:"user_name"}, ${s:username()})', '    set_var(${v:"loudness_value"}, ${n:loudness()})', '    set_var(${v:"mouse_pos"}, ${s:join(mouse_x(), join(", ", mouse_y()))})', '    set_var(${v:"distance"}, ${n:distance_to(${m:"_mouse_"})})', '    set_var(${v:"sprite_x"}, ${n:of(${m:"x position"}, ${m:"Sprite1"})})', '', '    # operators / nested expressions', '    set_var(${v:"random_score"}, ${n:random(${n:1}, ${n:100})})', '    set_var(${v:"sqrt"}, ${n:math(${m:"sqrt"}, ${n:81})})', '    set_var(${v:"rounded"}, ${n:round(${n:3.14159})})', '    set_var(${v:"text_length"}, ${n:length_of(${s:"Scrathon"})})', '    set_var(${v:"first_letter"}, ${s:letter_of(${n:1}, ${s:"Scrathon"})})', '    set_var(${v:"has_scratch"}, ${s:contains(${s:"Scrathon"}, ${s:"Scratch"})})', '    set_var(${v:"calc"}, ${n:10 + 5 * 2})', '    set_var(${v:"flag"}, ${s:(score >= 0) and not mouse_down()})', '', '    # control flow with elif', '    if ${b:key_pressed(${m:"space"})}:', '        say(${s:"Space pressed"})', '    elif ${b:touching(${m:"_mouse_"})}:', '        say(${s:"Touched by mouse"})', '    else:', '        say(${s:"Waiting..."})', '', '    if ${b:touching_color(${c:"#FF0000"})}:', '        change_var(${v:"score"}, ${n:1})', '', '    repeat(${n:3}):', '        change_volume_by(${n:-5})', '        wait(${n:0.1})', '    wait_until(${b:timer() > 1})', '', '    # custom block calls', '    draw_polygon(${n:5}, ${n:60}, ${s:"Pentagon"}, ${b:True})', '    countdown(${n:3})', '', '    # events / motion / looks / sound / pen / music', '    broadcast(${s:"update"})', '    broadcast_and_wait(${s:"done"})', '    go_to_xy(${n:0}, ${n:0})', '    glide_to_xy(${n:1}, ${n:100}, ${n:50})', '    point_in_direction(${n:90})', '    bounce_on_edge()', '    switch_costume(${m:"costume1"})', '    next_costume()', '    set_effect(${m:"COLOR"}, ${n:25})', '    change_size_by(${n:10})', '    show()', '    set_volume_to(${n:80})', '    start_sound(${m:"pop"})', '    play_sound_until_done(${m:"pop"})', '    create_clone_of(${m:"_myself_"})', '    pen.clear()', '    pen.setPenColorToColor(${c:"#FF4081"})', '    pen.penDown()', '    move(${n:20})', '    pen.penUp()', '    music.setInstrument(${m:"1"})', '    music.setTempo(${n:120})', '    music.playNoteForBeats(${n:60}, ${n:0.25})', '    set_var(${v:"x"}, ${n:x_position()})', '    set_var(${v:"y"}, ${n:y_position()})', '    set_var(${v:"direction_value"}, ${n:direction()})', '    set_var(${v:"size_value"}, ${n:size()})', '    set_var(${v:"costume_name"}, ${s:costume_number_name(${m:"name"})})', '    set_var(${v:"backdrop_name"}, ${s:backdrop_number_name(${m:"name"})})', '    set_var(${v:"volume_value"}, ${n:volume()})', '    set_var(${v:"tempo_value"}, ${n:music.getTempo()})', '', '# ---------- Other event hats ----------', '@when_broadcast(${s:"update"})', 'def on_update():', '    say(${s:"Update received"})', '    stop(${m:"this script"})', '', '@when_key_pressed(${m:"space"})', 'def on_space():', '    change_var(${v:"score"}, ${n:1})', '', '@when_greater_than(${m:"TIMER"}, ${n:10})', 'def on_timer():', '    say(${s:"10 seconds passed"})', '', '@when_backdrop_switches(${m:"backdrop1"})', 'def on_backdrop():', '    say(${s:"Backdrop changed"})', '', '@when_i_start_as_clone', 'def on_clone():', '    wait(${n:1})', '    delete_this_clone()', ''].join('\n');
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/lexer.js"
+/*!******************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/lexer.js ***!
+  \******************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   TT: () => (/* binding */ TT),
+/* harmony export */   findTrailingColon: () => (/* binding */ findTrailingColon),
+/* harmony export */   splitLines: () => (/* binding */ splitLines),
+/* harmony export */   splitTopLevelArgs: () => (/* binding */ splitTopLevelArgs),
+/* harmony export */   stripComment: () => (/* binding */ stripComment),
+/* harmony export */   tokenizeExpression: () => (/* binding */ tokenizeExpression)
+/* harmony export */ });
+/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./error.js */ "./src/addons/addons/astras-copilot/agent/scrathon/error.js");
+/**
+ * Scrathon lexer.
+ *
+ * Splits source into indentation-aware logical lines and tokenises the
+ * `${type:value}` sigil mini-language. Kept separate from the parser so both
+ * can be unit-tested in isolation.
+ */
+
+
+
+/** Token types produced by `tokenizeExpression`. */
+const TT = {
+  NUMBER: 'NUMBER',
+  STRING: 'STRING',
+  IDENT: 'IDENT',
+  OP: 'OP',
+  LPAREN: 'LPAREN',
+  RPAREN: 'RPAREN',
+  COMMA: 'COMMA',
+  SIGIL: 'SIGIL',
+  COLON: 'COLON',
+  RBRACE: 'RBRACE',
+  EOF: 'EOF'
+};
+const INDENT_UNIT = 4;
+
+/**
+ * Strip a trailing comment from a source line, respecting string literals.
+ * @param {string} line Source line.
+ * @returns {string} Line without its comment.
+ */
+const stripComment = line => {
+  let quote = '';
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quote) {
+      if (ch === '\\') {
+        i++;
+        continue;
+      }
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '#') return line.slice(0, i);
+  }
+  return line;
+};
+
+/**
+ * Split source into logical lines with indentation metadata.
+ * Blank lines and comment-only lines are dropped.
+ * @param {string} source Scrathon source.
+ * @returns {Array<{indent: number, text: string, line: number}>} Logical lines.
+ */
+const splitLines = source => {
+  const raw = String(source === undefined || source === null ? '' : source).split(/\r?\n/);
+  const out = [];
+  raw.forEach((rawLine, index) => {
+    const lineNumber = index + 1;
+    const withoutComment = stripComment(rawLine);
+    if (withoutComment.trim() === '') return;
+    const leading = withoutComment.match(/^[ \t]*/)[0];
+    if (leading.includes('\t')) {
+      throw new _error_js__WEBPACK_IMPORTED_MODULE_0__.ScrathonError({
+        type: 'SyntaxError',
+        message: 'Tabs are not allowed for indentation; use 4 spaces per level.',
+        line: lineNumber,
+        column: 1,
+        code: rawLine
+      });
+    }
+    const indent = leading.length;
+    if (indent % INDENT_UNIT !== 0) {
+      throw new _error_js__WEBPACK_IMPORTED_MODULE_0__.ScrathonError({
+        type: 'SyntaxError',
+        message: "Indentation must be a multiple of ".concat(INDENT_UNIT, " spaces."),
+        line: lineNumber,
+        column: indent + 1,
+        code: rawLine
+      });
+    }
+    out.push({
+      indent,
+      text: withoutComment.trim(),
+      line: lineNumber
+    });
+  });
+  return out;
+};
+
+/**
+ * Find the index of a top-level trailing colon (statement / control block).
+ * Colons inside `${...}` sigils or strings are ignored.
+ * @param {string} text Trimmed line text.
+ * @returns {number} Index of the colon, or -1.
+ */
+const findTrailingColon = text => {
+  let depth = 0;
+  let quote = '';
+  let last = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      if (ch === '\\') {
+        i++;
+        continue;
+      }
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '$' && text[i + 1] === '{') {
+      depth++;
+      i++;
+      continue;
+    }
+    if (ch === '{') depth++;else if (ch === '}') depth--;else if (ch === '(') depth++;else if (ch === ')') depth--;else if (ch === ':' && depth === 0) last = i;
+  }
+  return last;
+};
+
+/**
+ * Split an argument list body on top-level commas.
+ * @param {string} inner Text between the parentheses.
+ * @returns {Array<string>} Raw argument strings.
+ */
+const splitTopLevelArgs = inner => {
+  const text = String(inner || '');
+  if (text.trim() === '') return [];
+  const parts = [];
+  let depth = 0;
+  let quote = '';
+  let current = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      current += ch;
+      if (ch === '\\') {
+        current += text[i + 1] || '';
+        i++;
+        continue;
+      }
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === '$' && text[i + 1] === '{') {
+      depth++;
+      current += '${';
+      i++;
+      continue;
+    }
+    if (ch === '{' || ch === '(' || ch === '[') depth++;
+    if (ch === '}' || ch === ')' || ch === ']') depth--;
+    if (ch === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim() !== '') parts.push(current.trim());
+  return parts;
+};
+
+/**
+ * Tokenise an expression string (the inside of a sigil or an argument).
+ * @param {string} src Expression source.
+ * @param {number} [line] Source line for diagnostics.
+ * @param {number} [baseCol] 1-based column where `src` starts on that line.
+ * @returns {Array<object>} Tokens (always ending with EOF).
+ */
+const tokenizeExpression = function tokenizeExpression(src) {
+  let line = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  let baseCol = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
+  const text = String(src || '');
+  const tokens = [];
+  let i = 0;
+  const push = (type, value, col) => tokens.push({
+    type,
+    value,
+    col
+  });
+  while (i < text.length) {
+    const ch = text[i];
+    const col = baseCol + i;
+    if (ch === ' ' || ch === '\t') {
+      i++;
+      continue;
+    }
+    if (ch === '$' && text[i + 1] === '{') {
+      push(TT.SIGIL, '${', col);
+      i += 2;
+      continue;
+    }
+    if (ch === '(') {
+      push(TT.LPAREN, '(', col);
+      i++;
+      continue;
+    }
+    if (ch === ')') {
+      push(TT.RPAREN, ')', col);
+      i++;
+      continue;
+    }
+    if (ch === ',') {
+      push(TT.COMMA, ',', col);
+      i++;
+      continue;
+    }
+    if (ch === '}') {
+      push(TT.RBRACE, '}', col);
+      i++;
+      continue;
+    }
+    if (ch === ':') {
+      push(TT.COLON, ':', col);
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      let value = '';
+      let j = i + 1;
+      let closed = false;
+      while (j < text.length) {
+        const c = text[j];
+        if (c === '\\') {
+          const next = text[j + 1];
+          if (next === 'n') value += '\n';else if (next === 't') value += '\t';else value += next === undefined ? '' : next;
+          j += 2;
+          continue;
+        }
+        if (c === quote) {
+          closed = true;
+          j++;
+          break;
+        }
+        value += c;
+        j++;
+      }
+      if (!closed) {
+        throw new _error_js__WEBPACK_IMPORTED_MODULE_0__.ScrathonError({
+          type: 'SyntaxError',
+          message: 'Unterminated string literal.',
+          line,
+          column: col
+        });
+      }
+      push(TT.STRING, value, col);
+      i = j;
+      continue;
+    }
+    if (/[0-9]/.test(ch)) {
+      let j = i;
+      while (j < text.length && /[0-9.]/.test(text[j])) j++;
+      push(TT.NUMBER, text.slice(i, j), col);
+      i = j;
+      continue;
+    }
+    if (/[A-Za-z_\u4e00-\u9fff]/.test(ch)) {
+      let j = i;
+      while (j < text.length && /[A-Za-z0-9_.\u4e00-\u9fff]/.test(text[j])) j++;
+      push(TT.IDENT, text.slice(i, j), col);
+      i = j;
+      continue;
+    }
+    if ('+-*/%<>=!'.includes(ch)) {
+      const pair = text.slice(i, i + 2);
+      if (pair === '>=' || pair === '<=' || pair === '==' || pair === '!=') {
+        push(TT.OP, pair, col);
+        i += 2;
+        continue;
+      }
+      push(TT.OP, ch, col);
+      i++;
+      continue;
+    }
+    throw new _error_js__WEBPACK_IMPORTED_MODULE_0__.ScrathonError({
+      type: 'SyntaxError',
+      message: "Unexpected character \"".concat(ch, "\"."),
+      line,
+      column: col
+    });
+  }
+  push(TT.EOF, '', baseCol + text.length);
+  return tokens;
+};
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/mappings.js"
+/*!*********************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/mappings.js ***!
+  \*********************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   BUILTIN_EXTENSION_CATALOG: () => (/* binding */ BUILTIN_EXTENSION_CATALOG),
+/* harmony export */   COMPARISON_OPS: () => (/* binding */ COMPARISON_OPS),
+/* harmony export */   CONTROL_FUNCTIONS: () => (/* binding */ CONTROL_FUNCTIONS),
+/* harmony export */   EXPRESSION_FUNCTIONS: () => (/* binding */ EXPRESSION_FUNCTIONS),
+/* harmony export */   EXPRESSION_FUNCTION_ARGS: () => (/* binding */ EXPRESSION_FUNCTION_ARGS),
+/* harmony export */   FUNCTIONS: () => (/* binding */ FUNCTIONS),
+/* harmony export */   FUNCTION_ALIASES: () => (/* binding */ FUNCTION_ALIASES),
+/* harmony export */   HAT_ALIASES: () => (/* binding */ HAT_ALIASES),
+/* harmony export */   HAT_DECORATORS: () => (/* binding */ HAT_DECORATORS),
+/* harmony export */   IF_ELSE_FUNCTION: () => (/* binding */ IF_ELSE_FUNCTION),
+/* harmony export */   IF_FUNCTION: () => (/* binding */ IF_FUNCTION),
+/* harmony export */   KNOWN_BUILTIN_EXTENSIONS: () => (/* binding */ KNOWN_BUILTIN_EXTENSIONS),
+/* harmony export */   KNOWN_OPCODES: () => (/* binding */ KNOWN_OPCODES),
+/* harmony export */   LOGICAL_BINARY_OPS: () => (/* binding */ LOGICAL_BINARY_OPS),
+/* harmony export */   LOGICAL_NOT: () => (/* binding */ LOGICAL_NOT),
+/* harmony export */   NUMERIC_BINARY_OPS: () => (/* binding */ NUMERIC_BINARY_OPS),
+/* harmony export */   OPCODE_TO_CONTROL: () => (/* binding */ OPCODE_TO_CONTROL),
+/* harmony export */   OPCODE_TO_FUNCTION: () => (/* binding */ OPCODE_TO_FUNCTION),
+/* harmony export */   OPCODE_TO_HAT: () => (/* binding */ OPCODE_TO_HAT),
+/* harmony export */   TAGS: () => (/* binding */ TAGS),
+/* harmony export */   TAG_VARIABLE_TYPE: () => (/* binding */ TAG_VARIABLE_TYPE),
+/* harmony export */   describeScrathonCatalog: () => (/* binding */ describeScrathonCatalog)
+/* harmony export */ });
+function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
+function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
+function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == typeof i ? i : i + ""; }
+function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != typeof i) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+/**
+ * Scrathon instruction tables.
+ *
+ * A single source of truth mapping Scrathon instruction names to the exact
+ * scratch-blocks opcodes, input names and field names they compile to. Both the
+ * compiler and the decompiler read from here, so the two directions cannot
+ * drift apart.
+ *
+ * Argument descriptors use `{ t, k, name }`:
+ *   - `t`  value tag, matching the `${t:v}` sigils: n, s, b, c, m, v, l, msg
+ *   - `k`  where the value goes: 'input' (a shadow input) or 'field' (a dropdown
+ *          / variable field on the block itself)
+ *   - `name` the scratch-blocks input or field name
+ */
+
+/** Value tags used inside `${t:v}` sigils. */
+const TAGS = ['n', 's', 'b', 'c', 'm', 'v', 'l', 'msg'];
+
+/** `field` variable-type keyed by tag, matching the VM's variable types. */
+const TAG_VARIABLE_TYPE = {
+  v: '',
+  l: 'list',
+  msg: 'broadcast_msg'
+};
+
+/**
+ * Declare an argument descriptor.
+ * @param {string} t Value tag.
+ * @param {'input'|'field'} k Argument kind.
+ * @param {string} name Input or field name.
+ * @returns {object} Argument descriptor.
+ */
+const arg = (t, k, name) => ({
+  t,
+  k,
+  name
+});
+
+/**
+ * Declare a function instruction.
+ * @param {string} opcode Target opcode.
+ * @param {Array<object>} args Argument descriptors.
+ * @param {object} [options] Extra options.
+ * @returns {object} Instruction descriptor.
+ */
+const fn = function fn(opcode) {
+  let args = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  let options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  return {
+    opcode,
+    args,
+    shape: options.shape || 'statement',
+    substacks: options.substacks || 0,
+    reporter: options.reporter || false
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Statement / reporter functions
+// ---------------------------------------------------------------------------
+
+/** Scrathon function name -> instruction descriptor. */
+const FUNCTIONS = {
+  // --- Motion --------------------------------------------------------------
+  move: fn('motion_movesteps', [arg('n', 'input', 'STEPS')]),
+  turn_right: fn('motion_turnright', [arg('n', 'input', 'DEGREES')]),
+  turn_left: fn('motion_turnleft', [arg('n', 'input', 'DEGREES')]),
+  go_to_xy: fn('motion_gotoxy', [arg('n', 'input', 'X'), arg('n', 'input', 'Y')]),
+  go_to: fn('motion_goto', [arg('m', 'input', 'TO')]),
+  glide_to_xy: fn('motion_glidesecstoxy', [arg('n', 'input', 'SECS'), arg('n', 'input', 'X'), arg('n', 'input', 'Y')]),
+  glide_to: fn('motion_glideto', [arg('n', 'input', 'SECS'), arg('m', 'input', 'TO')]),
+  point_in_direction: fn('motion_pointindirection', [arg('n', 'input', 'DIRECTION')]),
+  point_towards: fn('motion_pointtowards', [arg('m', 'input', 'TOWARDS')]),
+  change_x: fn('motion_changexby', [arg('n', 'input', 'DX')]),
+  set_x: fn('motion_setx', [arg('n', 'input', 'X')]),
+  change_y: fn('motion_changeyby', [arg('n', 'input', 'DY')]),
+  set_y: fn('motion_sety', [arg('n', 'input', 'Y')]),
+  bounce_on_edge: fn('motion_ifonedgebounce'),
+  set_rotation_style: fn('motion_setrotationstyle', [arg('m', 'field', 'STYLE')]),
+  x_position: fn('motion_xposition', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  y_position: fn('motion_yposition', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  direction: fn('motion_direction', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  // --- Looks ---------------------------------------------------------------
+  say: fn('looks_say', [arg('s', 'input', 'MESSAGE')]),
+  say_for_secs: fn('looks_sayforsecs', [arg('s', 'input', 'MESSAGE'), arg('n', 'input', 'SECS')]),
+  think: fn('looks_think', [arg('s', 'input', 'MESSAGE')]),
+  think_for_secs: fn('looks_thinkforsecs', [arg('s', 'input', 'MESSAGE'), arg('n', 'input', 'SECS')]),
+  show: fn('looks_show'),
+  hide: fn('looks_hide'),
+  switch_costume: fn('looks_switchcostumeto', [arg('m', 'input', 'COSTUME')]),
+  next_costume: fn('looks_nextcostume'),
+  switch_backdrop: fn('looks_switchbackdropto', [arg('m', 'input', 'BACKDROP')]),
+  switch_backdrop_and_wait: fn('looks_switchbackdroptoandwait', [arg('m', 'input', 'BACKDROP')]),
+  next_backdrop: fn('looks_nextbackdrop'),
+  go_to_layer: fn('looks_gotofrontback', [arg('m', 'field', 'FRONT_BACK')]),
+  go_layers: fn('looks_goforwardbackwardlayers', [arg('m', 'field', 'FORWARD_BACKWARD'), arg('n', 'input', 'NUM')]),
+  change_effect_by: fn('looks_changeeffectby', [arg('m', 'field', 'EFFECT'), arg('n', 'input', 'CHANGE')]),
+  set_effect: fn('looks_seteffectto', [arg('m', 'field', 'EFFECT'), arg('n', 'input', 'VALUE')]),
+  clear_graphic_effects: fn('looks_cleargraphiceffects'),
+  change_size_by: fn('looks_changesizeby', [arg('n', 'input', 'CHANGE')]),
+  set_size_to: fn('looks_setsizeto', [arg('n', 'input', 'SIZE')]),
+  size: fn('looks_size', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  costume_number_name: fn('looks_costumenumbername', [arg('m', 'field', 'NUMBER_NAME')], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  backdrop_number_name: fn('looks_backdropnumbername', [arg('m', 'field', 'NUMBER_NAME')], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  // --- Sound ---------------------------------------------------------------
+  start_sound: fn('sound_play', [arg('m', 'input', 'SOUND_MENU')]),
+  play_sound_until_done: fn('sound_playuntildone', [arg('m', 'input', 'SOUND_MENU')]),
+  stop_all_sounds: fn('sound_stopallsounds'),
+  set_sound_effect: fn('sound_seteffectto', [arg('m', 'field', 'EFFECT'), arg('n', 'input', 'VALUE')]),
+  change_sound_effect_by: fn('sound_changeeffectby', [arg('m', 'field', 'EFFECT'), arg('n', 'input', 'VALUE')]),
+  clear_sound_effects: fn('sound_cleareffects'),
+  change_volume_by: fn('sound_changevolumeby', [arg('n', 'input', 'VOLUME')]),
+  set_volume_to: fn('sound_setvolumeto', [arg('n', 'input', 'VOLUME')]),
+  volume: fn('sound_volume', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  // --- Control -------------------------------------------------------------
+  wait: fn('control_wait', [arg('n', 'input', 'DURATION')]),
+  wait_until: fn('control_wait_until', [arg('b', 'input', 'CONDITION')]),
+  stop: fn('control_stop', [arg('m', 'field', 'STOP_OPTION')]),
+  create_clone_of: fn('control_create_clone_of', [arg('m', 'input', 'CLONE_OPTION')]),
+  delete_this_clone: fn('control_delete_this_clone'),
+  // --- Sensing -------------------------------------------------------------
+  touching: fn('sensing_touchingobject', [arg('m', 'input', 'TOUCHINGOBJECTMENU')], {
+    shape: 'boolean',
+    reporter: true
+  }),
+  touching_color: fn('sensing_touchingcolor', [arg('c', 'input', 'COLOR')], {
+    shape: 'boolean',
+    reporter: true
+  }),
+  color_is_touching_color: fn('sensing_coloristouchingcolor', [arg('c', 'input', 'COLOR'), arg('c', 'input', 'COLOR2')], {
+    shape: 'boolean',
+    reporter: true
+  }),
+  distance_to: fn('sensing_distanceto', [arg('m', 'input', 'DISTANCETOMENU')], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  ask_and_wait: fn('sensing_askandwait', [arg('s', 'input', 'QUESTION')]),
+  answer: fn('sensing_answer', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  key_pressed: fn('sensing_keypressed', [arg('m', 'input', 'KEY_OPTION')], {
+    shape: 'boolean',
+    reporter: true
+  }),
+  mouse_down: fn('sensing_mousedown', [], {
+    shape: 'boolean',
+    reporter: true
+  }),
+  mouse_x: fn('sensing_mousex', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  mouse_y: fn('sensing_mousey', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  set_drag_mode: fn('sensing_setdragmode', [arg('m', 'field', 'DRAG_MODE')]),
+  timer: fn('sensing_timer', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  reset_timer: fn('sensing_resettimer'),
+  of: fn('sensing_of', [arg('m', 'field', 'PROPERTY'), arg('m', 'input', 'OBJECT')], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  current: fn('sensing_current', [arg('m', 'field', 'CURRENTMENU')], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  days_since_2000: fn('sensing_dayssince2000', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  username: fn('sensing_username', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  loudness: fn('sensing_loudness', [], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  // --- Variables / lists ---------------------------------------------------
+  set_var: fn('data_setvariableto', [arg('v', 'field', 'VARIABLE'), arg('s', 'input', 'VALUE')]),
+  change_var: fn('data_changevariableby', [arg('v', 'field', 'VARIABLE'), arg('n', 'input', 'VALUE')]),
+  show_variable: fn('data_showvariable', [arg('v', 'field', 'VARIABLE')]),
+  hide_variable: fn('data_hidevariable', [arg('v', 'field', 'VARIABLE')]),
+  list_add: fn('data_addtolist', [arg('l', 'field', 'LIST'), arg('s', 'input', 'ITEM')]),
+  list_delete: fn('data_deleteoflist', [arg('l', 'field', 'LIST'), arg('n', 'input', 'INDEX')]),
+  list_delete_all: fn('data_deletealloflist', [arg('l', 'field', 'LIST')]),
+  list_insert: fn('data_insertatlist', [arg('l', 'field', 'LIST'), arg('n', 'input', 'INDEX'), arg('s', 'input', 'ITEM')]),
+  list_replace: fn('data_replaceitemoflist', [arg('l', 'field', 'LIST'), arg('n', 'input', 'INDEX'), arg('s', 'input', 'ITEM')]),
+  list_item: fn('data_itemoflist', [arg('l', 'field', 'LIST'), arg('n', 'input', 'INDEX')], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  list_item_num: fn('data_itemnumoflist', [arg('l', 'field', 'LIST'), arg('s', 'input', 'ITEM')], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  list_length: fn('data_lengthoflist', [arg('l', 'field', 'LIST')], {
+    shape: 'reporter',
+    reporter: true
+  }),
+  list_contains: fn('data_listcontainsitem', [arg('l', 'field', 'LIST'), arg('s', 'input', 'ITEM')], {
+    shape: 'boolean',
+    reporter: true
+  }),
+  show_list: fn('data_showlist', [arg('l', 'field', 'LIST')]),
+  hide_list: fn('data_hidelist', [arg('l', 'field', 'LIST')]),
+  // --- Events (broadcasts used as statements) ------------------------------
+  broadcast: fn('event_broadcast', [arg('msg', 'input', 'BROADCAST_INPUT')]),
+  broadcast_and_wait: fn('event_broadcastandwait', [arg('msg', 'input', 'BROADCAST_INPUT')])
+};
+
+/**
+ * Control-flow instructions that use a `name(...): <block>` body instead of a
+ * plain call. Kept separate so the parser can special-case their shape.
+ */
+const CONTROL_FUNCTIONS = {
+  repeat: {
+    opcode: 'control_repeat',
+    args: [arg('n', 'input', 'TIMES')],
+    substacks: 1
+  },
+  forever: {
+    opcode: 'control_forever',
+    args: [],
+    substacks: 1
+  },
+  repeat_until: {
+    opcode: 'control_repeat_until',
+    args: [arg('b', 'input', 'CONDITION')],
+    substacks: 1
+  },
+  while: {
+    opcode: 'control_while',
+    args: [arg('b', 'input', 'CONDITION')],
+    substacks: 1
+  },
+  for_each: {
+    opcode: 'control_for_each',
+    args: [arg('v', 'field', 'VARIABLE'), arg('n', 'input', 'VALUE')],
+    substacks: 1
+  }
+};
+
+/** `if` / `if ... else` control instructions. */
+const IF_FUNCTION = {
+  opcode: 'control_if',
+  args: [arg('b', 'input', 'CONDITION')],
+  substacks: 1
+};
+const IF_ELSE_FUNCTION = {
+  opcode: 'control_if_else',
+  args: [arg('b', 'input', 'CONDITION')],
+  substacks: 2
+};
+
+// ---------------------------------------------------------------------------
+// Hat decorators
+// ---------------------------------------------------------------------------
+
+/** Scrathon decorator name -> hat instruction descriptor. */
+const HAT_DECORATORS = {
+  when_flag_clicked: {
+    opcode: 'event_whenflagclicked',
+    args: []
+  },
+  when_key_pressed: {
+    opcode: 'event_whenkeypressed',
+    args: [arg('m', 'field', 'KEY_OPTION')]
+  },
+  when_this_sprite_clicked: {
+    opcode: 'event_whenthisspriteclicked',
+    args: []
+  },
+  when_stage_clicked: {
+    opcode: 'event_whenstageclicked',
+    args: []
+  },
+  when_backdrop_switches: {
+    opcode: 'event_whenbackdropswitchesto',
+    args: [arg('m', 'field', 'BACKDROP')]
+  },
+  when_greater_than: {
+    opcode: 'event_whengreaterthan',
+    args: [arg('m', 'field', 'WHENGREATERTHANMENU'), arg('n', 'input', 'VALUE')]
+  },
+  when_broadcast: {
+    opcode: 'event_whenbroadcastreceived',
+    args: [arg('msg', 'field', 'BROADCAST_OPTION')]
+  },
+  when_i_start_as_clone: {
+    opcode: 'control_start_as_clone',
+    args: []
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Expression operators
+// ---------------------------------------------------------------------------
+
+/** Infix binary numeric operators: token -> opcode. */
+const NUMERIC_BINARY_OPS = {
+  '+': 'operator_add',
+  '-': 'operator_subtract',
+  '*': 'operator_multiply',
+  '/': 'operator_divide',
+  '%': 'operator_mod'
+};
+
+/** Infix comparison operators: token -> opcode (boolean). */
+const COMPARISON_OPS = {
+  '>': 'operator_gt',
+  '<': 'operator_lt',
+  '==': 'operator_equals',
+  '=': 'operator_equals'
+};
+
+/** Infix logical operators: keyword -> opcode (boolean). */
+const LOGICAL_BINARY_OPS = {
+  and: 'operator_and',
+  or: 'operator_or'
+};
+
+/** Unary logical negation keyword -> opcode. */
+const LOGICAL_NOT = 'operator_not';
+
+/** Expression-level function calls: name -> opcode. */
+const EXPRESSION_FUNCTIONS = {
+  random: 'operator_random',
+  join: 'operator_join',
+  letter_of: 'operator_letter_of',
+  length_of: 'operator_length',
+  contains: 'operator_contains',
+  round: 'operator_round',
+  math: 'operator_mathop'
+};
+
+/** Argument descriptors for expression-level function calls. */
+const EXPRESSION_FUNCTION_ARGS = {
+  random: [arg('n', 'input', 'FROM'), arg('n', 'input', 'TO')],
+  join: [arg('s', 'input', 'STRING1'), arg('s', 'input', 'STRING2')],
+  letter_of: [arg('n', 'input', 'LETTER'), arg('s', 'input', 'STRING')],
+  length_of: [arg('s', 'input', 'STRING')],
+  contains: [arg('s', 'input', 'STRING1'), arg('s', 'input', 'STRING2')],
+  round: [arg('n', 'input', 'NUM')],
+  math: [arg('m', 'field', 'OPERATOR'), arg('n', 'input', 'NUM')]
+};
+
+// ---------------------------------------------------------------------------
+// Lookup helpers
+// ---------------------------------------------------------------------------
+
+/** Reverse map: opcode -> function name (statement/reporter instructions). */
+const OPCODE_TO_FUNCTION = (() => {
+  const map = new Map();
+  for (const _ref of Object.entries(FUNCTIONS)) {
+    var _ref2 = _slicedToArray(_ref, 2);
+    const name = _ref2[0];
+    const descriptor = _ref2[1];
+    map.set(descriptor.opcode, name);
+  }
+  return map;
+})();
+
+/** Reverse map: opcode -> control-flow function name. */
+const OPCODE_TO_CONTROL = (() => {
+  const map = new Map();
+  for (const _ref3 of Object.entries(CONTROL_FUNCTIONS)) {
+    var _ref4 = _slicedToArray(_ref3, 2);
+    const name = _ref4[0];
+    const descriptor = _ref4[1];
+    map.set(descriptor.opcode, name);
+  }
+  return map;
+})();
+
+/** Reverse map: opcode -> hat decorator name. */
+const OPCODE_TO_HAT = (() => {
+  const map = new Map();
+  for (const _ref5 of Object.entries(HAT_DECORATORS)) {
+    var _ref6 = _slicedToArray(_ref5, 2);
+    const name = _ref6[0];
+    const descriptor = _ref6[1];
+    map.set(descriptor.opcode, name);
+  }
+  return map;
+})();
+
+/** All built-in opcodes the decompiler knows how to render. */
+const KNOWN_OPCODES = new Set([...OPCODE_TO_FUNCTION.keys(), ...OPCODE_TO_CONTROL.keys(), ...OPCODE_TO_HAT.keys(), 'control_if', 'control_if_else', 'procedures_definition', 'procedures_call', 'argument_reporter_string_number', 'argument_reporter_boolean', 'data_variable', 'data_listcontents']);
+
+// ---------------------------------------------------------------------------
+// Aliases for LLM robustness
+// ---------------------------------------------------------------------------
+
+const FUNCTION_ALIASES = {
+  turnright: 'turn_right',
+  turnleft: 'turn_left',
+  goto: 'go_to',
+  gotoxy: 'go_to_xy',
+  gotarget: 'go_to',
+  glideto: 'glide_to',
+  glidetoxy: 'glide_to_xy',
+  pointindirection: 'point_in_direction',
+  pointtowards: 'point_towards',
+  changex: 'change_x',
+  changexby: 'change_x',
+  setx: 'set_x',
+  setxto: 'set_x',
+  changey: 'change_y',
+  changeyby: 'change_y',
+  sety: 'set_y',
+  setyto: 'set_y',
+  bounceonedge: 'bounce_on_edge',
+  ifonedgebounce: 'bounce_on_edge',
+  sayfor: 'say_for_secs',
+  sayforsecs: 'say_for_secs',
+  sayforseconds: 'say_for_secs',
+  thinkfor: 'think_for_secs',
+  thinkforsecs: 'think_for_secs',
+  thinkforseconds: 'think_for_secs',
+  switchcostume: 'switch_costume',
+  setcostume: 'switch_costume',
+  nextcostume: 'next_costume',
+  switchbackdrop: 'switch_backdrop',
+  setbackdrop: 'switch_backdrop',
+  nextbackdrop: 'next_backdrop',
+  playsound: 'start_sound',
+  startsound: 'start_sound',
+  playsounduntildone: 'play_sound_until_done',
+  playsoundandwait: 'play_sound_until_done',
+  stopallsounds: 'stop_all_sounds',
+  setvolume: 'set_volume_to',
+  setvolumeto: 'set_volume_to',
+  changevolume: 'change_volume_by',
+  changevolumeby: 'change_volume_by',
+  setvariable: 'set_var',
+  setvar: 'set_var',
+  setvariableto: 'set_var',
+  changevariable: 'change_var',
+  changevar: 'change_var',
+  changevariableby: 'change_var',
+  showvariable: 'show_variable',
+  hidevariable: 'hide_variable',
+  addtolist: 'list_add',
+  deletefromlist: 'list_delete',
+  deletealloflist: 'list_delete_all',
+  clearlist: 'list_delete_all',
+  insertatlist: 'list_insert',
+  waitseconds: 'wait',
+  waitsecs: 'wait',
+  waituntil: 'wait_until',
+  broadcastandwait: 'broadcast_and_wait',
+  broadcastwait: 'broadcast_and_wait',
+  // Pen extension aliases
+  pen_clear: 'pen.clear',
+  pen_stamp: 'pen.stamp',
+  pen_down: 'pen.penDown',
+  pen_pendown: 'pen.penDown',
+  pen_up: 'pen.penUp',
+  pen_penup: 'pen.penUp',
+  clear_pen: 'pen.clear',
+  set_pen_color: 'pen.setPenColorToColor',
+  set_pen_size: 'pen.setPenSizeTo',
+  change_pen_size: 'pen.changePenSizeBy',
+  // Music extension aliases
+  music_play_note: 'music.playNoteForBeats',
+  music_rest: 'music.restForBeats',
+  music_play_drum: 'music.playDrumForBeats',
+  music_set_instrument: 'music.setInstrument',
+  music_set_tempo: 'music.setTempo',
+  music_change_tempo: 'music.changeTempo',
+  // Text2speech extension aliases
+  text2speech_speak: 'text2speech.speakAndWait',
+  text2speech_voice: 'text2speech.setVoice',
+  text2speech_language: 'text2speech.setLanguage'
+};
+const HAT_ALIASES = {
+  when_green_flag_clicked: 'when_flag_clicked',
+  when_flag: 'when_flag_clicked',
+  when_clicked: 'when_this_sprite_clicked',
+  when_sprite_clicked: 'when_this_sprite_clicked',
+  when_backdrop_switch: 'when_backdrop_switches',
+  when_backdrop_switches_to: 'when_backdrop_switches',
+  when_backdropswitchesto: 'when_backdrop_switches',
+  when_key_press: 'when_key_pressed',
+  when_keypressed: 'when_key_pressed',
+  when_thisspriteclicked: 'when_this_sprite_clicked',
+  when_stageclicked: 'when_stage_clicked',
+  when_greaterthan: 'when_greater_than',
+  when_broadcast_received: 'when_broadcast',
+  when_broadcastreceived: 'when_broadcast',
+  when_clone_starts: 'when_i_start_as_clone',
+  when_start_as_clone: 'when_i_start_as_clone',
+  when_istartasclone: 'when_i_start_as_clone',
+  on_flag: 'when_flag_clicked',
+  on_key: 'when_key_pressed',
+  on_clicked: 'when_this_sprite_clicked',
+  on_stage_clicked: 'when_stage_clicked',
+  on_backdrop_switch: 'when_backdrop_switches',
+  on_greater_than: 'when_greater_than',
+  on_broadcast: 'when_broadcast',
+  on_start_as_clone: 'when_i_start_as_clone'
+};
+const KNOWN_BUILTIN_EXTENSIONS = new Set(['pen', 'music', 'text2speech', 'translate', 'videoSensing']);
+const BUILTIN_EXTENSION_CATALOG = [
+// Pen
+{
+  name: 'pen.clear',
+  category: 'pen',
+  kind: 'extension',
+  signature: 'import pen\npen.clear()',
+  opcode: 'pen_clear'
+}, {
+  name: 'pen.stamp',
+  category: 'pen',
+  kind: 'extension',
+  signature: 'import pen\npen.stamp()',
+  opcode: 'pen_stamp'
+}, {
+  name: 'pen.penDown',
+  category: 'pen',
+  kind: 'extension',
+  signature: 'import pen\npen.penDown()',
+  opcode: 'pen_penDown'
+}, {
+  name: 'pen.penUp',
+  category: 'pen',
+  kind: 'extension',
+  signature: 'import pen\npen.penUp()',
+  opcode: 'pen_penUp'
+}, {
+  name: 'pen.setPenColorToColor',
+  category: 'pen',
+  kind: 'extension',
+  signature: 'import pen\npen.setPenColorToColor(${c:"#00E5FF"})',
+  opcode: 'pen_setPenColorToColor'
+}, {
+  name: 'pen.setPenSizeTo',
+  category: 'pen',
+  kind: 'extension',
+  signature: 'import pen\npen.setPenSizeTo(${n:size})',
+  opcode: 'pen_setPenSizeTo'
+}, {
+  name: 'pen.changePenSizeBy',
+  category: 'pen',
+  kind: 'extension',
+  signature: 'import pen\npen.changePenSizeBy(${n:delta})',
+  opcode: 'pen_changePenSizeBy'
+}, {
+  name: 'pen.setPenColorParamTo',
+  category: 'pen',
+  kind: 'extension',
+  signature: 'import pen\npen.setPenColorParamTo(${m:param}, ${n:value})',
+  opcode: 'pen_setPenColorParamTo'
+}, {
+  name: 'pen.changePenColorParamBy',
+  category: 'pen',
+  kind: 'extension',
+  signature: 'import pen\npen.changePenColorParamBy(${m:param}, ${n:delta})',
+  opcode: 'pen_changePenColorParamBy'
+},
+// Music
+{
+  name: 'music.playDrumForBeats',
+  category: 'music',
+  kind: 'extension',
+  signature: 'import music\nmusic.playDrumForBeats(${m:drum}, ${n:beats})',
+  opcode: 'music_playDrumForBeats'
+}, {
+  name: 'music.restForBeats',
+  category: 'music',
+  kind: 'extension',
+  signature: 'import music\nmusic.restForBeats(${n:beats})',
+  opcode: 'music_restForBeats'
+}, {
+  name: 'music.playNoteForBeats',
+  category: 'music',
+  kind: 'extension',
+  signature: 'import music\nmusic.playNoteForBeats(${n:note}, ${n:beats})',
+  opcode: 'music_playNoteForBeats'
+}, {
+  name: 'music.setInstrument',
+  category: 'music',
+  kind: 'extension',
+  signature: 'import music\nmusic.setInstrument(${m:instrument})',
+  opcode: 'music_setInstrument'
+}, {
+  name: 'music.setTempo',
+  category: 'music',
+  kind: 'extension',
+  signature: 'import music\nmusic.setTempo(${n:tempo})',
+  opcode: 'music_setTempo'
+}, {
+  name: 'music.changeTempo',
+  category: 'music',
+  kind: 'extension',
+  signature: 'import music\nmusic.changeTempo(${n:delta})',
+  opcode: 'music_changeTempo'
+}, {
+  name: 'music.getTempo',
+  category: 'music',
+  kind: 'extension',
+  signature: 'import music\nmusic.getTempo()',
+  opcode: 'music_getTempo',
+  returns: 'number'
+},
+// Text to Speech
+{
+  name: 'text2speech.speakAndWait',
+  category: 'text2speech',
+  kind: 'extension',
+  signature: 'import text2speech\ntext2speech.speakAndWait(${s:text})',
+  opcode: 'text2speech_speakAndWait'
+}, {
+  name: 'text2speech.setVoice',
+  category: 'text2speech',
+  kind: 'extension',
+  signature: 'import text2speech\ntext2speech.setVoice(${m:voice})',
+  opcode: 'text2speech_setVoice'
+}, {
+  name: 'text2speech.setLanguage',
+  category: 'text2speech',
+  kind: 'extension',
+  signature: 'import text2speech\ntext2speech.setLanguage(${m:language})',
+  opcode: 'text2speech_setLanguage'
+},
+// Translate
+{
+  name: 'translate.getTranslate',
+  category: 'translate',
+  kind: 'extension',
+  signature: 'import translate\ntranslate.getTranslate(${s:text}, ${m:language})',
+  opcode: 'translate_getTranslate',
+  returns: 'string'
+}, {
+  name: 'translate.getViewerLanguage',
+  category: 'translate',
+  kind: 'extension',
+  signature: 'import translate\ntranslate.getViewerLanguage()',
+  opcode: 'translate_getViewerLanguage',
+  returns: 'string'
+}];
+
+/** Precise return descriptions for common reporter functions. */
+const FUNCTION_RETURNS = {
+  answer: 'string',
+  username: 'string',
+  days_since_2000: 'number',
+  current: 'number',
+  timer: 'number',
+  loudness: 'number',
+  mouse_x: 'number',
+  mouse_y: 'number',
+  distance_to: 'number',
+  x_position: 'number',
+  y_position: 'number',
+  direction: 'number',
+  size: 'number',
+  volume: 'number',
+  list_length: 'number',
+  list_item_num: 'number',
+  list_item: 'number|string',
+  costume_number_name: 'number|string',
+  backdrop_number_name: 'number|string',
+  of: 'number|string'
+};
+
+/**
+ * Build the full Scrathon DSL catalog for model lookup.
+ * @param {string} [query] Optional search query.
+ * @returns {Array<object>} Catalog entries.
+ */
+const describeScrathonCatalog = function describeScrathonCatalog() {
+  let query = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
+  const needle = String(query || '').trim().toLowerCase();
+  const results = [];
+  const add = function add(name, category, kind, signature, opcode) {
+    let extra = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : {};
+    if (!needle || name.toLowerCase().includes(needle) || category.toLowerCase().includes(needle) || kind.toLowerCase().includes(needle) || signature.toLowerCase().includes(needle) || opcode && opcode.toLowerCase().includes(needle)) {
+      results.push(_objectSpread({
+        name,
+        category,
+        kind,
+        signature,
+        opcode
+      }, extra));
+    }
+  };
+  const expressionReturns = {
+    random: 'number',
+    join: 'string',
+    letter_of: 'string',
+    length_of: 'number',
+    contains: 'boolean',
+    round: 'number',
+    math: 'number'
+  };
+  const getCategory = opcode => {
+    if (opcode.startsWith('motion_')) return 'motion';
+    if (opcode.startsWith('looks_')) return 'looks';
+    if (opcode.startsWith('sound_')) return 'sound';
+    if (opcode.startsWith('event_')) return 'events';
+    if (opcode.startsWith('control_')) return 'control';
+    if (opcode.startsWith('sensing_')) return 'sensing';
+    if (opcode.startsWith('data_')) return 'variables';
+    if (opcode.startsWith('operator_')) return 'operators';
+    return 'other';
+  };
+
+  // Broadcast slots accept the short string sigil `${s:...}`.
+  const formatArg = a => "${".concat(a.t === 'msg' ? 's' : a.t, ":").concat(a.name.toLowerCase(), "}");
+
+  // 1. Hat decorators
+  for (const _ref7 of Object.entries(HAT_DECORATORS)) {
+    var _ref8 = _slicedToArray(_ref7, 2);
+    const name = _ref8[0];
+    const descriptor = _ref8[1];
+    const args = (descriptor.args || []).map(formatArg).join(', ');
+    const signature = "@".concat(name).concat(args ? "(".concat(args, ")") : '', "\ndef on_").concat(name, "():");
+    add("@".concat(name), 'events', 'hat', signature, descriptor.opcode, {
+      args: descriptor.args || [],
+      returns: 'void'
+    });
+  }
+
+  // 2. Control flow blocks (blocks with colons)
+  for (const _ref9 of Object.entries(CONTROL_FUNCTIONS)) {
+    var _ref0 = _slicedToArray(_ref9, 2);
+    const name = _ref0[0];
+    const descriptor = _ref0[1];
+    const args = (descriptor.args || []).map(formatArg).join(', ');
+    const signature = "".concat(name, "(").concat(args, "):");
+    add(name, 'control', 'control', signature, descriptor.opcode, {
+      args: descriptor.args || [],
+      returns: 'void'
+    });
+  }
+
+  // If / elif / else
+  add('if', 'control', 'control', 'if ${b:condition}:', 'control_if', {
+    args: [{
+      t: 'b',
+      k: 'input',
+      name: 'CONDITION'
+    }],
+    returns: 'void'
+  });
+  add('elif', 'control', 'control', 'elif ${b:condition}:', 'control_if_else', {
+    args: [{
+      t: 'b',
+      k: 'input',
+      name: 'CONDITION'
+    }],
+    returns: 'void'
+  });
+  add('else', 'control', 'control', 'else:', 'control_if_else', {
+    args: [],
+    returns: 'void'
+  });
+
+  // 3. Statement / reporter functions
+  for (const _ref1 of Object.entries(FUNCTIONS)) {
+    var _ref10 = _slicedToArray(_ref1, 2);
+    const name = _ref10[0];
+    const descriptor = _ref10[1];
+    const args = (descriptor.args || []).map(formatArg).join(', ');
+    const signature = "".concat(name, "(").concat(args, ")");
+    const kind = descriptor.shape || (descriptor.reporter ? 'reporter' : 'statement');
+    const category = getCategory(descriptor.opcode);
+    const returns = descriptor.shape === 'boolean' ? 'boolean' : FUNCTION_RETURNS[name] || (descriptor.reporter ? 'number|string' : 'void');
+    add(name, category, kind, signature, descriptor.opcode, {
+      args: descriptor.args || [],
+      returns
+    });
+  }
+
+  // 4. Expression functions
+  for (const _ref11 of Object.entries(EXPRESSION_FUNCTIONS)) {
+    var _ref12 = _slicedToArray(_ref11, 2);
+    const name = _ref12[0];
+    const opcode = _ref12[1];
+    const argList = EXPRESSION_FUNCTION_ARGS[name] || [];
+    const args = argList.map(formatArg).join(', ');
+    const signature = "".concat(name, "(").concat(args, ")");
+    add(name, 'operators', 'reporter', signature, opcode, {
+      args: argList,
+      returns: expressionReturns[name] || 'number|string'
+    });
+  }
+
+  // 5. Built-in extension functions
+  for (const item of BUILTIN_EXTENSION_CATALOG) {
+    add(item.name, item.category, item.kind, item.signature, item.opcode, {
+      args: null,
+      returns: item.returns || 'void'
+    });
+  }
+  return results;
+};
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/parser.js"
+/*!*******************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/parser.js ***!
+  \*******************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   parse: () => (/* binding */ parse),
+/* harmony export */   parseExpression: () => (/* binding */ parseExpression)
+/* harmony export */ });
+/* harmony import */ var _error_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./error.js */ "./src/addons/addons/astras-copilot/agent/scrathon/error.js");
+/* harmony import */ var _lexer_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./lexer.js */ "./src/addons/addons/astras-copilot/agent/scrathon/lexer.js");
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+/**
+ * Scrathon parser.
+ *
+ * Turns the indentation-aware logical lines from the lexer into a small AST:
+ * a file header (target + imports) plus a list of hat / define / control /
+ * statement nodes. Expression parsing is a standard precedence-climbing
+ * recursive-descent parser over the token stream from the lexer.
+ */
+
+
+
+const INDENT_UNIT = 4;
+
+/**
+ * Build a Scrathon syntax error tied to a source line.
+ * @param {string} message Message.
+ * @param {object} line Logical line.
+ * @param {string} [type] Diagnostic type.
+ * @param {string} [suggestion] Fix suggestion.
+ * @returns {ScrathonError} Error.
+ */
+const syntaxError = function syntaxError(message, line) {
+  let type = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 'SyntaxError';
+  let suggestion = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : '';
+  return new _error_js__WEBPACK_IMPORTED_MODULE_0__.ScrathonError({
+    type,
+    message,
+    line: line ? line.line : 0,
+    column: (line ? line.indent : 0) + 1,
+    code: line ? line.text : '',
+    suggestion
+  });
+};
+
+/**
+ * Split `name(arg, arg)` into its name and raw argument strings.
+ * @param {string} text Call text.
+ * @param {object} line Logical line for diagnostics.
+ * @returns {{name: string, args: Array<string>}} Parsed call.
+ */
+const splitCall = (text, line) => {
+  const open = text.indexOf('(');
+  if (open <= 0) {
+    return {
+      name: text.trim(),
+      args: null
+    };
+  }
+  const name = text.slice(0, open).trim();
+  let depth = 0;
+  let quote = '';
+  let close = -1;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      if (ch === '\\') {
+        i++;
+        continue;
+      }
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '$' && text[i + 1] === '{') {
+      depth++;
+      i++;
+      continue;
+    }
+    if (ch === '{' || ch === '(') depth++;
+    if (ch === '}' || ch === ')') depth--;
+    if (ch === ')' && depth === 0) {
+      close = i;
+      break;
+    }
+  }
+  if (close === -1) {
+    throw syntaxError('Missing closing parenthesis ")" in call.', line);
+  }
+  const trailing = text.slice(close + 1).trim();
+  if (trailing !== '') {
+    throw syntaxError("Unexpected text after call: \"".concat(trailing, "\"."), line);
+  }
+  return {
+    name,
+    args: (0,_lexer_js__WEBPACK_IMPORTED_MODULE_1__.splitTopLevelArgs)(text.slice(open + 1, close))
+  };
+};
+
+/**
+ * Parse an expression string into an AST node.
+ * @param {string} src Expression source.
+ * @param {object} line Logical line for diagnostics.
+ * @param {number} [baseCol] 1-based column where the expression starts.
+ * @returns {object} Expression node.
+ */
+const parseExpression = function parseExpression(src, line) {
+  let baseCol = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
+  const tokens = (0,_lexer_js__WEBPACK_IMPORTED_MODULE_1__.tokenizeExpression)(src, line ? line.line : 0, baseCol);
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const next = () => tokens[pos++];
+  const fail = function fail(message) {
+    let type = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'SyntaxError';
+    const token = peek();
+    throw new _error_js__WEBPACK_IMPORTED_MODULE_0__.ScrathonError({
+      type,
+      message,
+      line: line ? line.line : 0,
+      column: token.col,
+      code: line ? line.text : ''
+    });
+  };
+  const isKeyword = (token, word) => token.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.IDENT && token.value === word;
+  const parseSigil = () => {
+    const open = next(); // SIGIL
+    const tagToken = peek();
+    if (tagToken.type !== _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.IDENT) fail('Expected a type tag after "${".');
+    const rawTag = next().value;
+    // Full-word aliases make the variable/list distinction explicit:
+    // ${list:"items"} == ${l:"items"}, ${variable:"score"} == ${v:"score"}.
+    const tag = rawTag === 'list' ? 'l' : rawTag === 'variable' || rawTag === 'var' ? 'v' : rawTag;
+    if (peek().type !== _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.COLON) fail("Expected \":\" after type tag \"".concat(rawTag, "\"."));
+    next(); // COLON
+
+    // Guard the common `${n:list"items"}` / `${n:list:"items"}` mistake: `n` is
+    // the numeric tag, while names must use v/l (or their full-word aliases).
+    const firstInner = peek();
+    const secondInner = tokens[pos + 1];
+    if (rawTag === 'n' && firstInner.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.IDENT && (firstInner.value === 'list' || firstInner.value === 'variable' || firstInner.value === 'var') && secondInner && (secondInner.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.STRING || secondInner.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.COLON)) {
+      fail('`${n:...}` is the number tag. Use `${list:"name"}` (or `${l:"name"}`) for a list, ' + 'or `${variable:"name"}` (or `${v:"name"}`) for a variable.');
+    }
+
+    // Optional scope qualifier: ${v:local:"name"} / ${v:global:"name"}.
+    let scope = null;
+    const scopeToken = peek();
+    const afterScope = tokens[pos + 1];
+    if (scopeToken.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.IDENT && (scopeToken.value === 'local' || scopeToken.value === 'global') && afterScope && afterScope.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.COLON) {
+      if (tag !== 'v' && tag !== 'l') {
+        fail("Scope prefix \"".concat(scopeToken.value, ":\" is only valid for variable and list sigils. ") + 'Use ${v:local:"name"} for a private variable or ${v:"name"} for a global variable.');
+      }
+      scope = next().value;
+      next(); // COLON
+    }
+    const inner = parseExpr();
+    if (peek().type !== _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.RBRACE) fail('Missing closing "}" for the type sigil.');
+    next(); // RBRACE
+    return {
+      kind: 'sigil',
+      tag,
+      scope,
+      expr: inner,
+      line: line ? line.line : 0,
+      col: open.col
+    };
+  };
+  const parsePrimary = () => {
+    const token = peek();
+    if (token.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.NUMBER) {
+      next();
+      const value = Number(token.value);
+      if (!Number.isFinite(value)) fail("Invalid number \"".concat(token.value, "\"."));
+      return {
+        kind: 'number',
+        value
+      };
+    }
+    if (token.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.STRING) {
+      next();
+      return {
+        kind: 'string',
+        value: token.value
+      };
+    }
+    if (token.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.SIGIL) {
+      return parseSigil();
+    }
+    if (token.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.LPAREN) {
+      next();
+      const inner = parseExpr();
+      if (peek().type !== _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.RPAREN) fail('Missing closing parenthesis ")".');
+      next();
+      return inner;
+    }
+    if (token.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.IDENT) {
+      next();
+      if (peek().type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.LPAREN) {
+        next();
+        const args = [];
+        if (peek().type !== _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.RPAREN) {
+          args.push(parseExpr());
+          while (peek().type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.COMMA) {
+            next();
+            args.push(parseExpr());
+          }
+        }
+        if (peek().type !== _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.RPAREN) fail('Missing closing parenthesis ")".');
+        next();
+        return {
+          kind: 'call',
+          name: token.value,
+          args
+        };
+      }
+      if (token.value === 'True') return {
+        kind: 'boolean',
+        value: true
+      };
+      if (token.value === 'False') return {
+        kind: 'boolean',
+        value: false
+      };
+      return {
+        kind: 'ident',
+        name: token.value
+      };
+    }
+    fail("Unexpected token \"".concat(token.value, "\"."));
+    return null;
+  };
+  const parseUnary = () => {
+    const token = peek();
+    if (token.type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.OP && token.value === '-') {
+      next();
+      const operand = parseUnary();
+      if (operand.kind === 'number') return {
+        kind: 'number',
+        value: -operand.value
+      };
+      return {
+        kind: 'unary',
+        op: '-',
+        operand
+      };
+    }
+    if (isKeyword(token, 'not')) {
+      next();
+      return {
+        kind: 'unary',
+        op: 'not',
+        operand: parseUnary()
+      };
+    }
+    return parsePrimary();
+  };
+  const parseMultiplicative = () => {
+    let left = parseUnary();
+    while (peek().type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.OP && ['*', '/', '%'].includes(peek().value)) {
+      const op = next().value;
+      left = {
+        kind: 'binary',
+        op,
+        left,
+        right: parseUnary()
+      };
+    }
+    return left;
+  };
+  const parseAdditive = () => {
+    let left = parseMultiplicative();
+    while (peek().type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.OP && ['+', '-'].includes(peek().value)) {
+      const op = next().value;
+      left = {
+        kind: 'binary',
+        op,
+        left,
+        right: parseMultiplicative()
+      };
+    }
+    return left;
+  };
+  const parseComparison = () => {
+    let left = parseAdditive();
+    while (peek().type === _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.OP && ['>', '<', '>=', '<=', '=', '==', '!='].includes(peek().value)) {
+      const op = next().value;
+      left = {
+        kind: 'binary',
+        op,
+        left,
+        right: parseAdditive()
+      };
+    }
+    return left;
+  };
+  const parseAnd = () => {
+    let left = parseComparison();
+    while (isKeyword(peek(), 'and')) {
+      next();
+      left = {
+        kind: 'binary',
+        op: 'and',
+        left,
+        right: parseComparison()
+      };
+    }
+    return left;
+  };
+  const parseExpr = () => {
+    let left = parseAnd();
+    while (isKeyword(peek(), 'or')) {
+      next();
+      left = {
+        kind: 'binary',
+        op: 'or',
+        left,
+        right: parseAnd()
+      };
+    }
+    return left;
+  };
+  const result = parseExpr();
+  if (peek().type !== _lexer_js__WEBPACK_IMPORTED_MODULE_1__.TT.EOF) fail("Unexpected trailing token \"".concat(peek().value, "\"."));
+  return result;
+};
+
+/**
+ * Parse a hat/custom-block decorator header into a decorator node.
+ * @param {string} text Decorator text without the leading "@".
+ * @param {object} line Logical line.
+ * @returns {object} Decorator descriptor.
+ */
+const parseDecorator = (text, line) => {
+  const _splitCall = splitCall(text, line),
+    name = _splitCall.name,
+    args = _splitCall.args;
+  return {
+    name,
+    rawArgs: args || [],
+    line: line.line
+  };
+};
+
+/**
+ * Parse a `def name(params):` header.
+ * @param {string} text Def line text.
+ * @param {object} line Logical line.
+ * @returns {{name: string, params: Array<object>}} Parsed header.
+ */
+const parseDef = (text, line) => {
+  if (!text.endsWith(':')) throw syntaxError('A "def" line must end with ":".', line);
+  const header = text.slice(0, -1).trim();
+  if (!header.startsWith('def ')) throw syntaxError('Expected "def".', line);
+  const rest = header.slice(4).trim();
+  const _splitCall2 = splitCall(rest, line),
+    name = _splitCall2.name,
+    args = _splitCall2.args;
+  if (!name) throw syntaxError('A "def" needs a name.', line);
+  const params = (args || []).map(raw => {
+    const node = parseExpression(raw, line);
+    if (node.kind !== 'sigil') {
+      throw syntaxError("Parameter \"".concat(raw, "\" must be a typed sigil like ${n:name}."), line);
+    }
+    const inner = node.expr;
+    if (inner.kind !== 'ident' && inner.kind !== 'string') {
+      throw syntaxError("Parameter name must be an identifier, got \"".concat(raw, "\"."), line);
+    }
+    const paramName = inner.kind === 'ident' ? inner.name : inner.value;
+    return {
+      tag: node.tag,
+      name: paramName
+    };
+  });
+  return {
+    name,
+    params
+  };
+};
+
+/**
+ * Parse a full Scrathon source file.
+ * @param {string} source Source code.
+ * @returns {{target: (string|null), imports: Array<string>, blocks: Array<object>}} Parsed file.
+ */
+const parse = source => {
+  const lines = (0,_lexer_js__WEBPACK_IMPORTED_MODULE_1__.splitLines)(source);
+  const file = {
+    target: null,
+    imports: [],
+    blocks: []
+  };
+  let i = 0;
+  const parseDecorators = start => {
+    const decorators = [];
+    let index = start;
+    while (index < lines.length && lines[index].text.startsWith('@')) {
+      decorators.push(parseDecorator(lines[index].text.slice(1), lines[index]));
+      index++;
+    }
+    return {
+      decorators,
+      index
+    };
+  };
+  const parseNodes = (start, indent) => {
+    const nodes = [];
+    let index = start;
+    while (index < lines.length) {
+      const line = lines[index];
+      if (line.indent < indent) break;
+      if (line.indent > indent) {
+        throw syntaxError('Unexpected indentation.', line);
+      }
+      if (line.text === 'else:' || line.text.startsWith('else ') || line.text === 'elif:' || line.text.startsWith('elif ')) {
+        break;
+      }
+      const _parseSingle = _parseSingle5(index, indent),
+        _parseSingle2 = _slicedToArray(_parseSingle, 2),
+        node = _parseSingle2[0],
+        next = _parseSingle2[1];
+      nodes.push(node);
+      index = next;
+    }
+    return [nodes, index];
+  };
+  const _parseSingle5 = function parseSingle(start, indent) {
+    let allowElif = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    const _parseDecorators = parseDecorators(start),
+      decorators = _parseDecorators.decorators,
+      index = _parseDecorators.index;
+    if (decorators.length > 0) {
+      const defLine = lines[index];
+      if (!defLine || defLine.indent !== indent || !defLine.text.startsWith('def ')) {
+        throw syntaxError('A decorator must be followed by a "def" line.', defLine || lines[start]);
+      }
+      const _parseDef = parseDef(defLine.text, defLine),
+        name = _parseDef.name,
+        params = _parseDef.params;
+      const bodyStart = index + 1;
+      const bodyIndent = indent + INDENT_UNIT;
+      const _parseNodes = parseNodes(bodyStart, bodyIndent),
+        _parseNodes2 = _slicedToArray(_parseNodes, 2),
+        body = _parseNodes2[0],
+        next = _parseNodes2[1];
+      const custom = decorators.find(decorator => decorator.name === 'custom_block');
+      if (custom) {
+        const labelArgs = custom.rawArgs.filter(raw => !/^warp\s*=/.test(raw.trim()));
+        return [{
+          kind: 'define',
+          name,
+          params,
+          label: labelArgs.length > 0 ? labelArgs[0] : null,
+          warp: parseWarpFlag(custom),
+          body,
+          line: defLine.line
+        }, next];
+      }
+      const hat = decorators[decorators.length - 1];
+      return [{
+        kind: 'hat',
+        name: hat.name,
+        args: hat.rawArgs,
+        body,
+        line: hat.line
+      }, next];
+    }
+    const line = lines[start];
+    if (line.text.startsWith('def ')) {
+      const _parseDef2 = parseDef(line.text, line),
+        name = _parseDef2.name,
+        params = _parseDef2.params;
+      const bodyStart = start + 1;
+      const bodyIndent = indent + INDENT_UNIT;
+      const _parseNodes3 = parseNodes(bodyStart, bodyIndent),
+        _parseNodes4 = _slicedToArray(_parseNodes3, 2),
+        body = _parseNodes4[0],
+        next = _parseNodes4[1];
+      return [{
+        kind: 'script',
+        name,
+        params,
+        body,
+        line: line.line
+      }, next];
+    }
+    const colon = (0,_lexer_js__WEBPACK_IMPORTED_MODULE_1__.findTrailingColon)(line.text);
+    if (colon !== -1) {
+      const header = line.text.slice(0, colon).trim();
+      const bodyIndent = indent + INDENT_UNIT;
+      const _parseNodes5 = parseNodes(start + 1, bodyIndent),
+        _parseNodes6 = _slicedToArray(_parseNodes5, 2),
+        body = _parseNodes6[0],
+        afterBody = _parseNodes6[1];
+      if (header === 'else') {
+        throw syntaxError('"else" without a matching "if".', line);
+      }
+      const isIf = header === 'if' || header.startsWith('if ');
+      const isElif = header === 'elif' || header.startsWith('elif ');
+      if (isElif && !allowElif) {
+        throw syntaxError('"elif" without a matching "if".', line);
+      }
+      if (isIf || isElif) {
+        const conditionSource = (isElif ? header.slice('elif'.length) : header.slice(2)).trim();
+        if (!conditionSource) {
+          throw syntaxError("\"".concat(isElif ? 'elif' : 'if', "\" needs a condition."), line);
+        }
+        const condition = parseExpression(conditionSource, line, line.indent + 4);
+        let elseBody = null;
+        let next = afterBody;
+        const elseLine = lines[next];
+        if (elseLine && elseLine.indent === indent) {
+          if (elseLine.text === 'else:' || elseLine.text === 'else') {
+            const _parseNodes7 = parseNodes(next + 1, bodyIndent),
+              _parseNodes8 = _slicedToArray(_parseNodes7, 2),
+              elseNodes = _parseNodes8[0],
+              afterElse = _parseNodes8[1];
+            elseBody = elseNodes;
+            next = afterElse;
+          } else if (elseLine.text === 'elif:' || elseLine.text.startsWith('elif ')) {
+            // `elif cond:` is sugar for an `if` nested in the else branch.
+            const _parseSingle3 = _parseSingle5(next, indent, true),
+              _parseSingle4 = _slicedToArray(_parseSingle3, 2),
+              elifNode = _parseSingle4[0],
+              afterElif = _parseSingle4[1];
+            elseBody = [elifNode];
+            next = afterElif;
+          }
+        }
+        return [{
+          kind: 'if',
+          condition,
+          body,
+          elseBody,
+          line: line.line
+        }, next];
+      }
+      const _splitCall3 = splitCall(header, line),
+        name = _splitCall3.name,
+        args = _splitCall3.args;
+      return [{
+        kind: 'control',
+        name,
+        args: args || [],
+        body,
+        line: line.line
+      }, afterBody];
+    }
+    const _splitCall4 = splitCall(line.text, line),
+      name = _splitCall4.name,
+      args = _splitCall4.args;
+    return [{
+      kind: 'call',
+      name,
+      args: args || [],
+      line: line.line
+    }, start + 1];
+  };
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.indent !== 0) throw syntaxError('Top-level statements must not be indented.', line);
+    if (line.text.startsWith('target ')) {
+      const value = line.text.slice('target '.length).trim();
+      const parsed = parseExpression(value, line);
+      if (parsed.kind !== 'string') throw syntaxError('target expects a quoted name.', line);
+      file.target = parsed.value;
+      i++;
+      continue;
+    }
+    if (line.text.startsWith('import ')) {
+      file.imports.push(line.text.slice('import '.length).trim());
+      i++;
+      continue;
+    }
+    const _parseSingle6 = _parseSingle5(i, 0),
+      _parseSingle7 = _slicedToArray(_parseSingle6, 2),
+      node = _parseSingle7[0],
+      next = _parseSingle7[1];
+    file.blocks.push(node);
+    i = next;
+  }
+  return file;
+};
+
+/**
+ * Read the `warp=True` flag from a custom_block decorator.
+ * @param {object} decorator Decorator descriptor.
+ * @returns {boolean} Warp flag.
+ */
+const parseWarpFlag = decorator => {
+  for (const raw of decorator.rawArgs) {
+    const match = /^warp\s*=\s*(True|False|true|false)$/.exec(raw.trim());
+    if (match) return match[1].toLowerCase() === 'true';
+  }
+  return false;
+};
+
+/***/ },
+
+/***/ "./src/addons/addons/astras-copilot/agent/scrathon/window.js"
+/*!*******************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/agent/scrathon/window.js ***!
+  \*******************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   createScrathonWindow: () => (/* binding */ createScrathonWindow),
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var _tools_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../tools.js */ "./src/addons/addons/astras-copilot/agent/tools.js");
+/* harmony import */ var _decompiler_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./decompiler.js */ "./src/addons/addons/astras-copilot/agent/scrathon/decompiler.js");
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+/**
+ * Scrathon conversion and debug window.
+ *
+ * A standalone, draggable DOM window (compact single-pane mode) that converts
+ * between Scrathon DSL text and real Scratch blocks:
+ *   - "Code -> Blocks": compile the code and apply to the target's workspace.
+ *   - "Blocks -> Code": decompile the target's scripts into the editor.
+ *   - "Round-Trip Test": test bidirectional conversion and verify fidelity.
+ */
+
+
+
+
+/** Turn any thrown value into a display string. */
+const errorText = error => error && error.message ? error.message : String(error);
+const DEFAULT_CODE = ['@when_flag_clicked', 'def main():', '    move(${n:10})', ''].join('\n');
+
+/**
+ * Build the Scrathon conversion window controller.
+ * @param {object} options Options.
+ * @param {object} options.vm Scratch VM.
+ * @param {Function} options.msg Localization function.
+ * @returns {object} Controller with `open()`, `close()` and `toggle()`.
+ */
+const createScrathonWindow = _ref => {
+  let vm = _ref.vm,
+    msg = _ref.msg;
+  let windowElement = null;
+  let codeArea = null;
+  let targetSelect = null;
+  let statusElement = null;
+  let dragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  const t = (key, fallback) => {
+    const value = msg(key);
+    if (!value || value === key || value.endsWith("/".concat(key))) return fallback;
+    return value;
+  };
+
+  /**
+   * Localize a message with `{placeholder}` substitution, falling back to the
+   * English template when the active locale has no translation.
+   * @param {string} key Message key.
+   * @param {string} fallback English template.
+   * @param {object} vars Placeholder values.
+   * @returns {string} Localized message.
+   */
+  const tf = (key, fallback, vars) => {
+    // Pass `vars` straight to `msg`: when the key is untranslated `msg` returns
+    // the namespaced key without formatting, so no required-argument error is
+    // thrown. Calling `msg(key)` first would throw for translated templates.
+    const value = msg(key, vars);
+    const missing = !value || value === key || value.endsWith("/".concat(key));
+    if (!missing) return value;
+    return String(fallback).replace(/\{(\w+)\}/g, (match, name) => {
+      return vars && Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match;
+    });
+  };
+
+  /** Report a message in the window's status strip. */
+  const setStatus = function setStatus(text) {
+    let isError = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+    let isSuccess = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    if (!statusElement) return;
+    statusElement.textContent = text;
+    statusElement.classList.toggle('sa-agent-scrathon-status-error', Boolean(isError));
+    statusElement.classList.toggle('sa-agent-scrathon-status-success', Boolean(isSuccess));
+  };
+
+  /** Refresh the target dropdown from the VM. */
+  const refreshTargets = () => {
+    if (!targetSelect) return;
+    const tools = (0,_tools_js__WEBPACK_IMPORTED_MODULE_0__.createScratchTools)(vm);
+    const _tools$list_targets = tools.list_targets(),
+      targets = _tools$list_targets.targets,
+      currentTarget = _tools$list_targets.currentTarget;
+    targetSelect.textContent = '';
+    for (const target of targets) {
+      const option = document.createElement('option');
+      option.value = target.name;
+      option.textContent = target.name;
+      if (currentTarget && target.name === currentTarget.name) option.selected = true;
+      targetSelect.appendChild(option);
+    }
+  };
+
+  /** The currently selected target name (or undefined for the editing target). */
+  const selectedTarget = () => targetSelect && targetSelect.value ? targetSelect.value : undefined;
+
+  /** Compile the text area and apply it to the selected target. */
+  const importCode = async () => {
+    if (!codeArea) return;
+    const code = codeArea.value;
+    if (!code.trim()) {
+      setStatus(t('scrathon-empty', 'Enter some Scrathon code first.'), true);
+      return;
+    }
+    try {
+      const result = await (0,_tools_js__WEBPACK_IMPORTED_MODULE_0__.applyScrathonSource)(vm, {
+        code,
+        target: selectedTarget()
+      });
+      setStatus(tf('scrathon-applied-status', 'Applied to {target}: {count} block(s).', {
+        target: result.target.name,
+        count: result.applied
+      }), false, true);
+    } catch (error) {
+      setStatus(errorText(error), true);
+    }
+  };
+
+  /** Decompile the selected target's scripts into the code area. */
+  const exportCode = () => {
+    try {
+      const _decompileTargetScrip = (0,_tools_js__WEBPACK_IMPORTED_MODULE_0__.decompileTargetScripts)(vm, selectedTarget()),
+        target = _decompileTargetScrip.target,
+        scripts = _decompileTargetScrip.scripts,
+        imports = _decompileTargetScrip.imports;
+      const importLines = Array.isArray(imports) && imports.length > 0 ? "".concat(imports.map(moduleName => "import ".concat(moduleName)).join('\n'), "\n\n") : '';
+      const scriptCode = scripts.map(script => script.code).filter(Boolean).join('\n\n');
+      const code = "".concat(importLines).concat(scriptCode);
+      if (codeArea) codeArea.value = code;
+      setStatus(tf('scrathon-exported-status', 'Exported {count} script(s) from {target}.', {
+        count: scripts.length,
+        target: target.name
+      }), false, true);
+    } catch (error) {
+      setStatus(errorText(error), true);
+    }
+  };
+
+  /**
+   * Perform an in-memory round-trip test:
+   * Code -> Compiler -> Mock Scratch Blocks -> Decompiler -> Recompiler.
+   */
+  const roundTripTest = async () => {
+    if (!codeArea) return;
+    const source = codeArea.value;
+    if (!source.trim()) {
+      setStatus(t('scrathon-empty', 'Enter some Scrathon code first.'), true);
+      return;
+    }
+    try {
+      const preparedCode = await (0,_tools_js__WEBPACK_IMPORTED_MODULE_0__.prepareScrathonCodeAndExtensions)(vm, source);
+      const compiled = (0,_tools_js__WEBPACK_IMPORTED_MODULE_0__.compileScrathonCode)(vm, preparedCode, {
+        target: selectedTarget()
+      });
+      if (!compiled.scripts || compiled.scripts.length === 0) {
+        throw new Error('Compilation produced 0 scripts.');
+      }
+      const mockTarget = {
+        id: 'debug-target',
+        name: selectedTarget() || 'Sprite1',
+        getName: () => selectedTarget() || 'Sprite1',
+        blocks: {
+          _blocks: {}
+        }
+      };
+      let blockIdCounter = 1;
+      const _addBlockTree = function addBlockTree(desc) {
+        let isTopLevel = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+        const id = "blk_".concat(blockIdCounter++);
+        const blk = {
+          id,
+          opcode: desc.opcode,
+          topLevel: isTopLevel,
+          inputs: {},
+          fields: {},
+          mutation: desc.mutation,
+          next: null
+        };
+        mockTarget.blocks._blocks[id] = blk;
+        if (desc.fields) {
+          for (const _ref2 of Object.entries(desc.fields)) {
+            var _ref3 = _slicedToArray(_ref2, 2);
+            const fName = _ref3[0];
+            const fVal = _ref3[1];
+            blk.fields[fName] = {
+              name: fName,
+              value: fVal
+            };
+          }
+        }
+        if (desc.inputs) {
+          for (const _ref4 of Object.entries(desc.inputs)) {
+            var _ref5 = _slicedToArray(_ref4, 2);
+            const iName = _ref5[0];
+            const iVal = _ref5[1];
+            if (iVal && typeof iVal === 'object' && iVal.opcode) {
+              const childId = _addBlockTree(iVal, false);
+              blk.inputs[iName] = {
+                block: childId
+              };
+            } else {
+              const sId = "shadow_".concat(blockIdCounter++);
+              const sVal = iVal && typeof iVal === 'object' && iVal.value !== undefined ? iVal.value : iVal;
+              let sOpcode = 'text';
+              let sField = 'TEXT';
+              if (typeof sVal === 'number' || !isNaN(Number(sVal)) && sVal !== '') {
+                sOpcode = 'math_number';
+                sField = 'NUM';
+              }
+              if (iVal && iVal.__shadow) {
+                sOpcode = iVal.__shadow;
+                sField = iVal.__field || 'TEXT';
+              }
+              mockTarget.blocks._blocks[sId] = {
+                id: sId,
+                opcode: sOpcode,
+                shadow: true,
+                fields: {
+                  [sField]: {
+                    name: sField,
+                    value: String(sVal !== null && sVal !== void 0 ? sVal : '')
+                  }
+                }
+              };
+              blk.inputs[iName] = {
+                block: sId,
+                shadow: sId
+              };
+            }
+          }
+        }
+        if (desc.substack) {
+          const subId = _addBlockTree(desc.substack[0], false);
+          blk.inputs.SUBSTACK = {
+            block: subId
+          };
+          let curId = subId;
+          for (let j = 1; j < desc.substack.length; j++) {
+            const nextId = _addBlockTree(desc.substack[j], false);
+            mockTarget.blocks._blocks[curId].next = nextId;
+            curId = nextId;
+          }
+        }
+        if (desc.next) {
+          const nextNodes = Array.isArray(desc.next) ? desc.next : [desc.next];
+          let curId = id;
+          for (const nextNode of nextNodes) {
+            const nextId = _addBlockTree(nextNode, false);
+            mockTarget.blocks._blocks[curId].next = nextId;
+            curId = nextId;
+          }
+        }
+        return id;
+      };
+      for (const script of compiled.scripts) {
+        if (script.blocks && script.blocks.length > 0) {
+          let prevId = null;
+          for (let i = 0; i < script.blocks.length; i++) {
+            const bId = _addBlockTree(script.blocks[i], i === 0);
+            if (prevId) mockTarget.blocks._blocks[prevId].next = bId;
+            prevId = bId;
+          }
+        }
+      }
+      const decompiler = (0,_decompiler_js__WEBPACK_IMPORTED_MODULE_1__.createDecompiler)(vm, mockTarget);
+      const decompiledResult = decompiler.file();
+
+      // Verify that the decompiled code compiles cleanly without errors
+      const recompiled = (0,_tools_js__WEBPACK_IMPORTED_MODULE_0__.compileScrathonCode)(vm, decompiledResult.code, {
+        target: selectedTarget()
+      });
+      if (!recompiled.scripts || recompiled.scripts.length === 0) {
+        throw new Error('Recompilation produced 0 scripts.');
+      }
+      setStatus(t('scrathon-roundtrip-ok', '✓ Round-trip verified! DSL and blocks convert cleanly both ways.'), false, true);
+    } catch (err) {
+      setStatus(tf('scrathon-roundtrip-error', 'Round-trip failed: {message}', {
+        message: errorText(err)
+      }), true);
+    }
+  };
+
+  /** Copy text to clipboard. */
+  const copyText = text => {
+    if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+    setStatus(t('scrathon-copied', 'Copied to clipboard.'), false, true);
+  };
+
+  /** Start dragging the window from its header. */
+  const onDragStart = event => {
+    if (!windowElement) return;
+    dragging = true;
+    const rect = windowElement.getBoundingClientRect();
+    dragOffsetX = event.clientX - rect.left;
+    dragOffsetY = event.clientY - rect.top;
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', onDragEnd);
+  };
+
+  /** Move the window while dragging. */
+  const onDragMove = event => {
+    if (!dragging || !windowElement) return;
+    const width = windowElement.offsetWidth;
+    const height = windowElement.offsetHeight;
+    const maxX = window.innerWidth - width;
+    const maxY = window.innerHeight - height;
+    windowElement.style.left = "".concat(Math.min(Math.max(0, event.clientX - dragOffsetX), Math.max(0, maxX)), "px");
+    windowElement.style.top = "".concat(Math.min(Math.max(0, event.clientY - dragOffsetY), Math.max(0, maxY)), "px");
+  };
+
+  /** Stop dragging. */
+  const onDragEnd = () => {
+    dragging = false;
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+  };
+
+  /** Allow Tab key to indent 4 spaces in textarea. */
+  const setupTabIndent = textarea => {
+    textarea.addEventListener('keydown', e => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        textarea.value = "".concat(textarea.value.substring(0, start), "    ").concat(textarea.value.substring(end));
+        textarea.selectionStart = textarea.selectionEnd = start + 4;
+      }
+    });
+  };
+
+  /** Build the window DOM once. */
+  const build = () => {
+    windowElement = document.createElement('div');
+    windowElement.className = 'sa-agent-scrathon-window';
+    windowElement.style.display = 'none';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'sa-agent-scrathon-header';
+    header.addEventListener('mousedown', onDragStart);
+    const title = document.createElement('span');
+    title.className = 'sa-agent-scrathon-title';
+    title.textContent = t('scrathon-window-title', 'Scrathon Debugger & Converter');
+    header.appendChild(title);
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'sa-agent-scrathon-close';
+    closeButton.textContent = '\u00d7';
+    closeButton.title = t('scrathon-close', 'Close');
+    closeButton.setAttribute('aria-label', t('scrathon-close', 'Close'));
+    closeButton.addEventListener('click', () => close());
+    header.appendChild(closeButton);
+    windowElement.appendChild(header);
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'sa-agent-scrathon-body';
+
+    // Toolbar Row
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sa-agent-scrathon-toolbar';
+    const targetGroup = document.createElement('div');
+    targetGroup.className = 'sa-agent-scrathon-target-group';
+    const targetLabel = document.createElement('span');
+    targetLabel.className = 'sa-agent-scrathon-label';
+    targetLabel.textContent = t('scrathon-target', 'Target');
+    targetGroup.appendChild(targetLabel);
+    targetSelect = document.createElement('select');
+    targetSelect.className = 'sa-agent-scrathon-select';
+    targetGroup.appendChild(targetSelect);
+    const refreshButton = document.createElement('button');
+    refreshButton.type = 'button';
+    refreshButton.className = 'sa-agent-scrathon-panel-btn';
+    refreshButton.textContent = t('scrathon-refresh', 'Refresh');
+    refreshButton.addEventListener('click', refreshTargets);
+    targetGroup.appendChild(refreshButton);
+    toolbar.appendChild(targetGroup);
+
+    // Action buttons
+    const buttons = document.createElement('div');
+    buttons.className = 'sa-agent-scrathon-buttons';
+    const importButton = document.createElement('button');
+    importButton.type = 'button';
+    importButton.className = 'sa-agent-button sa-agent-button-primary';
+    importButton.textContent = t('scrathon-import', 'Code \u2192 Blocks');
+    importButton.title = t('scrathon-import-tooltip', 'Compile Scrathon code and apply to target');
+    importButton.addEventListener('click', importCode);
+    const exportButton = document.createElement('button');
+    exportButton.type = 'button';
+    exportButton.className = 'sa-agent-button sa-agent-button-secondary';
+    exportButton.textContent = t('scrathon-export', 'Blocks \u2192 Code');
+    exportButton.title = t('scrathon-export-tooltip', 'Decompile target scripts into code');
+    exportButton.addEventListener('click', exportCode);
+    const roundTripButton = document.createElement('button');
+    roundTripButton.type = 'button';
+    roundTripButton.className = 'sa-agent-button sa-agent-button-secondary';
+    roundTripButton.textContent = t('scrathon-roundtrip', 'Round-Trip Test');
+    roundTripButton.title = t('scrathon-roundtrip-tooltip', 'Test bidirectional conversion fidelity');
+    roundTripButton.addEventListener('click', roundTripTest);
+    buttons.appendChild(importButton);
+    buttons.appendChild(exportButton);
+    buttons.appendChild(roundTripButton);
+    toolbar.appendChild(buttons);
+    body.appendChild(toolbar);
+
+    // Code area controls row
+    const editorHeader = document.createElement('div');
+    editorHeader.className = 'sa-agent-scrathon-editor-header';
+    const editorTitle = document.createElement('span');
+    editorTitle.className = 'sa-agent-scrathon-label';
+    editorTitle.textContent = t('scrathon-editor-title', 'Scrathon DSL Code');
+    editorHeader.appendChild(editorTitle);
+    const editorActions = document.createElement('div');
+    editorActions.className = 'sa-agent-scrathon-panel-actions';
+    const sampleButton = document.createElement('button');
+    sampleButton.type = 'button';
+    sampleButton.className = 'sa-agent-scrathon-panel-btn';
+    sampleButton.textContent = t('scrathon-sample', 'Sample');
+    sampleButton.addEventListener('click', () => {
+      if (codeArea) codeArea.value = DEFAULT_CODE;
+    });
+    editorActions.appendChild(sampleButton);
+    const clearButton = document.createElement('button');
+    clearButton.type = 'button';
+    clearButton.className = 'sa-agent-scrathon-panel-btn';
+    clearButton.textContent = t('scrathon-clear', 'Clear');
+    clearButton.addEventListener('click', () => {
+      if (codeArea) codeArea.value = '';
+    });
+    editorActions.appendChild(clearButton);
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'sa-agent-scrathon-panel-btn';
+    copyButton.textContent = t('scrathon-copy', 'Copy');
+    copyButton.addEventListener('click', () => {
+      if (codeArea) copyText(codeArea.value);
+    });
+    editorActions.appendChild(copyButton);
+    editorHeader.appendChild(editorActions);
+    body.appendChild(editorHeader);
+
+    // Single code textarea
+    codeArea = document.createElement('textarea');
+    codeArea.className = 'sa-agent-scrathon-code';
+    codeArea.spellcheck = false;
+    codeArea.value = DEFAULT_CODE;
+    setupTabIndent(codeArea);
+    body.appendChild(codeArea);
+
+    // Status strip
+    statusElement = document.createElement('pre');
+    statusElement.className = 'sa-agent-scrathon-status';
+    statusElement.textContent = t('scrathon-ready', 'Ready.');
+    body.appendChild(statusElement);
+    windowElement.appendChild(body);
+    document.body.appendChild(windowElement);
+    return windowElement;
+  };
+
+  /** Open (and focus) the window. */
+  const open = () => {
+    if (!windowElement) build();
+    refreshTargets();
+    windowElement.style.display = 'flex';
+    if (codeArea) codeArea.focus();
+  };
+
+  /** Close the window. */
+  const close = () => {
+    if (windowElement) windowElement.style.display = 'none';
+  };
+
+  /** Toggle the window. */
+  const toggle = () => {
+    if (!windowElement || windowElement.style.display === 'none') open();else close();
+  };
+  return {
+    open,
+    close,
+    toggle
+  };
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (createScrathonWindow);
 
 /***/ },
 
@@ -2433,13 +8001,27 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   TOOL_DEFINITIONS: () => (/* binding */ TOOL_DEFINITIONS),
 /* harmony export */   WRITE_TOOL_NAMES: () => (/* binding */ WRITE_TOOL_NAMES),
-/* harmony export */   createScratchTools: () => (/* binding */ createScratchTools)
+/* harmony export */   applyScrathonSource: () => (/* binding */ applyScrathonSource),
+/* harmony export */   applyScriptDescriptors: () => (/* binding */ applyScriptDescriptors),
+/* harmony export */   compileScrathonCode: () => (/* binding */ compileScrathonCode),
+/* harmony export */   createScratchTools: () => (/* binding */ createScratchTools),
+/* harmony export */   decompileTargetScripts: () => (/* binding */ decompileTargetScripts),
+/* harmony export */   makeVarContext: () => (/* binding */ makeVarContext),
+/* harmony export */   prepareScrathonCodeAndExtensions: () => (/* binding */ prepareScrathonCodeAndExtensions)
 /* harmony export */ });
 /* harmony import */ var scratch_vm_src_dispatch_central_dispatch__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! scratch-vm/src/dispatch/central-dispatch */ "../scratch-vm/src/dispatch/central-dispatch.js");
 /* harmony import */ var scratch_vm_src_dispatch_central_dispatch__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(scratch_vm_src_dispatch_central_dispatch__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _dsl_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./dsl.js */ "./src/addons/addons/astras-copilot/agent/dsl.js");
 /* harmony import */ var _block_xml_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./block-xml.js */ "./src/addons/addons/astras-copilot/agent/block-xml.js");
 /* harmony import */ var _writer_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./writer.js */ "./src/addons/addons/astras-copilot/agent/writer.js");
+/* harmony import */ var _docs_scrathon_doc_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../docs/scrathon-doc.js */ "./src/addons/addons/astras-copilot/docs/scrathon-doc.js");
+/* harmony import */ var _scrathon_parser_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./scrathon/parser.js */ "./src/addons/addons/astras-copilot/agent/scrathon/parser.js");
+/* harmony import */ var _scrathon_compiler_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./scrathon/compiler.js */ "./src/addons/addons/astras-copilot/agent/scrathon/compiler.js");
+/* harmony import */ var _scrathon_decompiler_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./scrathon/decompiler.js */ "./src/addons/addons/astras-copilot/agent/scrathon/decompiler.js");
+/* harmony import */ var _scrathon_catalog_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./scrathon/catalog.js */ "./src/addons/addons/astras-copilot/agent/scrathon/catalog.js");
+/* harmony import */ var _scrathon_error_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./scrathon/error.js */ "./src/addons/addons/astras-copilot/agent/scrathon/error.js");
+/* harmony import */ var _scrathon_example_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./scrathon/example.js */ "./src/addons/addons/astras-copilot/agent/scrathon/example.js");
+/* harmony import */ var _scrathon_mappings_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./scrathon/mappings.js */ "./src/addons/addons/astras-copilot/agent/scrathon/mappings.js");
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
@@ -2451,6 +8033,14 @@ function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) 
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
 function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+
+
+
+
+
+
+
+
 
 
 
@@ -3040,14 +8630,16 @@ const getScript = (vm, args) => {
   const root = getBlock(target, rootId);
   const maxBlocks = Math.max(1, Math.min(MAX_SCRIPT_BLOCKS, Number(args.maxBlocks) || 200));
   const result = (0,_dsl_js__WEBPACK_IMPORTED_MODULE_1__.scriptToDSL)(vm, target, rootId, maxBlocks);
+  const scrathon = (0,_scrathon_decompiler_js__WEBPACK_IMPORTED_MODULE_7__.createDecompiler)(vm, target).script(rootId);
   return {
     target: getTargetIdentity(target),
     root: {
       label: root ? (0,_dsl_js__WEBPACK_IMPORTED_MODULE_1__.getBlockLabel)(vm, root.opcode, root.mutation) : null
     },
     dsl: result.dsl,
+    scrathon: scrathon.code,
     blockCount: countScriptBlocks(target, rootId),
-    truncated: result.truncated
+    truncated: result.truncated || scrathon.truncated
   };
 };
 
@@ -3153,29 +8745,39 @@ const makeVarContext = (vm, target) => {
   const stage = getStage(vm);
   const declarations = [];
   const cache = new Map();
-  const lookup = (holder, type, name) => {
-    return holder && typeof holder.lookupVariableByNameAndType === 'function' ? holder.lookupVariableByNameAndType(name, type) : null;
+  const lookup = function lookup(holder, type, name) {
+    let skipStage = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
+    return holder && typeof holder.lookupVariableByNameAndType === 'function' ? holder.lookupVariableByNameAndType(name, type, skipStage) : null;
   };
-  const findVariable = (type, name) => lookup(target, type, name) || lookup(stage, type, name);
+  const findLocal = (type, name) => lookup(target, type, name, true);
+  const findGlobal = (type, name) => lookup(stage, type, name);
   const firstCostume = target && typeof target.getCostumes === 'function' ? target.getCostumes()[0] : null;
   const stageCostumes = stage && typeof stage.getCostumes === 'function' ? stage.getCostumes() : [];
   const backdrop = stageCostumes[stageCostumes.length - 1] || stageCostumes[0] || null;
   const firstSound = target && typeof target.getSounds === 'function' ? target.getSounds()[0] : null;
+  const firstBroadcast = Object.values(stage && stage.variables || {}).find(variable => variable && variable.type === 'broadcast_msg');
   return {
     defaultCostume: firstCostume ? firstCostume.name : '',
     defaultBackdrop: backdrop ? backdrop.name : '',
     defaultSound: firstSound ? firstSound.name : '',
+    defaultBroadcast: firstBroadcast ? firstBroadcast.name : '',
     resolveField(fieldName, rawName) {
+      let scope = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
       const name = String(rawName === undefined || rawName === null ? '' : rawName);
       const type = fieldName === 'LIST' ? 'list' : fieldName === 'BROADCAST_OPTION' ? 'broadcast_msg' : '';
-      const key = "".concat(type, ":").concat(name);
+      const isLocal = scope === 'local' && type !== 'broadcast_msg';
+      if (isLocal && (!target || target.isStage)) {
+        throw new Error("Cannot create local ".concat(type === 'list' ? 'list' : 'variable', " \"").concat(name, "\" on the stage. ") + 'Apply the code to a sprite, or use a global variable without the local: prefix.');
+      }
+      const key = "".concat(isLocal ? 'local' : 'global', ":").concat(type, ":").concat(name);
       if (cache.has(key)) return cache.get(key);
-      const existing = findVariable(type, name);
+      const existing = isLocal ? findLocal(type, name) : findGlobal(type, name);
       if (existing) {
         const resolved = {
           id: existing.id,
           name: existing.name,
-          type: existing.type || ''
+          type: existing.type || '',
+          isLocal
         };
         cache.set(key, resolved);
         return resolved;
@@ -3185,7 +8787,7 @@ const makeVarContext = (vm, target) => {
         id,
         name,
         type,
-        isLocal: false
+        isLocal
       };
       declarations.push(created);
       cache.set(key, created);
@@ -3217,21 +8819,53 @@ const WRITE_TOOL_NAMES = ['apply_scripts', 'delete_scripts', 'create_variable', 
 // --- Write tools -----------------------------------------------------------
 
 /**
- * Apply one script to a target's workspace.
+ * Compile a Scrathon source string into block descriptors.
+ *
+ * Scrathon is the text DSL documented in `docs/scrathon.md`. Compilation is
+ * strict: an unknown instruction, a type mismatch or an unimported extension
+ * throws a `ScrathonError` whose message carries the source line, so the model
+ * can fix the code and retry.
+ * @param {object} vm Scratch VM (for extension metadata).
+ * @param {string} code Scrathon source.
+ * @param {object} [options] Options.
+ * @param {string} [options.target] Fallback target name from a `target` declaration.
+ * @returns {{scripts: Array<object>, target: (string|null), imports: Array<string>}} Compiled result.
+ */
+const compileScrathonCode = function compileScrathonCode(vm, code) {
+  let options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  if (typeof code !== 'string' || code.trim() === '') {
+    throw new Error('code is required: provide Scrathon source text.');
+  }
+  try {
+    const file = (0,_scrathon_parser_js__WEBPACK_IMPORTED_MODULE_5__.parse)(code);
+    const compiled = (0,_scrathon_compiler_js__WEBPACK_IMPORTED_MODULE_6__.compileFile)(file, {
+      vm
+    });
+    return {
+      scripts: compiled.scripts,
+      target: file.target || options.target || null,
+      imports: compiled.imports
+    };
+  } catch (error) {
+    throw new Error((0,_scrathon_error_js__WEBPACK_IMPORTED_MODULE_9__.toScrathonError)(error).format());
+  }
+};
+
+/**
+ * Apply a list of block descriptors to a target's workspace.
  * @param {object} vm Scratch VM.
- * @param {object} args Tool arguments.
- * @param {object} args.target Target name or ID (omit for editing target).
- * @param {Array<object>} args.scripts Script descriptors.
+ * @param {string|undefined} targetSelector Target name or ID (omit for editing target).
+ * @param {Array<object>} scripts Script descriptors.
  * @returns {Promise<object>} Result.
  */
-const applyScripts = async (vm, args) => {
-  if (!Array.isArray(args.scripts) || args.scripts.length === 0) {
-    throw new Error('scripts is required: provide an array of { blocks: [...] } entries.');
+const applyScriptDescriptors = async (vm, targetSelector, scripts) => {
+  if (!Array.isArray(scripts) || scripts.length === 0) {
+    throw new Error('No blocks to apply.');
   }
-  const target = requireTarget(vm, args.target);
+  const target = requireTarget(vm, targetSelector);
   if (!target || target.isStage === undefined) throw new Error('Target not found.');
   const ctx = makeVarContext(vm, target);
-  const compiled = (0,_block_xml_js__WEBPACK_IMPORTED_MODULE_2__.buildScriptsXml)(args.scripts, ctx);
+  const compiled = (0,_block_xml_js__WEBPACK_IMPORTED_MODULE_2__.buildScriptsXml)(scripts, ctx);
   const result = await (0,_writer_js__WEBPACK_IMPORTED_MODULE_3__.applyXml)(compiled.xml, {
     targetId: target.id,
     declarations: compiled.declarations
@@ -3243,6 +8877,136 @@ const applyScripts = async (vm, args) => {
     warnings: compiled.warnings,
     applied: result && result.blockIds ? result.blockIds.length : compiled.scripts
   };
+};
+const BUILTIN_EXTENSIONS = ['pen', 'music', 'text2speech', 'translate', 'videoSensing'];
+
+/**
+ * Ensure extensions used in code are loaded into the VM.
+ * Also auto-adds missing import declarations for built-in extensions so scripts don't fail compilation.
+ * @param {object} vm Scratch VM.
+ * @param {string} code Scrathon source.
+ * @returns {Promise<string>} Prepared source code.
+ */
+const prepareScrathonCodeAndExtensions = async (vm, code) => {
+  if (typeof code !== 'string') return code;
+  let prepared = code;
+  const declaredImports = new Set();
+  const importRegex = /^import\s+([A-Za-z0-9_]+)/gm;
+  let match;
+  while ((match = importRegex.exec(code)) !== null) {
+    declaredImports.add(match[1]);
+  }
+
+  // Detect used built-in extensions without import
+  const missingImports = [];
+  for (const ext of BUILTIN_EXTENSIONS) {
+    if (!declaredImports.has(ext)) {
+      const pattern = new RegExp("\\b".concat(ext, "\\.[a-zA-Z0-9_]+"), 'g');
+      if (pattern.test(code)) {
+        missingImports.push(ext);
+        declaredImports.add(ext);
+      }
+    }
+  }
+  if (missingImports.length > 0) {
+    prepared = "".concat(missingImports.map(ext => "import ".concat(ext)).join('\n'), "\n").concat(prepared);
+  }
+
+  // Ensure all declared/detected extensions are loaded in VM
+  if (vm && vm.extensionManager) {
+    for (const ext of declaredImports) {
+      const isLoaded = typeof vm.extensionManager.isExtensionLoaded === 'function' && vm.extensionManager.isExtensionLoaded(ext);
+      if (!isLoaded && typeof vm.extensionManager.loadExtensionURL === 'function') {
+        try {
+          await vm.extensionManager.loadExtensionURL(ext);
+        } catch (e) {
+          // Ignore failure if offline or unsupported
+        }
+      }
+    }
+  }
+  return prepared;
+};
+
+/**
+ * Compile Scrathon source and apply it to a target in one step. Used by the
+ * Scrathon window; the agent tool calls this through `apply_scripts`.
+ * @param {object} vm Scratch VM.
+ * @param {object} args Arguments.
+ * @param {string} args.code Scrathon source.
+ * @param {string} [args.target] Target name or ID.
+ * @returns {Promise<object>} Result.
+ */
+const applyScrathonSource = async function applyScrathonSource(vm) {
+  let _ref7 = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {},
+    code = _ref7.code,
+    target = _ref7.target;
+  const preparedCode = await prepareScrathonCodeAndExtensions(vm, code);
+  const compiled = compileScrathonCode(vm, preparedCode, {
+    target
+  });
+  const targetSelector = target || compiled.target || undefined;
+  const result = await applyScriptDescriptors(vm, targetSelector, compiled.scripts);
+  return _objectSpread(_objectSpread({}, result), {}, {
+    imports: compiled.imports
+  });
+};
+
+/**
+ * List a target's top-level scripts decompiled to Scrathon. Used by the Scrathon
+ * window's "blocks -> code" direction.
+ * @param {object} vm Scratch VM.
+ * @param {string} [targetSelector] Target name or ID. Defaults to the editing target.
+ * @returns {{target: object, scripts: Array<object>}} Target identity and scripts.
+ */
+const decompileTargetScripts = (vm, targetSelector) => {
+  const target = requireTarget(vm, targetSelector);
+  const decompiler = (0,_scrathon_decompiler_js__WEBPACK_IMPORTED_MODULE_7__.createDecompiler)(vm, target);
+  const scripts = getScriptIds(target).map(scriptId => {
+    const block = getBlock(target, scriptId);
+    return {
+      id: scriptId,
+      label: block ? (0,_dsl_js__WEBPACK_IMPORTED_MODULE_1__.getBlockLabel)(vm, block.opcode, block.mutation) : null,
+      code: decompiler.script(scriptId).code
+    };
+  });
+  const imports = typeof decompiler.getImports === 'function' ? decompiler.getImports() : [];
+  return {
+    target: getTargetIdentity(target),
+    scripts,
+    imports
+  };
+};
+
+/**
+ * Apply one script to a target's workspace.
+ * @param {object} vm Scratch VM.
+ * @param {object} args Tool arguments.
+ * @param {object} args.target Target name or ID (omit for editing target).
+ * @param {Array<object>} args.scripts Script descriptors.
+ * @param {string} [args.code] Scrathon source (alternative to `scripts`).
+ * @returns {Promise<object>} Result.
+ */
+const applyScripts = async (vm, args) => {
+  let scripts = args.scripts;
+  let targetSelector = args.target;
+  let imports = null;
+  if (typeof args.code === 'string' && args.code.trim() !== '') {
+    const code = await prepareScrathonCodeAndExtensions(vm, args.code);
+    const compiled = compileScrathonCode(vm, code, {
+      target: args.target
+    });
+    scripts = compiled.scripts;
+    imports = compiled.imports;
+    if (!targetSelector && compiled.target) targetSelector = compiled.target;
+  }
+  if (!Array.isArray(scripts) || scripts.length === 0) {
+    throw new Error('Provide Scrathon `code`, or `scripts` as an array of { blocks: [...] } entries.');
+  }
+  const result = await applyScriptDescriptors(vm, targetSelector, scripts);
+  return _objectSpread(_objectSpread({}, result), {}, {
+    imports
+  });
 };
 
 /**
@@ -3346,17 +9110,164 @@ const renameTarget = async (vm, args) => {
   };
 };
 
+/** Human-readable label for a Scrathon sigil in catalog output. */
+const CATALOG_TAG_LABEL = {
+  n: 'number',
+  s: 'string',
+  b: 'boolean',
+  c: 'color',
+  m: 'menu',
+  v: 'variable',
+  l: 'list',
+  msg: 'broadcast'
+};
+
+/** Map an extension argument type to the Scrathon sigil used to write it. */
+const extensionSigil = type => {
+  if (type === 'boolean') return 'b';
+  if (type === 'color') return 'c';
+  if (type === 'menu') return 'm';
+  if (type === 'note') return 'n';
+  if (type === 'string' || type === 'matrix' || type === 'image') return 's';
+  if (['number', 'angle', 'integer', 'positiveInteger', 'positiveNumber', 'wholeNumber'].includes(type)) {
+    return 'n';
+  }
+  return 's';
+};
+
+/** Map an extension block type to a return description. */
+const extensionReturns = blockType => {
+  if (blockType === 'Boolean') return 'boolean';
+  if (blockType === 'reporter') return 'number|string';
+  return 'void';
+};
+
 /**
- * List core block opcodes an agent may use, optionally filtered.
+ * Add type and menu information to a core catalog argument.
+ * @param {object} entry Catalog entry.
+ * @param {object} arg Raw argument descriptor.
+ * @param {object} vm Scratch VM.
+ * @param {object} target Current editing target.
+ * @returns {object} Public argument descriptor.
+ */
+const enrichCoreArg = (entry, arg, vm, target) => {
+  const result = {
+    name: arg.name,
+    type: CATALOG_TAG_LABEL[arg.t] || arg.t,
+    sigil: arg.t,
+    kind: arg.k
+  };
+  if (arg.t === 'msg') {
+    result.sigil = 's';
+    result.legacySigil = 'msg';
+  }
+  if (arg.t === 'm' || arg.t === 'v' || arg.t === 'l' || arg.t === 'msg') {
+    const menu = (0,_scrathon_catalog_js__WEBPACK_IMPORTED_MODULE_8__.resolveMenuOptions)({
+      opcode: entry.opcode,
+      argName: arg.name,
+      vm,
+      target
+    });
+    if (menu.options && menu.options.length > 0) result.options = menu.options;
+    if (menu.dynamic) result.dynamic = true;
+    if (menu.note) result.note = menu.note;
+  }
+  return result;
+};
+
+/**
+ * Add type and menu information to an extension catalog argument.
+ * @param {object} entry Catalog entry.
+ * @param {string} name Argument name.
+ * @param {object} info Extension argument metadata.
+ * @param {object} meta Extension block metadata.
+ * @param {object} vm Scratch VM.
+ * @param {object} target Current editing target.
+ * @returns {object} Public argument descriptor.
+ */
+const enrichExtensionArg = (entry, name, info, meta, vm, target) => {
+  const type = info.type || 'string';
+  const isMenu = type === 'menu' || Boolean(info.menu);
+  const menuName = info.menu || name;
+  const menuInfo = meta.menus ? meta.menus[menuName] : null;
+  const result = {
+    name,
+    type: isMenu ? 'menu' : type,
+    sigil: isMenu ? 'm' : extensionSigil(type),
+    kind: isMenu && menuInfo && !menuInfo.acceptReporters ? 'field' : 'input'
+  };
+  if (isMenu) {
+    const menu = (0,_scrathon_catalog_js__WEBPACK_IMPORTED_MODULE_8__.resolveMenuOptions)({
+      opcode: entry.opcode,
+      argName: menuName,
+      menuInfo,
+      vm,
+      target
+    });
+    if (menu.options && menu.options.length > 0) result.options = menu.options;
+    if (menu.dynamic) result.dynamic = true;
+    if (menu.note) result.note = menu.note;
+    if (!result.options || result.options.length === 0) {
+      result.note = result.note || 'Menu options are populated by the extension at runtime.';
+    }
+  }
+  return result;
+};
+
+/**
+ * Enrich one catalog entry with argument types, return type and menu options.
+ * @param {object} entry Catalog entry.
+ * @param {object} vm Scratch VM.
+ * @param {object} target Current editing target.
+ * @param {Map<string, object>} extensionBlocks Extension metadata.
+ * @returns {object} Enriched entry.
+ */
+const enrichCatalogEntry = (entry, vm, target, extensionBlocks) => {
+  let args = entry.args;
+  let returns = entry.returns || 'void';
+  if (entry.kind === 'extension') {
+    const meta = extensionBlocks.get(entry.opcode);
+    if (meta) {
+      args = Object.entries(meta.arguments || {}).map(_ref8 => {
+        let _ref9 = _slicedToArray(_ref8, 2),
+          name = _ref9[0],
+          info = _ref9[1];
+        return enrichExtensionArg(entry, name, info || {}, meta, vm, target);
+      });
+      returns = entry.returns && entry.returns !== 'void' ? entry.returns : extensionReturns(meta.blockType);
+    } else {
+      args = [];
+    }
+  } else {
+    args = (args || []).map(arg => enrichCoreArg(entry, arg, vm, target));
+  }
+  return {
+    name: entry.name,
+    category: entry.category,
+    kind: entry.kind,
+    signature: entry.signature,
+    returns,
+    arguments: args
+  };
+};
+
+/**
+ * List core Scrathon DSL functions with argument types, return types and menu
+ * options, optionally filtered.
+ * @param {object} vm Scratch VM.
  * @param {object} args Tool arguments.
  * @returns {object} Catalog.
  */
-const blockCatalog = args => {
+const blockCatalog = (vm, args) => {
   const filter = String(args.query || '').trim();
-  const blocks = (0,_block_xml_js__WEBPACK_IMPORTED_MODULE_2__.describeCoreBlocks)(filter);
+  const blocks = (0,_scrathon_mappings_js__WEBPACK_IMPORTED_MODULE_11__.describeScrathonCatalog)(filter);
+  const stage = vm && vm.runtime && typeof vm.runtime.getTargetForStage === 'function' ? vm.runtime.getTargetForStage() : null;
+  const target = getEditingTarget(vm) || stage;
+  const extensionBlocks = (0,_scrathon_compiler_js__WEBPACK_IMPORTED_MODULE_6__.collectExtensionBlocks)(vm);
+  const enriched = blocks.map(entry => enrichCatalogEntry(entry, vm, target, extensionBlocks));
   return {
-    count: blocks.length,
-    blocks: blocks.slice(0, 200)
+    count: enriched.length,
+    blocks: enriched.slice(0, 100)
   };
 };
 const TOOL_DEFINITIONS = [{
@@ -3423,7 +9334,7 @@ const TOOL_DEFINITIONS = [{
   type: 'function',
   function: {
     name: 'get_script',
-    description: 'Get a script as a readable Scratch DSL. Pass a script ID from list_scripts or search_blocks; the tool resolves the containing top-level script. The DSL renders core blocks, custom blocks, and extension blocks with their arguments, and does not expose per-block IDs.',
+    description: 'Get a script as readable text. Returns both a plain-English DSL and an equivalent Scrathon snippet (the strict text language in docs/scrathon.md). Pass a script ID from list_scripts or search_blocks; the tool resolves the containing top-level script. Does not expose per-block IDs.',
     parameters: {
       type: 'object',
       properties: {
@@ -3509,7 +9420,7 @@ const TOOL_DEFINITIONS = [{
   type: 'function',
   function: {
     name: 'apply_scripts',
-    description: 'ADD OR MODIFY blocks in a sprite or the stage. Compiles a JSON block tree into Scratch blocks and loads them into the real editor workspace (the change is undoable with Ctrl+Z). Use list_scripts/get_script first to see existing code, and block_catalog to confirm opcodes and input names. Only include the blocks you intend to add; this never deletes existing scripts. Provide blocks as a nested tree: {opcode, fields:{}, inputs:{}} where inputs are literal values or nested block trees, and control blocks use substack/substack2 arrays plus next for the following statement.',
+    description: 'ADD OR MODIFY blocks in a sprite or the stage. Prefer the Scrathon `code` parameter: pass Scrathon source (see docs/scrathon.md) and it is compiled to Scratch blocks and loaded into the real editor workspace (undoable with Ctrl+Z). Use list_scripts/get_script first to see existing code, and block_catalog for Scrathon instruction names and signatures. Only add the blocks you intend; this never deletes existing scripts. Alternatively pass `scripts` as a nested tree: {opcode, fields:{}, inputs:{}} where inputs are literal values or nested block trees, and control blocks use substack/substack2 arrays plus next for the following statement.',
     parameters: {
       type: 'object',
       properties: {
@@ -3517,9 +9428,13 @@ const TOOL_DEFINITIONS = [{
           type: 'string',
           description: 'Sprite name or ID. Omit to use the current editing target.'
         },
+        code: {
+          type: 'string',
+          description: 'Scrathon source to compile and apply. Preferred over `scripts`. Example: "@when_flag_clicked\\ndef main():\\n    move(${n:10})".'
+        },
         scripts: {
           type: 'array',
-          description: 'Array of scripts. Each script is {x, y, blocks: [blockTree, ...]} where blocks is the whole stack starting from a hat block.',
+          description: 'Array of scripts (legacy alternative to `code`). Each script is {x, y, blocks: [blockTree, ...]} where blocks is the whole stack starting from a hat block.',
           items: {
             type: 'object',
             properties: {
@@ -3543,7 +9458,6 @@ const TOOL_DEFINITIONS = [{
           }
         }
       },
-      required: ['scripts'],
       additionalProperties: false
     }
   }
@@ -3575,7 +9489,7 @@ const TOOL_DEFINITIONS = [{
   type: 'function',
   function: {
     name: 'create_variable',
-    description: 'Create a variable, list, or broadcast message. Creates nothing if it already exists. Undoable with Ctrl+Z.',
+    description: 'Create a variable, list, or broadcast message. Pass kind:"list" explicitly for a list; omitting kind creates a variable. Creates nothing if it already exists. Undoable with Ctrl+Z.',
     parameters: {
       type: 'object',
       properties: {
@@ -3586,7 +9500,7 @@ const TOOL_DEFINITIONS = [{
         kind: {
           type: 'string',
           enum: ['variable', 'list', 'broadcast'],
-          description: 'What to create. Defaults to variable.'
+          description: 'What to create. Use "list" for a list and "variable" for a variable; defaults to variable.'
         },
         target: {
           type: 'string',
@@ -3630,15 +9544,37 @@ const TOOL_DEFINITIONS = [{
   type: 'function',
   function: {
     name: 'block_catalog',
-    description: 'List core Scratch block opcodes with their input names, optionally filtered. Use this to look up exact opcodes/inputs before calling apply_scripts.',
+    description: 'List core Scrathon DSL functions, hat decorators, and expression signatures with typed sigils (${n:...}, ${s:...}, ${b:...}, etc.), optionally filtered. Each entry includes argument types, return type, and dropdown options when the argument is a menu. ALWAYS use this to look up valid Scrathon DSL names, argument types, and menu options before writing code for apply_scripts.',
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Optional case-insensitive filter, e.g. "motion" or "data_".'
+          description: 'Optional name, category, or keyword to filter by (e.g. "motion", "sound", "control", "var", "looks", "hat").'
         }
       },
+      additionalProperties: false
+    }
+  }
+}, {
+  type: 'function',
+  function: {
+    name: 'Scrathon_doc',
+    description: 'Return the complete Scrathon DSL reference markdown (docs/scrathon.md), including syntax, type sigils, variables/lists/scopes, control flow, custom blocks, and extension notes. Use this when you need the full language details rather than a catalog lookup.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    }
+  }
+}, {
+  type: 'function',
+  function: {
+    name: 'scrathon_example',
+    description: 'Return a complete, tested Scrathon feature-tour example covering events, motion, looks, sound, control/elif, sensing reporters (answer, days_since_2000, current, timer, username), operators, variables/lists with scopes, custom blocks, pen, and music. Use it as a template instead of guessing syntax.',
+    parameters: {
+      type: 'object',
+      properties: {},
       additionalProperties: false
     }
   }
@@ -3661,7 +9597,13 @@ const createScratchTools = vm => ({
   search_blocks: args => searchBlocks(vm, args || {}),
   get_extension_source: args => getExtensionSource(vm, args || {}),
   get_runtime_state: () => getRuntimeState(vm),
-  block_catalog: args => blockCatalog(args || {}),
+  block_catalog: args => blockCatalog(vm, args || {}),
+  Scrathon_doc: () => ({
+    content: _docs_scrathon_doc_js__WEBPACK_IMPORTED_MODULE_4__.SCRATHON_DOC
+  }),
+  scrathon_example: () => ({
+    code: _scrathon_example_js__WEBPACK_IMPORTED_MODULE_10__.SCRATHON_EXAMPLE
+  }),
   get_write_status: () => getWriteReady(),
   apply_scripts: args => applyScripts(vm, args || {}),
   delete_scripts: args => deleteScripts(vm, args || {}),
@@ -3893,6 +9835,30 @@ const applyXml = async function applyXml(xml) {
 
 /***/ },
 
+/***/ "./src/addons/addons/astras-copilot/docs/scrathon-doc.js"
+/*!***************************************************************!*\
+  !*** ./src/addons/addons/astras-copilot/docs/scrathon-doc.js ***!
+  \***************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   SCRATHON_DOC: () => (/* binding */ SCRATHON_DOC)
+/* harmony export */ });
+/**
+ * Generated from docs/scrathon.md. Keep this file in sync with the
+ * Markdown source; a unit test compares the two strings.
+ *
+ * Regenerate with: pnpm --filter scratch-gui build:scrathon-doc
+ */
+/* eslint-disable max-len */
+// prettier-ignore
+const SCRATHON_DOC = "# Scrathon 语言规范 (Scrathon Language Specification)\n\n- **版本**: v1.0\n- **定位**: 专为 AstraEditor / Scratch 体系设计的严格强类型、Pythonic 代码式积木语言\n- **目标**: 为大模型代码生成、积木反编译阅读以及文本化编程提供零歧义、低 Token 消耗、完全匹配底层 Opcode 的 DSL 协议\n\n---\n\n## 目录\n1. 语言概述与设计哲学\n2. 词法与排版规约\n3. 严格类型标签系统（`${t:v}`）\n4. 目标与扩展导入声明\n5. 事件与帽子积木（Hat Blocks）\n6. 自定义积木（Procedures / 函数定义与调用）\n7. 控制流与 C 形积木（Control Flow）\n8. 变量、列表与数据容器（Data & Variables）\n9. 表达式与运算符（Operators）\n10. 官方核心积木 API 映射规范\n11. 外置扩展积木调用规范\n12. 编译期诊断与错误规约\n13. 综合工程示例项目\n14. 编译器流水线设计参考\n\n---\n\n## 1. 语言概述与设计哲学\n\nScrathon 是一门以 Python 语法形态为载体、直接面向 Scratch 运行时与图形块体系的领域特定语言（DSL）。\n\n其核心设计哲学包含以下四条准则：\n\n1. **结构直观（Pythonic Structure）**：利用 4 空格缩进天然对齐 Scratch C 形积木的堆叠嵌套，利用 `@` 装饰器天然对齐帽子积木（Hat Blocks）与过程定义。\n2. **完全匹配（Strict Matching）**：消除所有可能带来歧义的模糊匹配。积木调用、扩展方法必须 1:1 严格对齐官方注册表或底层 Opcode，无对应的调用直接触发编译错误。\n3. **强类型定界（Explicit Typed Sigil）**：所有插入插槽的数值、菜单、布尔、颜色均通过 `${类型:内容}` 显式包裹，与底层阴影积木（Shadow Blocks）保持 1:1 物理映射，彻底消灭歧义。\n4. **双向无损互转（Bidirectional Homomorphism）**：Scrathon 代码不仅能单向编译为 Scratch XML / Blocks，工作区现存的积木也能够 100% 反编译为干净的 Scrathon 代码。\n\n---\n\n## 2. 词法与排版规约\n\n### 2.1 缩进与换行\n- 必须严格采用 **4 个空格** 进行代码缩进，禁止使用制表符（Tab）。\n- 缩进深度增加代表进入 C 形控制积木内部分支（`SUBSTACK` 或 `SUBSTACK2`）。\n- 缩进深度回退代表闭合当前积木分支，接续外层的下一个积木（`next` 关系）。\n- 语句以换行符分隔，单行只允许一条积木指令。\n\n### 2.2 注释\n- 使用 `#` 进行注释，支持整行独立注释与语句行尾注释。\n- 编译器会保留有意义的行注释，并可选择将其转换为 Scratch 工作区中的积木附着注释（Block Comments）。\n\n### 2.3 标识符与命名\n- 变量名、列表名、广播名允许中英文字符、数字与下划线。\n- 建议函数名遵循 `snake_case` 命名风格。\n\n---\n\n## 3. 严格类型标签系统（`${t:v}`）\n\nScratch 底层的插槽具备严格的物理形态区分（圆角数值插槽、六边形布尔插槽、下拉菜单、色块拾取器等）。在 Scrathon 中，所有插槽入参必须由大括号定界符显式标注类型。\n\n### 3.1 类型标签一览表\n\n| 标签 | 类型全称 | Scratch 底层对应 | 阴影生成规则 | 语法示例 |\n| :---: | :--- | :--- | :--- | :--- |\n| **`n`** | **Number** (数值) | `math_number` / `math_integer` | 生成数值型阴影积木 | `${n:10}`, `${n:-3.14}`, `${n:hp + 5}` |\n| **`s`** | **String** (字符串) / **Broadcast** (广播名) | `text` 阴影 / `event_broadcast_menu` 阴影 | 生成文本阴影；广播插槽自动映射到广播消息 ID | `${s:\"Game Over\"}`, `${s:\"game_start\"}` |\n| **`b`** | **Boolean** (布尔) | 六角菱形插槽 | 无阴影，插槽必须填入布尔求值积木 | `${b:True}`, `${b:hp > 0}`, `${b:touching(${m:\"edge\"})}` |\n| **`c`** | **Color** (颜色) | `colour_picker` 拾色块 | 生成十六进制色块阴影 | `${c:\"#FF5722\"}`, `${c:\"#00FF00\"}` |\n| **`m`** | **Menu** (下拉菜单) | 字段专属下拉项 | 生成目标积木绑定的 Field / Menu | `${m:\"mouse-pointer\"}`, `${m:\"mysound\"}` |\n| **`v`** | **Variable** (变量名) | 变量引用字段 | 自动映射到变量 ID；无前缀=全局，`local:`=角色私有 | `${v:\"score\"}` / `${variable:\"score\"}`, `${v:local:\"hp\"}` |\n| **`l`** | **List** (列表名) | 列表引用字段 | 自动映射到列表 ID；无前缀=全局，`local:`=角色私有 | `${l:\"inventory\"}` / `${list:\"inventory\"}`, `${l:local:\"backpack\"}` |\n\n> 变量与列表必须显式区分：`${v:\"...\"}` / `${variable:\"...\"}` 是变量，`${l:\"...\"}` / `${list:\"...\"}` 是列表。`${n:...}` 始终是数值标签，不能用于名字；`${n:list\"...\"}` 会直接报错并提示正确写法。\n\n> 广播名统一使用 `${s:\"...\"}`；编译器会根据目标插槽自动生成 `event_broadcast_menu` 阴影并绑定广播 ID。旧的 `${msg:\"...\"}` 写法仍然兼容，但反编译输出始终为 `${s}`。\n\n### 3.2 强校验规则\n- 若积木插槽期望类型为 `${c:...}`（颜色），传入 `${n:...}` 或 `${s:...}` 均属于编译期类型冲突错误。\n- `${b:...}` 内部必须是布尔字面量（`True`/`False`）、比较表达式或布尔 Reporter 积木，不得将数值作为布尔隐式转换。\n- **变量与列表是动态 Reporter**：`${v:...}` / `${l:...}` 可以直接填入任意数值、字符串、颜色插槽，编译器会保留 `local:` / `global:` 作用域，不再需要写成 `${n:变量名}`。\n  ```python\n  move(${v:local:\"speed\"})          # 数值插槽直接使用局部变量\n  say(${l:\"inventory\"})             # 字符串插槽直接使用列表内容\n  touching_color(${v:\"playerColor\"}) # 颜色插槽直接使用变量\n  ```\n- 变量/列表**不能**填入布尔插槽和下拉菜单字段：布尔插槽请写比较表达式或 `${b:...}`，菜单请写 `${m:...}`。\n- 旧写法 `${n:name}` / `${s:name}` 仍然兼容，但其中的 `name` 不带作用域，等价于全局变量；要首次创建或引用角色私有变量，请使用 `${v:local:\"name\"}` / `${l:local:\"name\"}`。\n\n### 3.3 特殊插槽（音符 / 矩阵 / 扩展菜单）\n\n部分扩展积木的参数不是普通数值插槽，而是 Scratch 的特殊输入控件。Scrathon 会根据扩展元数据自动选择正确的阴影类型：\n\n- **音符**：音乐扩展的 `music.playNoteForBeats` 等音符输入使用 `${n:60}`，会生成 `<shadow type=\"note\"><field name=\"NOTE\">60</field></shadow>`，保留点击弹出钢琴键盘与手动输入数值的能力。\n- **矩阵**：micro:bit 的矩阵输入使用 `${s:\"...\"}`，会生成 `matrix` 阴影并写入 `MATRIX` 字段。\n- **扩展下拉菜单**：乐器、鼓、语音等菜单使用 `${m:\"...\"}`，会自动生成对应的 `<扩展>_menu_<菜单名>` 阴影并写入正确的字段。\n\n---\n\n## 4. 目标与扩展导入声明\n\nScrathon 脚本首部允许声明目标角色作用域与所需加载的外置扩展。\n\n### 4.1 角色目标声明（`target`）\n```python\n# 声明当前脚本将注入到角色 \"Player\" 的独立工作区中\ntarget \"Player\"\n\n# 若针对舞台编写背景与全局逻辑，则指向舞台\ntarget \"Stage\"\n```\n*注：若脚本省略 `target` 声明，编译器默认作用于当前编辑器处于焦点状态的角色。*\n\n### 4.2 扩展模块导入声明（`import`）\n```python\nimport pen\nimport music\nimport text2speech\n```\n*注：编译器在静态解析到 `import <ext>` 时，会自动校验当前 VM 运行时中是否已加载对应扩展；若未加载，将自动触发底层 `vm.extensionManager.loadExtensionIdSync` 完成静默加载。*\n\n---\n\n## 5. 事件与帽子积木（Hat Blocks）\n\n帽子积木通过标准 Python 装饰器（`@`）实现，用于修饰独立的事件响应代码块。\n\n### 5.1 常用事件定义表\n\n```python\n# 1. 绿旗点击事件\n@when_flag_clicked\ndef on_start():\n    ...\n\n# 2. 按键按下事件（参数必须为菜单项 ${m:...}）\n@when_key_pressed(${m:\"space\"})\ndef on_jump():\n    ...\n\n# 3. 角色被点击事件\n@when_this_sprite_clicked\ndef on_click():\n    ...\n\n# 4. 接收到广播事件（参数使用字符串广播名 ${s:...}）\n@when_broadcast(${s:\"game_over\"})\ndef on_game_over():\n    ...\n\n# 5. 舞台背景切换事件\n@when_backdrop_switches(${m:\"backdrop2\"})\ndef on_scene_change():\n    ...\n\n# 6. 响度或计时器大于阈值事件\n@when_greater_than(${m:\"TIMER\"}, ${n:5})\ndef on_timeout():\n    ...\n```\n\n---\n\n## 6. 自定义积木（Procedures / 函数定义与调用）\n\nScratch 中的自定义积木（My Blocks）在底层由定义帽子积木（`procedures_definition`）、原型阴影（`procedures_prototype`）、形参读取（`argument_reporter_*`）和过程调用（`procedures_call`）复合构成。\n\n### 6.1 函数定义规范\n- 必须使用 `@custom_block` 装饰器修饰。\n- 装饰器支持关键字参数 `warp=True|False`（是否勾选“运行时不刷新屏幕”）。\n- 装饰器首个参数可传入**多段标签模板字符串**，其中使用 `${类型:形参名}` 对应形参。\n- 函数形参列表必须严格声明参数类型：`${n:name}`、`${s:name}`、`${b:name}`。\n\n```python\n# 示例 1：基础自定义函数（无穿插标签，默认顺序拼接）\n@custom_block(warp=True)\ndef dash(${n:distance}, ${b:invincible}):\n    if ${b:invincible}:\n        set_ghost_effect(${n:50})\n    move(${n:distance})\n    set_ghost_effect(${n:0})\n\n# 示例 2：带穿插文字标签的多段自定义函数\n@custom_block(\"向右冲刺 ${n:distance} 步，开启无敌: ${b:invincible}\", warp=True)\ndef custom_dash(${n:distance}, ${b:invincible}):\n    ...\n```\n\n### 6.2 形参在函数体内的读取\n函数体内读取外部传入的形参时，编译器自动映射到专用的形参读取块：\n- `${n:distance}` 或 `${s:distance}` ➔ 编译为 `argument_reporter_string_number`\n- `${b:invincible}` ➔ 编译为 `argument_reporter_boolean`\n\n### 6.3 过程调用（Invocation）\n调用函数时必须与定义阶段声明的实参类型完全吻合：\n```python\n# 正确调用\ncustom_dash(${n:50}, ${b:True})\n\n# 错误调用示例（编译期就地拦截并报错）：\n# custom_dash(${s:\"50\"}, ${b:True})  # 报错：参数 1 期望数值类型 ${n:...}，实际传入字符串 ${s:...}\n```\n\n---\n\n## 7. 控制流与 C 形积木（Control Flow）\n\nScratch 的分支与循环积木均拥有垂直包含块的结构（C-Blocks），Scrathon 使用冒号 `:` 与 4 格缩进表达。\n\n### 7.1 控制流语法定义\n\n```python\n# 1. 无限循环 (control_forever)\nforever:\n    move(${n:5})\n    bounce_on_edge()\n\n# 2. 计数循环 (control_repeat)\nrepeat(${n:10}):\n    change_x(${n:5})\n    wait(${n:0.05})\n\n# 3. 条件循环 (control_repeat_until)\nrepeat_until(${b:touching(${m:\"edge\"})}):\n    move(${n:3})\n\n# 4. 单分支条件 (control_if)\nif ${b:hp < 20}:\n    say(${s:\"血量过低！\"}, ${n:1})\n\n# 5. 双分支条件 (control_if_else)\nif ${b:score >= 100}:\n    broadcast(${s:\"stage_clear\"})\n    stop(${m:\"all\"})\nelse:\n    change_var(${v:\"score\"}, ${n:10})\n\n# 6. 多分支条件（elif 编译为 else 分支里的嵌套 if/else）\nif ${b:score >= 100}:\n    broadcast(${s:\"stage_clear\"})\nelif ${b:score >= 50}:\n    say(${s:\"Good!\"})\nelif ${b:score >= 10}:\n    say(${s:\"Keep going\"})\nelse:\n    say(${s:\"Try again\"})\n\n# 7. 等待特定时长 (control_wait)\nwait(${n:0.5})\n\n# 8. 等待条件成立 (control_wait_until)\nwait_until(${b:key_pressed(${m:\"any\"})})\n\n# 9. 终止脚本 (control_stop)\nstop(${m:\"this script\"})  # 可选: \"all\", \"this script\", \"other scripts in sprite\"\n```\n\n---\n\n## 8. 变量、列表与数据容器（Data & Variables）\n\nScrathon 提供对 Scratch 全局/局部变量与列表的精确操作。\n\n### 8.1 变量作用域（全局 / 私有）\n\n- `${v:\"name\"}`：**全局变量**（舞台所有角色共享）。不存在时自动在舞台上创建。\n- `${v:local:\"name\"}`：**当前角色的私有变量**。不存在时自动在当前角色上创建。\n- `${v:global:\"name\"}`：显式指定全局，等价于不写前缀。\n- 列表同理：`${l:\"name\"}` / `${l:local:\"name\"}` / `${l:global:\"name\"}`。\n- 完整单词别名：`${variable:\"name\"}` = `${v:\"name\"}`，`${list:\"name\"}` = `${l:\"name\"}`；作用域前缀同样可用，例如 `${list:local:\"backpack\"}`。\n- `local:` 只能用于 `${v:...}` / `${l:...}` / `${variable:...}` / `${list:...}`；`${n:...}` 是数值标签，不能用于变量名或列表名。\n- 在舞台上使用 `local:` 会报错；舞台没有私有作用域。\n- 反编译时，角色私有变量输出为 `${v:local:\"...\"}`，全局变量输出为 `${v:\"...\"}`。\n- `${v:...}` / `${l:...}` 本身就是 Reporter，可直接填入数值、字符串、颜色插槽；无需再嵌套进 `${n:...}` / `${s:...}`。\n\n> 注意：不带前缀现在明确表示**全局变量**。若要引用当前角色已有的同名私有变量，必须写 `${v:local:\"...\"}`。\n\n### 8.2 变量操作\n```python\n# 全局变量设值 (data_setvariableto)\nset_var(${v:\"score\"}, ${n:0})\n\n# 当前角色私有变量设值\nset_var(${v:local:\"hp\"}, ${n:100})\n\n# 变量累加 (data_changevariableby)\nchange_var(${v:\"score\"}, ${n:1})\n\n# 变量 / 列表直接作为值使用\nmove(${v:local:\"speed\"})\nsay(${l:\"inventory\"})\n\n# 显示与隐藏变量监视器\nshow_variable(${v:\"score\"})\nhide_variable(${v:\"score\"})\n```\n\n### 8.3 列表操作\n```python\n# 添加项到全局列表末尾 (data_addtolist)\nlist_add(${l:\"inventory\"}, ${s:\"Iron Sword\"})\n\n# 当前角色的私有列表\nlist_add(${l:local:\"backpack\"}, ${s:\"Potion\"})\n\n# 删除列表指定项或清空 (data_deleteoflist / data_deletealloflist)\nlist_delete(${l:\"inventory\"}, ${n:1})\nlist_delete_all(${l:\"inventory\"})\n\n# 插入项到指定位置 (data_insertatlist)\nlist_insert(${l:\"inventory\"}, ${n:1}, ${s:\"Wooden Shield\"})\n\n# 替换指定项 (data_replaceitemoflist)\nlist_replace(${l:\"inventory\"}, ${n:1}, ${s:\"Steel Shield\"})\n\n# 读取列表项作为 Reporter 积木\nsay(list_item(${l:\"inventory\"}, ${n:1}))\n```\n\n---\n\n## 9. 表达式与运算符（Operators）\n\n复杂的表达式直接嵌套在 `${n:...}`、`${s:...}` 或 `${b:...}` 内部，由编译器递归构建对应的嵌套 Reporter 节点。\n\n### 9.1 数值运算符（嵌入在 `${n:...}` 中）\n- 基础四则运算：`+`, `-`, `*`, `/` ➔ 分别编译为 `operator_add`, `operator_subtract`, `operator_multiply`, `operator_divide`\n- 取余：`%` ➔ 编译为 `operator_mod`\n- 四舍五入：`round(expr)` ➔ 编译为 `operator_round`\n- 随机数生成：`random(${n:min}, ${n:max})` ➔ 编译为 `operator_random`\n- 数学函数：`math(${m:func}, ${n:val})` ➔ 编译为 `operator_mathop`（支持 `sqrt`, `sin`, `cos`, `abs` 等）\n\n### 9.2 布尔关系运算符（嵌入在 `${b:...}` 中）\n- 大于、小于、等于：`>`, `<`, `==` ➔ 编译为 `operator_gt`, `operator_lt`, `operator_equals`\n- 逻辑与：`and` ➔ 编译为 `operator_and`\n- 逻辑或：`or` ➔ 编译为 `operator_or`\n- 逻辑非：`not` ➔ 编译为 `operator_not`\n- 字符串包含：`contains(${s:str1}, ${s:str2})` ➔ 编译为 `operator_contains`\n\n### 9.3 字符串拼接（嵌入在 `${s:...}` 中）\n- 字符串合并：`join(${s:str1}, ${s:str2})` ➔ 编译为 `operator_join`\n- 提取第 N 个字符：`letter_of(${n:pos}, ${s:str})` ➔ 编译为 `operator_letter_of`\n- 字符串长度：`length_of(${s:str})` ➔ 编译为 `operator_length`\n\n---\n\n## 10. 官方核心积木 API 映射规范\n\n以下指令名称为系统标准保留字，与 Scratch 核心积木实现严格 1:1 物理映射：\n\n### 10.1 运动分类 (Motion)\n- `move(${n:steps})` ➔ `motion_movesteps`\n- `turn_right(${n:degrees})` ➔ `motion_turnright`\n- `turn_left(${n:degrees})` ➔ `motion_turnleft`\n- `go_to_xy(${n:x}, ${n:y})` ➔ `motion_gotoxy`\n- `go_to(${m:target})` ➔ `motion_goto`\n- `glide_to_xy(${n:secs}, ${n:x}, ${n:y})` ➔ `motion_glidesecstoxy`\n- `set_x(${n:x})` ➔ `motion_setx`\n- `change_x(${n:dx})` ➔ `motion_changexby`\n- `set_y(${n:y})` ➔ `motion_sety`\n- `change_y(${n:dy})` ➔ `motion_changeyby`\n- `bounce_on_edge()` ➔ `motion_ifonedgebounce`\n- `set_rotation_style(${m:style})` ➔ `motion_setrotationstyle`\n\n### 10.2 外观分类 (Looks)\n- `say_for_secs(${s:text}, ${n:secs})` ➔ `looks_sayforsecs`\n- `say(${s:text})` ➔ `looks_say`\n- `think_for_secs(${s:text}, ${n:secs})` ➔ `looks_thinkforsecs`\n- `think(${s:text})` ➔ `looks_think`\n- `switch_costume(${m:costume})` ➔ `looks_switchcostumeto`\n- `next_costume()` ➔ `looks_nextcostume`\n- `switch_backdrop(${m:backdrop})` ➔ `looks_switchbackdropto`\n- `next_backdrop()` ➔ `looks_nextbackdrop`\n- `change_size_by(${n:delta})` ➔ `looks_changesizeby`\n- `set_size_to(${n:percent})` ➔ `looks_setsizeto`\n- `set_effect(${m:effect}, ${n:value})` ➔ `looks_seteffectto`\n- `change_effect_by(${m:effect}, ${n:delta})` ➔ `looks_changeeffectby`\n- `clear_graphic_effects()` ➔ `looks_cleargraphiceffects`\n- `show()` ➔ `looks_show`\n- `hide()` ➔ `looks_hide`\n- `go_to_layer(${m:\"front\" | \"back\"})` ➔ `looks_gotofrontback`\n\n### 10.3 声音分类 (Sound)\n- `play_sound_until_done(${m:sound})` ➔ `sound_playuntildone`\n- `start_sound(${m:sound})` ➔ `sound_play`\n- `stop_all_sounds()` ➔ `sound_stopallsounds`\n- `change_volume_by(${n:delta})` ➔ `sound_changevolumeby`\n- `set_volume_to(${n:volume})` ➔ `sound_setvolumeto`\n\n### 10.4 侦测分类 (Sensing)\n- `touching(${m:target})` ➔ `sensing_touchingobject`（布尔值）\n- `touching_color(${c:color})` ➔ `sensing_touchingcolor`（布尔值）\n- `distance_to(${m:target})` ➔ `sensing_distanceto`（数值）\n- `ask_and_wait(${s:prompt})` ➔ `sensing_askandwait`\n- `key_pressed(${m:key})` ➔ `sensing_keypressed`（布尔值）\n- `mouse_down()` ➔ `sensing_mousedown`（布尔值）\n- `mouse_x()` / `mouse_y()` ➔ `sensing_mousex` / `sensing_mousey`\n\n---\n\n## 11. 外置扩展积木调用规范\n\n对于官方扩展及第三方扩展积木，Scrathon 实行 **“命名空间 + 确定性 Opcode 完全对齐”** 规则：\n调用格式为：`模块名.Opcode(${类型:值}, ...)`\n\n### 11.1 画笔扩展 (`pen`) 示例\n```python\nimport pen\n\npen.clear()\npen.penDown()\npen.penUp()\n\n# 1. 设置色块 (setPenColorToColor 严格接受颜色 ${c:...})\npen.setPenColorToColor(${c:\"#00E5FF\"})\n\n# 2. 设置分量数值 (setPenColorParamTo 严格接受菜单 ${m:...} 与数值 ${n:...})\npen.setPenColorParamTo(${m:\"brightness\"}, ${n:100})\n\n# 3. 改变分量数值 (changePenColorParamBy 严格接受菜单 ${m:...} 与增量 ${n:...})\npen.changePenColorParamBy(${m:\"saturation\"}, ${n:10})\n\n# 4. 设置笔触粗细 (setPenSizeTo 严格接受数值 ${n:...})\npen.setPenSizeTo(${n:4})\n```\n\n### 11.2 音乐扩展 (`music`) 示例\n```python\nimport music\n\n# 击打乐器：乐器代号与拍数\nmusic.playDrumForBeats(${m:1}, ${n:0.25})\n\n# 休止指定拍数\nmusic.restForBeats(${n:0.5})\n\n# 演奏音符：MIDI 音高 (0~127) 与拍数\nmusic.playNoteForBeats(${n:60}, ${n:0.5})\n\n# 设定乐器编号\nmusic.setInstrument(${m:1})\n```\n\n### 11.3 文字朗读扩展 (`text2speech`) 示例\n```python\nimport text2speech\n\ntext2speech.speakAndWait(${s:\"欢迎来到 AstraEditor！\"})\ntext2speech.setVoice(${m:\"ALTO\"})\ntext2speech.setLanguage(${m:\"zh-cn\"})\n```\n\n---\n\n## 12. 编译期诊断与错误规约\n\n在严格匹配原则下，编译器会在词法、语法与符号分析阶段实行就地拦截，输出确定性诊断信息。\n\n### 12.1 诊断错误分类\n1. **`SyntaxError` (语法结构错误)**：缺少冒号 `:`、缩进未对齐 4 的倍数、大括号定界符 `${` 未闭合。\n2. **`UnknownInstructionError` (未知积木错误)**：调用了不存在的积木指令或拼写错误的 Opcode。\n3. **`TypeMismatchError` (插槽类型冲突错误)**：实参标签与积木插槽的定义冲突（例如向 `${c:...}` 插槽传入了 `${n:50}`）。\n4. **`ArgumentCountError` (参数个数错误)**：传入实参数量少于或多于目标积木所定义的必需输入数量。\n5. **`UnimportedModuleError` (模块未导入错误)**：调用扩展方法时未在文件前部声明 `import <ext>`。\n\n### 12.2 错误输出格式规范\n编译器必须明确输出发生错误的行号、错误片段及修复建议，例如：\n\n```text\n[Scrathon CompileError]\nFile: \"Sprite1.py\", Line 14, Column 5\nCode: pen.setPenColorToColor(${n:50})\n      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeMismatchError:\n  Block 'pen_setPenColorToColor' slot 'COLOR' expects a color token (${c:...}),\n  but received a number token (${n:...}).\n\nCorrect Syntax:\n  pen.setPenColorToColor(${c:\"#FF0000\"})\n```\n\n---\n\n## 13. 综合工程示例项目\n\n以下为一个完整的、可直接被编译器编译并在 Scratch 工作区中无损呈现的 Scrathon 脚本：\n\n```python\ntarget \"Player\"\nimport pen\nimport music\n\n# -------------------------------------------------------------\n# 1. 自定义积木定义：带类型参数与无刷新屏幕 (Warp)\n# -------------------------------------------------------------\n@custom_block(\"绘制多边形，边数 ${n:sides}，边长: ${n:length}，颜色: ${c:line_color}\", warp=True)\ndef draw_polygon(${n:sides}, ${n:length}, ${c:line_color}):\n    pen.setPenColorToColor(${c:line_color})\n    pen.penDown()\n    repeat(${n:sides}):\n        move(${n:length})\n        turn_right(${n:360 / sides})\n    pen.penUp()\n\n# -------------------------------------------------------------\n# 2. 绿旗主入口脚本\n# -------------------------------------------------------------\n@when_flag_clicked\ndef main():\n    # 数据与环境初始化\n    set_var(${v:\"score\"}, ${n:0})\n    show_variable(${v:\"score\"})\n    clear_graphic_effects()\n    set_size_to(${n:100})\n    go_to_xy(${n:0}, ${n:0})\n    \n    # 画布初始化\n    pen.clear()\n    pen.setPenSizeTo(${n:3})\n    \n    # 调用自定义函数绘制一个天蓝色六边形\n    draw_polygon(${n:6}, ${n:60}, ${c:\"#00E5FF\"})\n    \n    say_for_secs(${s:\"图形绘制完毕！按空格键跳跃。\"}, ${n:2})\n    \n    # 核心常驻循环\n    forever:\n        move(${n:4})\n        bounce_on_edge()\n        \n        # 碰撞与拾取逻辑\n        if ${b:touching(${m:\"_mouse_\"})}:\n            change_var(${v:\"score\"}, ${n:1})\n            start_sound(${m:\"pop\"})\n            \n        wait(${n:0.02})\n\n# -------------------------------------------------------------\n# 3. 按键控制与广播触发\n# -------------------------------------------------------------\n@when_key_pressed(${m:\"space\"})\ndef on_jump():\n    # 跳跃模拟\n    repeat(${n:8}):\n        change_y(${n:10})\n    repeat(${n:8}):\n        change_y(${n:-10})\n        \n    # 分数过关校验\n    if ${b:${v:\"score\"} >= 10}:\n        broadcast(${s:\"stage_clear\"})\n\n# -------------------------------------------------------------\n# 4. 广播事件监听\n# -------------------------------------------------------------\n@when_broadcast(${s:\"stage_clear\"})\ndef on_clear():\n    say(${s:\"恭喜通关！\"})\n    music.playNoteForBeats(${n:72}, ${n:0.5})\n    stop(${m:\"all\"})\n```\n\n---\n\n## 14. 编译器流水线设计参考\n\n在实现 Scrathon 编译器与反编译器时，推荐按三阶段流水线推进：\n\n1. **词法阶段 (Tokenizer / Lexer)**：\n   - 维护缩进栈（Indent Stack），将空格缩进转化为 `INDENT` 与 `DEDENT` 标记；\n   - 提取并严格验证 `${类型:内容}` 词元。\n2. **语法与抽象语法树阶段 (AST Parser)**：\n   - 解析 `@装饰器` 并识别帽子积木；\n   - 识别 `@custom_block` 并构建过程定义节点（含 Mutation 元数据）；\n   - 将 C 形块分支构建为 `body: [...]` 树形节点，消灭底层的 `next` 递归负担。\n3. **XML 发射阶段 (Scratch-Blocks XML Emitter)**：\n   - 将 AST 映射为符合 `scratch-blocks` 规范的原生 XML；\n   - 自动装配对应插槽的阴影积木（`<shadow type=\"math_number\">` 等）；\n   - 最终提交至 `Blockly.Xml.domToWorkspace`，原子化完成工作区渲染并保留 Ctrl+Z 撤销能力。\n";
+/* eslint-enable max-len */
+
+/***/ },
+
 /***/ "./src/addons/addons/astras-copilot/userscript.js"
 /*!********************************************************!*\
   !*** ./src/addons/addons/astras-copilot/userscript.js ***!
@@ -3927,7 +9893,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _agent_loop_js__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ./agent/loop.js */ "./src/addons/addons/astras-copilot/agent/loop.js");
 /* harmony import */ var _agent_prompt_js__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ./agent/prompt.js */ "./src/addons/addons/astras-copilot/agent/prompt.js");
 /* harmony import */ var _agent_tools_js__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ./agent/tools.js */ "./src/addons/addons/astras-copilot/agent/tools.js");
-/* harmony import */ var _agent_writer_js__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ./agent/writer.js */ "./src/addons/addons/astras-copilot/agent/writer.js");
+/* harmony import */ var _agent_scrathon_window_js__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ./agent/scrathon/window.js */ "./src/addons/addons/astras-copilot/agent/scrathon/window.js");
+/* harmony import */ var _agent_scrathon_diff_js__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! ./agent/scrathon/diff.js */ "./src/addons/addons/astras-copilot/agent/scrathon/diff.js");
+/* harmony import */ var _agent_writer_js__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! ./agent/writer.js */ "./src/addons/addons/astras-copilot/agent/writer.js");
 function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
@@ -3939,6 +9907,8 @@ function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t =
 function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
 function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == typeof i ? i : i + ""; }
 function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != typeof i) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+
+
 
 
 
@@ -3977,6 +9947,7 @@ const POSITION_TYPES = {
   BOTTOM: 'bottom'
 };
 const DEFAULT_MODELS = ['gpt-4o-mini', 'gpt-4o', 'claude-3-7-sonnet', 'claude-3-5-sonnet', 'deepseek-chat', 'deepseek-reasoner'];
+const REASONING_EFFORTS = ['default', 'low', 'high', 'max'];
 const DEFAULT_CONFIG = {
   apiUrl: 'https://api.openai.com/v1/chat/completions',
   apiKey: '',
@@ -3987,7 +9958,28 @@ const DEFAULT_CONFIG = {
   temperature: 0.2,
   maxTokens: 3000,
   retries: 2,
+  reasoningEffort: 'default',
   streamIdleTimeoutMs: 30000
+};
+
+/**
+ * Convert a full API URL to the base URL shown in the settings field.
+ * @param {string} apiUrl API URL.
+ * @returns {string} Base URL.
+ */
+const getApiBaseUrl = apiUrl => String(apiUrl || '').trim().replace(/\/+$/, '').replace(/\/chat\/completions$/i, '');
+
+/**
+ * Convert the base URL entered by the user to a full chat-completions URL.
+ * @param {string} baseUrl Base URL, for example https://api.example.com/v1.
+ * @returns {string} Full endpoint.
+ */
+const buildApiEndpoint = baseUrl => {
+  const value = String(baseUrl || '').trim().replace(/\/+$/, '');
+  if (!value) return DEFAULT_CONFIG.apiUrl;
+  if (/\/chat\/completions$/i.test(value)) return value;
+  if (/\/v\d+[a-z0-9.]*$/i.test(value)) return "".concat(value, "/chat/completions");
+  return "".concat(value, "/v1/chat/completions");
 };
 
 /**
@@ -4112,6 +10104,7 @@ const loadConfig = () => {
     temperature: Number.isFinite(Number(stored.temperature)) ? Number(stored.temperature) : DEFAULT_CONFIG.temperature,
     maxTokens: Number.isFinite(Number(stored.maxTokens)) ? Number(stored.maxTokens) : DEFAULT_CONFIG.maxTokens,
     retries: Number.isFinite(Number(stored.retries)) ? Number(stored.retries) : DEFAULT_CONFIG.retries,
+    reasoningEffort: REASONING_EFFORTS.includes(stored.reasoningEffort) ? stored.reasoningEffort : 'default',
     streamIdleTimeoutMs: Number.isFinite(Number(stored.streamIdleTimeoutMs)) ? Number(stored.streamIdleTimeoutMs) : DEFAULT_CONFIG.streamIdleTimeoutMs
   };
 };
@@ -4320,12 +10313,17 @@ const createIcon = (iconSource, className) => {
   let sidebarToggleButton = null;
   let bottomToggleButton = null;
   let settingsPanel = null;
+  let scrathonWindow = null;
   let settingsErrorElement = null;
   let apiUrlInput = null;
+  let apiUrlHint = null;
   let apiKeyInput = null;
   let headersInput = null;
   let streamInput = null;
   let autoApproveInput = null;
+  let capabilitySelect = null;
+  let requestPreviewElement = null;
+  let requestPreviewTimer = 0;
   let autoApproveTools = false;
   let modeButton = null;
   let modelSelectElement = null;
@@ -4639,13 +10637,22 @@ const createIcon = (iconSource, className) => {
   const getToolLabel = name => TOOL_LABELS[name] || name;
 
   /**
+   * Whether a scrollable element is scrolled near its bottom.
+   * @param {?HTMLElement} element Scrollable element.
+   * @param {number} [threshold] Distance in pixels.
+   * @returns {boolean} Near bottom.
+   */
+  const isElementNearBottom = function isElementNearBottom(element) {
+    let threshold = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 40;
+    if (!element) return true;
+    return element.scrollHeight - element.scrollTop - element.clientHeight < threshold;
+  };
+
+  /**
    * Whether the message list is scrolled near the bottom.
    * @returns {boolean} Near bottom.
    */
-  const isNearBottom = () => {
-    if (!messagesElement) return true;
-    return messagesElement.scrollHeight - messagesElement.scrollTop - messagesElement.clientHeight < 40;
-  };
+  const isNearBottom = () => isElementNearBottom(messagesElement);
 
   /**
    * Scroll the message list to the bottom when auto-scroll is enabled.
@@ -4852,7 +10859,7 @@ const createIcon = (iconSource, className) => {
     const scrollTop = conversationListElement.scrollTop;
     const ordered = conversations.slice().sort((a, b) => b.updatedAt - a.updatedAt);
     conversationListElement.textContent = '';
-    for (const conversation of ordered) {
+    const renderConversationItem = conversation => {
       const item = document.createElement('div');
       item.className = 'sa-agent-conversation-item';
       item.setAttribute('role', 'listitem');
@@ -4935,6 +10942,9 @@ const createIcon = (iconSource, className) => {
       item.dataset.conversationId = conversation.id;
       deleteButton.classList.add('sa-agent-delete-button');
       conversationListElement.appendChild(item);
+    };
+    for (const conversation of ordered) {
+      renderConversationItem(conversation);
     }
     updateHeaderTitle();
     autoApproveTools = approvedConversations.has(activeConversationId);
@@ -4982,8 +10992,14 @@ const createIcon = (iconSource, className) => {
         streamingReasoningBody = streamingReasoningElement.querySelector('.sa-agent-reasoning-body');
         streamingRow.insertBefore(streamingReasoningElement, streamingBubble);
       }
+      // Follow the newest reasoning tokens, but stop if the user scrolled up
+      // inside the reasoning box to read earlier text.
+      const followReasoning = isElementNearBottom(streamingReasoningBody);
       streamingReasoningBody.textContent = '';
       streamingReasoningBody.appendChild((0,_agent_markdown_js__WEBPACK_IMPORTED_MODULE_19__.renderMarkdown)(streamingReasoning));
+      if (followReasoning) {
+        streamingReasoningBody.scrollTop = streamingReasoningBody.scrollHeight;
+      }
       streamingReasoningElement.querySelector('summary').textContent = msg(streamingText ? 'reasoning-title' : 'reasoning-active');
     }
     const content = streamingSanitize ? (0,_agent_dsl_js__WEBPACK_IMPORTED_MODULE_18__.replaceInternalIds)(vm, streamingText) : streamingText;
@@ -5277,7 +11293,8 @@ const createIcon = (iconSource, className) => {
   const requestToolApproval = _ref2 => {
     let id = _ref2.id,
       traceIndex = _ref2.traceIndex,
-      signal = _ref2.signal;
+      signal = _ref2.signal,
+      diff = _ref2.diff;
     return new Promise(resolve => {
       if (!id || signal && signal.aborted) {
         resolve(false);
@@ -5299,7 +11316,8 @@ const createIcon = (iconSource, className) => {
         resolve,
         signal,
         onAbort,
-        traceIndex
+        traceIndex,
+        diff
       });
       renderLiveTrace();
     });
@@ -5335,7 +11353,7 @@ const createIcon = (iconSource, className) => {
     for (const part of parts) {
       if (!part) continue;
       if (part.type === 'tools' && Array.isArray(part.trace) && part.trace.length) {
-        row.appendChild(buildTraceElement(part.trace, interactive));
+        appendTraceElements(row, part.trace, interactive);
       } else if (part.type === 'response') {
         if (part.reasoning) row.appendChild(buildReasoningElement(part.reasoning, part));
         if (part.content) {
@@ -5368,6 +11386,114 @@ const createIcon = (iconSource, className) => {
     if (allowed) approvedConversations.add(activeConversationId);else approvedConversations.delete(activeConversationId);
     if (autoApproveInput) autoApproveInput.checked = allowed;
     if (allowed) Array.from(approvalResolvers.keys()).forEach(id => resolveToolApproval(id, true));
+  };
+
+  /**
+   * Build an in-chat visual code diff card.
+   * @param {object} diff Diff data produced by computeToolDiff/computeScopeDiff.
+   * @returns {HTMLElement} Diff card element.
+   */
+  const buildDiffCard = diff => {
+    const card = document.createElement('div');
+    card.className = 'sa-agent-diff-card';
+    if (!diff || !diff.hasChanges || !Array.isArray(diff.scripts) || diff.scripts.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'sa-agent-diff-empty';
+      empty.textContent = msg('diff-no-changes');
+      card.appendChild(empty);
+      return card;
+    }
+    const header = document.createElement('div');
+    header.className = 'sa-agent-diff-header';
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'sa-agent-diff-title';
+    if (diff.target) {
+      const targetBadge = document.createElement('span');
+      targetBadge.className = 'sa-agent-diff-target-badge';
+      targetBadge.textContent = diff.target;
+      titleGroup.appendChild(targetBadge);
+    }
+    const headerText = document.createElement('span');
+    headerText.className = 'sa-agent-diff-header-text';
+    headerText.textContent = msg('diff-title');
+    titleGroup.appendChild(headerText);
+    const stats = document.createElement('div');
+    stats.className = 'sa-agent-diff-stats';
+    if (diff.totalAdd > 0) {
+      const statAdd = document.createElement('span');
+      statAdd.className = 'sa-agent-diff-stat-add';
+      statAdd.textContent = "+".concat(diff.totalAdd);
+      stats.appendChild(statAdd);
+    }
+    if (diff.totalDel > 0) {
+      const statDel = document.createElement('span');
+      statDel.className = 'sa-agent-diff-stat-del';
+      statDel.textContent = "-".concat(diff.totalDel);
+      stats.appendChild(statDel);
+    }
+    header.appendChild(titleGroup);
+    header.appendChild(stats);
+    card.appendChild(header);
+    const body = document.createElement('div');
+    body.className = 'sa-agent-diff-body';
+    for (const script of diff.scripts) {
+      const scriptSection = document.createElement('div');
+      scriptSection.className = 'sa-agent-diff-script';
+      const scriptHeader = document.createElement('div');
+      scriptHeader.className = 'sa-agent-diff-script-header';
+      const scriptTitle = document.createElement('span');
+      scriptTitle.className = 'sa-agent-diff-script-title';
+      scriptTitle.textContent = script.title || 'Script';
+      const badge = document.createElement('span');
+      badge.className = "sa-agent-diff-script-badge ".concat(script.isNew ? 'is-new' : script.isDelete ? 'is-delete' : 'is-modified');
+      badge.textContent = script.isNew ? msg('diff-badge-new') : script.isDelete ? msg('diff-badge-del') : msg('diff-badge-mod');
+      scriptHeader.appendChild(scriptTitle);
+      scriptHeader.appendChild(badge);
+      scriptSection.appendChild(scriptHeader);
+      const linesContainer = document.createElement('div');
+      linesContainer.className = 'sa-agent-diff-lines';
+      const renderLine = entry => {
+        const lineRow = document.createElement('div');
+        lineRow.className = "sa-agent-diff-line sa-agent-diff-line-".concat(entry.type);
+        const oldNo = document.createElement('span');
+        oldNo.className = 'sa-agent-diff-lineno sa-agent-diff-lineno-old';
+        oldNo.textContent = entry.oldLineNo !== null ? String(entry.oldLineNo) : '';
+        const newNo = document.createElement('span');
+        newNo.className = 'sa-agent-diff-lineno sa-agent-diff-lineno-new';
+        newNo.textContent = entry.newLineNo !== null ? String(entry.newLineNo) : '';
+        const prefix = document.createElement('span');
+        prefix.className = 'sa-agent-diff-prefix';
+        prefix.textContent = entry.type === 'add' ? '+' : entry.type === 'del' ? '-' : ' ';
+        const text = document.createElement('span');
+        text.className = 'sa-agent-diff-text';
+        text.textContent = entry.line;
+        lineRow.appendChild(oldNo);
+        lineRow.appendChild(newNo);
+        lineRow.appendChild(prefix);
+        lineRow.appendChild(text);
+        return lineRow;
+      };
+      const hunks = Array.isArray(script.hunks) && script.hunks.length > 0 ? script.hunks : null;
+      if (hunks) {
+        for (const hunk of hunks) {
+          const hunkHeader = document.createElement('div');
+          hunkHeader.className = 'sa-agent-diff-hunk-header';
+          hunkHeader.textContent = hunk.header;
+          linesContainer.appendChild(hunkHeader);
+          for (const lineEntry of hunk.lines) {
+            linesContainer.appendChild(renderLine(lineEntry));
+          }
+        }
+      } else if (Array.isArray(script.diff)) {
+        for (const lineEntry of script.diff) {
+          linesContainer.appendChild(renderLine(lineEntry));
+        }
+      }
+      scriptSection.appendChild(linesContainer);
+      body.appendChild(scriptSection);
+    }
+    card.appendChild(body);
+    return card;
   };
 
   /**
@@ -5436,16 +11562,28 @@ const createIcon = (iconSource, className) => {
       pre.textContent = entry.preview;
       body.appendChild(pre);
     }
+    if (entry.diff && entry.diff.hasChanges && status !== 'awaiting') {
+      const diffTitle = document.createElement('div');
+      diffTitle.className = 'sa-agent-tool-line-label';
+      diffTitle.textContent = msg('diff-title');
+      body.appendChild(diffTitle);
+      body.appendChild(buildDiffCard(entry.diff));
+    }
     details.appendChild(body);
     row.appendChild(details);
     if (interactive && status === 'awaiting' && entry.id) {
       const approval = document.createElement('div');
       approval.className = 'sa-agent-tool-approval';
+      const isWrite = WRITE_TOOL_SET.has(entry.name);
+      if (isWrite) row.classList.add('sa-agent-tool-write');
+      if (entry.diff && entry.diff.hasChanges) {
+        approval.appendChild(buildDiffCard(entry.diff));
+      }
+      const controls = document.createElement('div');
+      controls.className = 'sa-agent-tool-approval-controls';
       const hint = document.createElement('span');
       hint.className = 'sa-agent-tool-approval-hint';
-      const isWrite = WRITE_TOOL_SET.has(entry.name);
       hint.textContent = msg(isWrite ? 'trace-write-approval-hint' : 'trace-approval-hint');
-      if (isWrite) row.classList.add('sa-agent-tool-write');
       const allow = document.createElement('button');
       allow.type = 'button';
       allow.className = 'sa-agent-tool-approval-button sa-agent-tool-allow';
@@ -5463,10 +11601,11 @@ const createIcon = (iconSource, className) => {
       allowAll.addEventListener('click', () => {
         setAutoApproveTools(true);
       });
-      approval.appendChild(hint);
-      approval.appendChild(allow);
-      approval.appendChild(deny);
-      approval.appendChild(allowAll);
+      controls.appendChild(hint);
+      controls.appendChild(allow);
+      controls.appendChild(deny);
+      controls.appendChild(allowAll);
+      approval.appendChild(controls);
       row.appendChild(approval);
     }
     return row;
@@ -5514,6 +11653,273 @@ const createIcon = (iconSource, className) => {
     // Keep pending approval actions reachable even when the completed stack is collapsed.
     for (const entry of awaiting) wrapper.appendChild(buildToolRow(entry, true));
     return wrapper;
+  };
+
+  /**
+   * Determine whether a tool call represents a code modification (e.g. apply_scripts, delete_scripts).
+   * @param {object} entry Tool trace entry.
+   * @returns {boolean} True if code write tool.
+   */
+  const isCodeWriteTool = entry => Boolean(entry && (entry.name === 'apply_scripts' || entry.name === 'delete_scripts'));
+
+  /**
+   * Build a standalone in-chat code edit element with side-by-side split diff.
+   * Does not use a collapsible details card or bubble borders; renders directly on the background.
+   *
+   * Format:
+   * EDIT -> Target
+   * 10 xxx.xxx()      |  10 xxx.xxx()
+   *                   |+ 11 xxxx.xxxx(abc)
+   *                   |+ 12 xxx.xxxxxx()
+   * 11 xxxx.xx()      |~ 13 xxxx.xx()
+   *
+   * @param {object} entry Tool trace entry.
+   * @param {boolean} interactive Whether approval controls are available.
+   * @returns {HTMLElement} Code edit element.
+   */
+  const buildCodeEditElement = function buildCodeEditElement(entry) {
+    let interactive = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+    const status = entry.status || (entry.ok === false ? 'error' : 'ok');
+    const container = document.createElement('div');
+    container.className = "sa-agent-code-edit sa-agent-status-".concat(status);
+    const diff = entry.diff;
+    const targetName = diff && diff.target || entry.args && entry.args.target || '';
+
+    // Header: EDIT -> Target
+    const header = document.createElement('div');
+    header.className = 'sa-agent-code-edit-header';
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'sa-agent-code-edit-title';
+    const label = document.createElement('span');
+    label.className = 'sa-agent-code-edit-label';
+    label.textContent = 'EDIT';
+    const arrow = document.createElement('span');
+    arrow.className = 'sa-agent-code-edit-arrow';
+    arrow.textContent = '->';
+    titleGroup.appendChild(label);
+    titleGroup.appendChild(arrow);
+    if (targetName) {
+      const targetSpan = document.createElement('span');
+      targetSpan.className = 'sa-agent-code-edit-target';
+      targetSpan.textContent = targetName;
+      titleGroup.appendChild(targetSpan);
+    }
+    header.appendChild(titleGroup);
+    const meta = document.createElement('div');
+    meta.className = 'sa-agent-code-edit-meta';
+    if (diff) {
+      const stats = document.createElement('span');
+      stats.className = 'sa-agent-code-edit-stats';
+      if (diff.totalAdd > 0) {
+        const statAdd = document.createElement('span');
+        statAdd.className = 'sa-agent-diff-stat-add';
+        statAdd.textContent = "+".concat(diff.totalAdd);
+        stats.appendChild(statAdd);
+      }
+      if (diff.totalDel > 0) {
+        const statDel = document.createElement('span');
+        statDel.className = 'sa-agent-diff-stat-del';
+        statDel.textContent = "-".concat(diff.totalDel);
+        stats.appendChild(statDel);
+      }
+      meta.appendChild(stats);
+    }
+    const badge = document.createElement('span');
+    badge.className = "sa-agent-code-edit-status sa-agent-status-".concat(status);
+    badge.textContent = formatTraceStatus(status);
+    meta.appendChild(badge);
+    header.appendChild(meta);
+    container.appendChild(header);
+
+    // Body: side-by-side split diff
+    const content = document.createElement('div');
+    content.className = 'sa-agent-code-edit-content';
+    const scripts = diff && Array.isArray(diff.scripts) && diff.scripts.length > 0 ? diff.scripts : null;
+    if (scripts) {
+      for (const script of scripts) {
+        if (scripts.length > 1 && script.title) {
+          const scriptHeader = document.createElement('div');
+          scriptHeader.className = 'sa-agent-code-edit-script-title';
+          scriptHeader.textContent = script.title;
+          content.appendChild(scriptHeader);
+        }
+        const table = document.createElement('div');
+        table.className = 'sa-agent-split-table';
+        const hunks = Array.isArray(script.hunks) && script.hunks.length > 0 ? script.hunks : null;
+        const hunkList = hunks || [{
+          header: null,
+          lines: script.diff || []
+        }];
+        for (const hunk of hunkList) {
+          if (hunk.header) {
+            const hunkHeader = document.createElement('div');
+            hunkHeader.className = 'sa-agent-split-hunk-header';
+            hunkHeader.textContent = hunk.header;
+            table.appendChild(hunkHeader);
+          }
+          const splitRows = (0,_agent_scrathon_diff_js__WEBPACK_IMPORTED_MODULE_24__.buildSideBySideRows)(hunk.lines || []);
+          for (const rowData of splitRows) {
+            const row = document.createElement('div');
+            row.className = 'sa-agent-split-row';
+
+            // Left column (old code)
+            const leftCol = document.createElement('div');
+            leftCol.className = "sa-agent-split-col sa-agent-split-left is-".concat(rowData.left.type);
+            const leftNo = document.createElement('span');
+            leftNo.className = 'sa-agent-split-lineno';
+            leftNo.textContent = rowData.left.lineNo !== null ? String(rowData.left.lineNo) : '';
+            const leftText = document.createElement('span');
+            leftText.className = 'sa-agent-split-text';
+            leftText.textContent = rowData.left.text;
+            leftCol.appendChild(leftNo);
+            leftCol.appendChild(leftText);
+
+            // Divider: |
+            const divider = document.createElement('div');
+            divider.className = 'sa-agent-split-divider';
+            divider.textContent = '|';
+
+            // Right column (new code)
+            const rightCol = document.createElement('div');
+            rightCol.className = "sa-agent-split-col sa-agent-split-right is-".concat(rowData.right.type);
+            const rightMark = document.createElement('span');
+            rightMark.className = "sa-agent-split-mark is-".concat(rowData.right.type);
+            rightMark.textContent = rowData.right.mark;
+            const rightNo = document.createElement('span');
+            rightNo.className = 'sa-agent-split-lineno';
+            rightNo.textContent = rowData.right.lineNo !== null ? String(rowData.right.lineNo) : '';
+            const rightText = document.createElement('span');
+            rightText.className = 'sa-agent-split-text';
+            rightText.textContent = rowData.right.text;
+            rightCol.appendChild(rightMark);
+            rightCol.appendChild(rightNo);
+            rightCol.appendChild(rightText);
+            row.appendChild(leftCol);
+            row.appendChild(divider);
+            row.appendChild(rightCol);
+            table.appendChild(row);
+          }
+        }
+        content.appendChild(table);
+      }
+    } else if (entry.args && typeof entry.args.code === 'string' && entry.args.code.trim()) {
+      // Fallback synthetic diff for plain code string
+      const lines = entry.args.code.trim().split('\n');
+      const table = document.createElement('div');
+      table.className = 'sa-agent-split-table';
+      lines.forEach((lineText, idx) => {
+        const row = document.createElement('div');
+        row.className = 'sa-agent-split-row';
+        const leftCol = document.createElement('div');
+        leftCol.className = 'sa-agent-split-col sa-agent-split-left is-empty';
+        const leftNo = document.createElement('span');
+        leftNo.className = 'sa-agent-split-lineno';
+        const leftText = document.createElement('span');
+        leftText.className = 'sa-agent-split-text';
+        leftCol.appendChild(leftNo);
+        leftCol.appendChild(leftText);
+        const divider = document.createElement('div');
+        divider.className = 'sa-agent-split-divider';
+        divider.textContent = '|';
+        const rightCol = document.createElement('div');
+        rightCol.className = 'sa-agent-split-col sa-agent-split-right is-add';
+        const rightMark = document.createElement('span');
+        rightMark.className = 'sa-agent-split-mark is-add';
+        rightMark.textContent = '+';
+        const rightNo = document.createElement('span');
+        rightNo.className = 'sa-agent-split-lineno';
+        rightNo.textContent = String(idx + 1);
+        const rightText = document.createElement('span');
+        rightText.className = 'sa-agent-split-text';
+        rightText.textContent = lineText;
+        rightCol.appendChild(rightMark);
+        rightCol.appendChild(rightNo);
+        rightCol.appendChild(rightText);
+        row.appendChild(leftCol);
+        row.appendChild(divider);
+        row.appendChild(rightCol);
+        table.appendChild(row);
+      });
+      content.appendChild(table);
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'sa-agent-code-edit-empty';
+      empty.textContent = msg('diff-no-changes');
+      content.appendChild(empty);
+    }
+    container.appendChild(content);
+
+    // Approval controls when awaiting approval
+    if (interactive && status === 'awaiting' && entry.id) {
+      const approval = document.createElement('div');
+      approval.className = 'sa-agent-code-edit-approval';
+      const controls = document.createElement('div');
+      controls.className = 'sa-agent-tool-approval-controls';
+      const hint = document.createElement('span');
+      hint.className = 'sa-agent-tool-approval-hint';
+      hint.textContent = msg('trace-write-approval-hint');
+      const allow = document.createElement('button');
+      allow.type = 'button';
+      allow.className = 'sa-agent-tool-approval-button sa-agent-tool-allow';
+      allow.textContent = msg('trace-allow');
+      allow.addEventListener('click', () => resolveToolApproval(entry.id, true));
+      const deny = document.createElement('button');
+      deny.type = 'button';
+      deny.className = 'sa-agent-tool-approval-button sa-agent-tool-deny';
+      deny.textContent = msg('trace-deny');
+      deny.addEventListener('click', () => resolveToolApproval(entry.id, false));
+      const allowAll = document.createElement('button');
+      allowAll.type = 'button';
+      allowAll.className = 'sa-agent-tool-approval-button sa-agent-tool-allow-all';
+      allowAll.textContent = msg('trace-allow-all');
+      allowAll.addEventListener('click', () => {
+        setAutoApproveTools(true);
+        resolveToolApproval(entry.id, true);
+      });
+      controls.appendChild(hint);
+      controls.appendChild(allow);
+      controls.appendChild(deny);
+      controls.appendChild(allowAll);
+      approval.appendChild(controls);
+      container.appendChild(approval);
+    }
+
+    // Error message display if failed
+    if ((status === 'error' || entry.ok === false) && entry.summary && (entry.summary.error || entry.summary.message)) {
+      const errorNotice = document.createElement('div');
+      errorNotice.className = 'sa-agent-code-edit-error';
+      errorNotice.textContent = entry.summary.error || entry.summary.message;
+      container.appendChild(errorNotice);
+    }
+    return container;
+  };
+
+  /**
+   * Append trace entries into a message row.
+   * Separates normal tool calls (placed into collapsible stack) from code-write tool calls
+   * (placed directly as standalone EDIT side-by-side elements without collapsible cards).
+   *
+   * @param {HTMLElement} container Message row element.
+   * @param {Array<object>} trace Tool entries.
+   * @param {boolean} interactive Whether approval controls are interactive.
+   */
+  const appendTraceElements = function appendTraceElements(container, trace) {
+    let interactive = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    let currentNormalGroup = [];
+    for (const entry of trace) {
+      if (isCodeWriteTool(entry)) {
+        if (currentNormalGroup.length > 0) {
+          container.appendChild(buildTraceElement(currentNormalGroup, interactive));
+          currentNormalGroup = [];
+        }
+        container.appendChild(buildCodeEditElement(entry, interactive));
+      } else {
+        currentNormalGroup.push(entry);
+      }
+    }
+    if (currentNormalGroup.length > 0) {
+      container.appendChild(buildTraceElement(currentNormalGroup, interactive));
+    }
   };
 
   /**
@@ -5656,12 +12062,13 @@ const createIcon = (iconSource, className) => {
       role.className = 'sa-agent-message-role';
       role.textContent = message.role === 'user' ? msg('role-you') : msg('role-agent');
       row.appendChild(role);
+      const hasResponsePart = parts && parts.some(p => p && p.type === 'response' && p.content && p.content.trim());
       if (parts && parts.length) {
         appendAssistantParts(row, parts);
       } else if (message.role === 'assistant' && trace && trace.length > 0) {
-        row.appendChild(buildTraceElement(trace));
+        appendTraceElements(row, trace, false);
       }
-      if (hasContent && (!parts || !parts.length)) {
+      if (hasContent && (!parts || !parts.length || !hasResponsePart)) {
         const bubble = document.createElement('div');
         bubble.className = 'sa-agent-bubble';
         renderFormattedContent(bubble, message.content);
@@ -5780,16 +12187,31 @@ const createIcon = (iconSource, className) => {
     let notice = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : '';
     let meta = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : null;
     const parts = liveParts;
-    if (!parts.length && content) parts.push({
-      type: 'response',
-      content,
-      reasoning: ''
-    });
+    const trimmedContent = typeof content === 'string' ? content.trim() : '';
+    if (trimmedContent) {
+      const hasResponse = parts.some(p => p && p.type === 'response' && p.content && p.content.trim());
+      const lastPart = parts[parts.length - 1];
+      if (!lastPart || lastPart.type !== 'response') {
+        parts.push({
+          type: 'response',
+          content: trimmedContent,
+          reasoning: ''
+        });
+      } else if (!lastPart.content) {
+        lastPart.content = trimmedContent;
+      } else if (!hasResponse) {
+        parts.push({
+          type: 'response',
+          content: trimmedContent,
+          reasoning: ''
+        });
+      }
+    }
     if (!parts.length && trace.length) parts.push({
       type: 'tools',
       trace
     });
-    const text = parts.filter(part => part.type === 'response').map(part => part.content || '').join('\n\n');
+    const text = parts.filter(part => part.type === 'response').map(part => part.content || '').join('\n\n') || trimmedContent;
     liveParts = [];
     liveTrace = [];
     liveTraceElement = null;
@@ -6027,6 +12449,7 @@ const createIcon = (iconSource, className) => {
               id: event.id,
               name: event.name,
               args: event.args || {},
+              diff: event.diff || null,
               status: autoApproved ? 'pending' : 'awaiting'
             });
             setStatus('');
@@ -6036,11 +12459,13 @@ const createIcon = (iconSource, className) => {
             if (entry) {
               entry.status = 'pending';
               entry.args = event.args || entry.args || {};
+              if (event.diff) entry.diff = event.diff;
             } else {
               addLiveTool({
                 id: event.id,
                 name: event.name,
                 args: event.args || {},
+                diff: event.diff || null,
                 status: 'pending'
               });
             }
@@ -6053,11 +12478,13 @@ const createIcon = (iconSource, className) => {
               entry.status = status;
               entry.summary = event.summary;
               entry.preview = event.preview;
+              if (event.diff) entry.diff = event.diff;
             } else {
               addLiveTool({
                 id: event.id,
                 name: event.name,
                 args: event.args || {},
+                diff: event.diff || null,
                 status,
                 summary: event.summary,
                 preview: event.preview
@@ -6123,11 +12550,76 @@ const createIcon = (iconSource, className) => {
   };
 
   /**
+   * Read the model list currently shown in the settings textarea.
+   * @returns {Array<string>} Model names.
+   */
+  const getModelsFromInput = () => {
+    const raw = String(modelsInput && modelsInput.value || config.models || '').trim();
+    return raw.split(/[\n,]/).map(model => model.trim()).filter(Boolean);
+  };
+
+  /**
+   * Build a config snapshot from the current form values for the request preview.
+   * @returns {object} Preview config.
+   */
+  const buildPreviewConfig = () => {
+    const models = getModelsFromInput();
+    let model = config.model;
+    if (!models.includes(model)) model = models[0] || DEFAULT_CONFIG.model;
+    return _objectSpread(_objectSpread({}, config), {}, {
+      apiUrl: buildApiEndpoint(apiUrlInput ? apiUrlInput.value : config.apiUrl),
+      model,
+      stream: streamInput ? Boolean(streamInput.checked) : config.stream !== false,
+      temperature: Math.max(0, Math.min(2, Number(temperatureInput.value))),
+      maxTokens: Math.max(1, Math.min(32000, Number(maxTokensInput.value) || DEFAULT_CONFIG.maxTokens)),
+      reasoningEffort: capabilitySelect ? capabilitySelect.value : config.reasoningEffort
+    });
+  };
+
+  /**
+   * Update the small endpoint hint under the API URL field.
+   */
+  const updateEndpointHint = () => {
+    if (!apiUrlHint || !apiUrlInput) return;
+    apiUrlHint.textContent = msg('settings-endpoint-hint', {
+      url: buildApiEndpoint(apiUrlInput.value)
+    });
+  };
+
+  /**
+   * Render the complete request JSON that the next send would use.
+   */
+  const updateRequestPreview = () => {
+    if (!requestPreviewElement) return;
+    try {
+      const body = (0,_agent_loop_js__WEBPACK_IMPORTED_MODULE_20__.buildRequestPreview)({
+        config: buildPreviewConfig(),
+        messages: chatMessages,
+        writeEnabled
+      });
+      requestPreviewElement.textContent = JSON.stringify(body, null, 2);
+    } catch (error) {
+      requestPreviewElement.textContent = error && error.message ? error.message : String(error);
+    }
+  };
+
+  /**
+   * Debounce request-preview updates while the user edits settings.
+   */
+  const scheduleRequestPreview = () => {
+    if (requestPreviewTimer) clearTimeout(requestPreviewTimer);
+    requestPreviewTimer = setTimeout(() => {
+      requestPreviewTimer = 0;
+      updateRequestPreview();
+    }, 150);
+  };
+
+  /**
    * Populate the settings fields from the current config.
    */
   const populateSettings = () => {
     if (!apiUrlInput) return;
-    apiUrlInput.value = config.apiUrl;
+    apiUrlInput.value = getApiBaseUrl(config.apiUrl);
     apiKeyInput.value = config.apiKey;
     if (modelsInput) modelsInput.value = config.models || config.model || '';
     headersInput.value = JSON.stringify(config.headers || {}, null, 2);
@@ -6136,6 +12628,9 @@ const createIcon = (iconSource, className) => {
     if (temperatureInput) temperatureInput.value = String(config.temperature);
     if (maxTokensInput) maxTokensInput.value = String(config.maxTokens);
     if (retriesInput) retriesInput.value = String(config.retries);
+    if (capabilitySelect) capabilitySelect.value = config.reasoningEffort || 'default';
+    updateEndpointHint();
+    updateRequestPreview();
     settingsErrorElement.textContent = '';
     settingsErrorElement.style.display = 'none';
   };
@@ -6194,7 +12689,7 @@ const createIcon = (iconSource, className) => {
       activeModel = modelList[0] || DEFAULT_CONFIG.model;
     }
     config = {
-      apiUrl: apiUrlInput.value.trim() || DEFAULT_CONFIG.apiUrl,
+      apiUrl: buildApiEndpoint(apiUrlInput.value),
       apiKey: apiKeyInput.value.trim(),
       model: activeModel,
       models: rawModels,
@@ -6203,6 +12698,7 @@ const createIcon = (iconSource, className) => {
       temperature: Math.max(0, Math.min(2, Number(temperatureInput.value))),
       maxTokens: Math.max(1, Math.min(32000, Number(maxTokensInput.value) || DEFAULT_CONFIG.maxTokens)),
       retries: Math.max(0, Math.min(5, Number(retriesInput.value))),
+      reasoningEffort: capabilitySelect ? capabilitySelect.value : config.reasoningEffort,
       streamIdleTimeoutMs: typeof config.streamIdleTimeoutMs === 'number' ? config.streamIdleTimeoutMs : DEFAULT_CONFIG.streamIdleTimeoutMs
     };
     saveConfig(config);
@@ -6240,6 +12736,7 @@ const createIcon = (iconSource, className) => {
      * Add a labeled field to the settings form.
      * @param {string} labelText Field label.
      * @param {HTMLElement} field Field element.
+     * @returns {HTMLLabelElement} Field wrapper.
      */
     const addField = (labelText, field) => {
       const label = document.createElement('label');
@@ -6251,12 +12748,16 @@ const createIcon = (iconSource, className) => {
       label.appendChild(labelSpan);
       label.appendChild(field);
       form.appendChild(label);
+      return label;
     };
     apiUrlInput = document.createElement('input');
     apiUrlInput.className = 'sa-agent-settings-input';
     apiUrlInput.type = 'url';
     apiUrlInput.spellcheck = false;
-    addField(msg('api-url'), apiUrlInput);
+    const apiUrlField = addField(msg('api-url'), apiUrlInput);
+    apiUrlHint = document.createElement('div');
+    apiUrlHint.className = 'sa-agent-settings-hint';
+    apiUrlField.appendChild(apiUrlHint);
     apiKeyInput = document.createElement('input');
     apiKeyInput.className = 'sa-agent-settings-input';
     apiKeyInput.type = 'password';
@@ -6289,6 +12790,19 @@ const createIcon = (iconSource, className) => {
     retriesInput.max = '5';
     retriesInput.step = '1';
     addField(msg('settings-retries'), retriesInput);
+    capabilitySelect = document.createElement('select');
+    capabilitySelect.className = 'sa-agent-settings-input sa-agent-settings-select';
+    for (const effort of REASONING_EFFORTS) {
+      const option = document.createElement('option');
+      option.value = effort;
+      option.textContent = effort;
+      capabilitySelect.appendChild(option);
+    }
+    const capabilityField = addField(msg('settings-capability'), capabilitySelect);
+    const capabilityHint = document.createElement('div');
+    capabilityHint.className = 'sa-agent-settings-hint';
+    capabilityHint.textContent = msg('settings-capability-hint');
+    capabilityField.appendChild(capabilityHint);
     streamInput = document.createElement('input');
     streamInput.className = 'sa-agent-settings-checkbox';
     streamInput.type = 'checkbox';
@@ -6297,6 +12811,25 @@ const createIcon = (iconSource, className) => {
     headersInput.className = 'sa-agent-settings-input sa-agent-settings-textarea';
     headersInput.spellcheck = false;
     addField(msg('extra-headers'), headersInput);
+    const previewLabel = document.createElement('div');
+    previewLabel.className = 'sa-agent-settings-label';
+    previewLabel.textContent = msg('settings-request-preview');
+    form.appendChild(previewLabel);
+    requestPreviewElement = document.createElement('pre');
+    requestPreviewElement.className = 'sa-agent-settings-request-json';
+    form.appendChild(requestPreviewElement);
+    const previewHint = document.createElement('div');
+    previewHint.className = 'sa-agent-settings-hint';
+    previewHint.textContent = msg('settings-request-preview-hint');
+    form.appendChild(previewHint);
+    form.addEventListener('input', () => {
+      updateEndpointHint();
+      scheduleRequestPreview();
+    });
+    form.addEventListener('change', () => {
+      updateEndpointHint();
+      scheduleRequestPreview();
+    });
     const note = document.createElement('div');
     note.className = 'sa-agent-settings-note';
     note.textContent = msg('settings-storage-note');
@@ -6450,7 +12983,7 @@ const createIcon = (iconSource, className) => {
     writeQueue = next.catch(() => {});
     return next;
   };
-  (0,_agent_writer_js__WEBPACK_IMPORTED_MODULE_23__.setApplier)(applyWrite);
+  (0,_agent_writer_js__WEBPACK_IMPORTED_MODULE_25__.setApplier)(applyWrite);
 
   /**
    * Build the conversation UI.
@@ -6552,6 +13085,21 @@ const createIcon = (iconSource, className) => {
     settingsButton.setAttribute('aria-label', msg('settings'));
     settingsButton.appendChild(createIcon(_lib_tw_recolor_build_icon_setting_svg__WEBPACK_IMPORTED_MODULE_3__["default"], 'sa-agent-settings-icon'));
     settingsButton.addEventListener('click', showSettingsPanel);
+    const scrathonButton = document.createElement('button');
+    scrathonButton.type = 'button';
+    scrathonButton.className = 'sa-agent-icon-button sa-agent-scrathon-button';
+    scrathonButton.title = msg('scrathon');
+    scrathonButton.setAttribute('aria-label', msg('scrathon'));
+    scrathonButton.appendChild(createIcon(_lib_tw_recolor_build_icon_build_svg__WEBPACK_IMPORTED_MODULE_10__["default"], 'sa-agent-scrathon-icon'));
+    scrathonButton.addEventListener('click', () => {
+      if (!scrathonWindow) {
+        scrathonWindow = (0,_agent_scrathon_window_js__WEBPACK_IMPORTED_MODULE_23__.createScrathonWindow)({
+          vm,
+          msg
+        });
+      }
+      scrathonWindow.toggle();
+    });
     newConversationButton = document.createElement('button');
     newConversationButton.type = 'button';
     newConversationButton.className = 'sa-agent-icon-button sa-agent-new-chat-button';
@@ -6561,6 +13109,7 @@ const createIcon = (iconSource, className) => {
     newConversationButton.addEventListener('click', startNewConversation);
     actions.appendChild(newConversationButton);
     actions.appendChild(settingsButton);
+    actions.appendChild(scrathonButton);
     actions.appendChild(positionSwitchElement);
     header.appendChild(heading);
     header.appendChild(actions);
@@ -8721,6 +15270,18 @@ button:hover .sa-agent-settings-icon {
   filter: none !important;
 }
 
+.sa-agent-scrathon-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  filter: grayscale(100%);
+  transition: filter 0.2s ease;
+}
+
+button:hover .sa-agent-scrathon-icon {
+  filter: none !important;
+}
+
 .sa-agent-position-switch {
   position: relative;
   display: flex;
@@ -9146,8 +15707,11 @@ button:hover .sa-agent-settings-icon {
 
 .sa-agent-tool-stack-multiple:not([open]) {
   margin-bottom: 6px;
-  box-shadow: 0 3px 0 -1px var(--ui-white), 0 3px 0 var(--ui-black-transparent),
-    0 6px 0 -1px var(--ui-white), 0 6px 0 var(--ui-black-transparent);
+  box-shadow:
+    0 3px 0 -1px var(--ui-white),
+    0 3px 0 var(--ui-black-transparent),
+    0 6px 0 -1px var(--ui-white),
+    0 6px 0 var(--ui-black-transparent);
 }
 
 .sa-agent-tool-stack-summary {
@@ -9296,12 +15860,19 @@ button:hover .sa-agent-settings-icon {
 
 .sa-agent-tool-approval {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 6px;
   padding: 6px 8px;
   border-top: 1px solid var(--ui-black-transparent);
   background: rgba(0, 0, 0, 0.04);
+}
+
+.sa-agent-tool-approval-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
 .sa-agent-tool-approval-hint {
@@ -9338,6 +15909,440 @@ button:hover .sa-agent-settings-icon {
 
 .sa-agent-tool-allow-all {
   border-style: dashed;
+}
+
+/* Standalone Code Edit & Side-by-Side Split Diff */
+.sa-agent-code-edit {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 6px 0 10px 0;
+  border: none;
+  background: transparent;
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.sa-agent-code-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 6px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  user-select: none;
+}
+
+.sa-agent-code-edit-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sa-agent-code-edit-label {
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+
+.sa-agent-code-edit-arrow {
+  color: var(--looks-secondary, #4c97ff);
+  font-weight: bold;
+}
+
+.sa-agent-code-edit-target {
+  color: var(--looks-secondary, #4c97ff);
+}
+
+.sa-agent-code-edit-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sa-agent-code-edit-stats {
+  display: flex;
+  gap: 6px;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.sa-agent-code-edit-status {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.sa-agent-code-edit-status.sa-agent-status-ok {
+  background: rgba(46, 160, 67, 0.15);
+  color: #2e9e4f;
+}
+
+.sa-agent-code-edit-status.sa-agent-status-awaiting {
+  background: rgba(217, 119, 6, 0.15);
+  color: #d97706;
+}
+
+.sa-agent-code-edit-status.sa-agent-status-denied,
+.sa-agent-code-edit-status.sa-agent-status-error {
+  background: rgba(207, 34, 46, 0.15);
+  color: #cf222e;
+}
+
+.sa-agent-code-edit-content {
+  width: 100%;
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.sa-agent-split-table {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 100%;
+}
+
+.sa-agent-split-row {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 20px;
+  line-height: 20px;
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 11px;
+  border-radius: 2px;
+}
+
+.sa-agent-split-row:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.sa-agent-split-left {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  padding: 0 4px 0 0;
+  border-radius: 2px 0 0 2px;
+}
+
+.sa-agent-split-divider {
+  width: 16px;
+  min-width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+  user-select: none;
+  color: var(--text-primary);
+  opacity: 0.35;
+  font-weight: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sa-agent-split-right {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  padding: 0 0 0 4px;
+  border-radius: 0 2px 2px 0;
+}
+
+.sa-agent-split-mark {
+  width: 14px;
+  min-width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  user-select: none;
+  font-weight: bold;
+}
+
+.sa-agent-split-mark.is-add {
+  color: #2e9e4f;
+}
+
+.sa-agent-split-mark.is-mod {
+  color: #0969da;
+}
+
+.sa-agent-split-mark.is-del {
+  color: #cf222e;
+}
+
+.sa-agent-split-lineno {
+  width: 26px;
+  min-width: 26px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 6px;
+  user-select: none;
+  color: var(--text-primary);
+  opacity: 0.4;
+  font-size: 10px;
+}
+
+/* Wrap long lines inside each column so the center divider, row backgrounds
+   and line numbers stay aligned even in a narrow chat panel. */
+.sa-agent-split-text {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 4;
+  color: var(--text-primary);
+}
+
+.sa-agent-split-left.is-del {
+  background-color: rgba(248, 81, 73, 0.15);
+}
+
+.sa-agent-split-left.is-del .sa-agent-split-lineno {
+  color: #cf222e;
+  opacity: 0.8;
+}
+
+.sa-agent-split-right.is-add {
+  background-color: rgba(46, 160, 67, 0.15);
+}
+
+.sa-agent-split-right.is-mod {
+  background-color: rgba(9, 105, 218, 0.12);
+}
+
+.sa-agent-split-hunk-header {
+  padding: 2px 4px;
+  color: var(--text-primary);
+  opacity: 0.55;
+  font-size: 10px;
+  user-select: none;
+  margin: 2px 0;
+}
+
+.sa-agent-code-edit-script-title {
+  padding: 4px 0 2px 0;
+  font-weight: 600;
+  font-size: 10px;
+  color: var(--text-primary);
+  opacity: 0.75;
+}
+
+.sa-agent-code-edit-approval {
+  margin-top: 6px;
+  padding: 6px 0;
+}
+
+.sa-agent-code-edit-empty {
+  padding: 6px 0;
+  opacity: 0.5;
+  font-style: italic;
+  font-size: 11px;
+}
+
+.sa-agent-code-edit-error {
+  margin-top: 4px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(207, 34, 46, 0.1);
+  color: #cf222e;
+  font-size: 11px;
+}
+
+/* Diff Review Card */
+.sa-agent-diff-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--ui-white);
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.sa-agent-diff-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid var(--ui-black-transparent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sa-agent-diff-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sa-agent-diff-target-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--ui-primary-transparent);
+  color: var(--looks-secondary);
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.sa-agent-diff-header-text {
+  color: var(--text-primary);
+}
+
+.sa-agent-diff-stats {
+  display: flex;
+  gap: 6px;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.sa-agent-diff-stat-add {
+  color: #2e9e4f;
+}
+
+.sa-agent-diff-stat-del {
+  color: #cf222e;
+}
+
+.sa-agent-diff-body {
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: var(--ui-white);
+}
+
+.sa-agent-diff-script {
+  border-bottom: 1px solid var(--ui-black-transparent);
+}
+
+.sa-agent-diff-script:last-child {
+  border-bottom: none;
+}
+
+.sa-agent-diff-script-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+.sa-agent-diff-script-badge {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: bold;
+}
+
+.sa-agent-diff-script-badge.is-new {
+  background: rgba(46, 160, 67, 0.18);
+  color: #2e9e4f;
+}
+
+.sa-agent-diff-script-badge.is-delete {
+  background: rgba(207, 34, 46, 0.18);
+  color: #cf222e;
+}
+
+.sa-agent-diff-script-badge.is-modified {
+  background: rgba(9, 105, 218, 0.18);
+  color: #0969da;
+}
+
+.sa-agent-diff-lines {
+  display: flex;
+  flex-direction: column;
+}
+
+.sa-agent-diff-hunk-header {
+  padding: 2px 8px;
+  background: rgba(9, 105, 218, 0.08);
+  color: var(--text-primary);
+  opacity: 0.65;
+  font-size: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.sa-agent-diff-line {
+  display: flex;
+  align-items: baseline;
+  min-height: 18px;
+  line-height: 18px;
+  white-space: pre;
+}
+
+.sa-agent-diff-line-add {
+  background-color: rgba(46, 160, 67, 0.15);
+}
+
+.sa-agent-diff-line-del {
+  background-color: rgba(248, 81, 73, 0.15);
+}
+
+.sa-agent-diff-line-same {
+  background-color: transparent;
+  opacity: 0.85;
+}
+
+.sa-agent-diff-lineno {
+  width: 26px;
+  min-width: 26px;
+  text-align: right;
+  padding-right: 6px;
+  user-select: none;
+  color: var(--text-primary);
+  opacity: 0.35;
+  font-size: 10px;
+}
+
+.sa-agent-diff-prefix {
+  width: 14px;
+  min-width: 14px;
+  text-align: center;
+  user-select: none;
+  font-weight: bold;
+}
+
+.sa-agent-diff-line-add .sa-agent-diff-prefix {
+  color: #2e9e4f;
+}
+
+.sa-agent-diff-line-del .sa-agent-diff-prefix {
+  color: #cf222e;
+}
+
+.sa-agent-diff-text {
+  flex: 1;
+  padding-right: 8px;
+  tab-size: 4;
+  color: var(--text-primary);
+}
+
+.sa-agent-diff-empty {
+  padding: 8px;
+  text-align: center;
+  opacity: 0.6;
+  font-style: italic;
+  color: var(--text-primary);
 }
 
 .sa-agent-trace-dot {
@@ -9449,7 +16454,9 @@ button:hover .sa-agent-settings-icon {
   background: var(--ui-white);
   padding: 5px 6px 4px;
   box-sizing: border-box;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .sa-agent-composer-card:focus-within {
@@ -9598,7 +16605,9 @@ button:hover .sa-agent-settings-icon {
   white-space: nowrap;
   appearance: none;
   -webkit-appearance: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .sa-agent-model-select:hover {
@@ -9659,7 +16668,10 @@ button:hover .sa-agent-settings-icon {
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  transition: opacity 0.15s ease, background 0.15s ease, transform 0.1s ease;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    transform 0.1s ease;
 }
 
 .sa-agent-button:disabled {
@@ -9906,8 +16918,12 @@ button:hover .sa-agent-settings-icon {
 /* VSCode 侧边栏按钮 hover 状态：规范只提升亮度（brightness(150%)），保持灰度，不包含饱和度 */
 .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover .sa-agent-toggle-icon,
 .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover img,
-[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover .sa-agent-toggle-icon,
-[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover img {
+[class*='tabs'][class*='vscodeList']
+  .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover
+  .sa-agent-toggle-icon,
+[class*='tabs'][class*='vscodeList']
+  .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover
+  img {
   filter: brightness(150%) grayscale(100%) !important;
   -webkit-filter: brightness(150%) grayscale(100%) !important;
 }
@@ -10087,6 +17103,29 @@ button:hover .sa-agent-settings-icon {
   opacity: 0.7;
 }
 
+.sa-agent-settings-hint {
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.7;
+  overflow-wrap: anywhere;
+}
+
+.sa-agent-settings-request-json {
+  box-sizing: border-box;
+  max-height: 260px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
 .sa-agent-settings-error {
   color: #d93025;
   font-size: 12px;
@@ -10199,7 +17238,198 @@ button:hover .sa-agent-settings-icon {
   font-size: 12px;
   opacity: 0.85;
 }
-`, "",{"version":3,"sources":["webpack://./src/addons/addons/astras-copilot/agent.css"],"names":[],"mappings":"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","sourcesContent":[".sa-agent-container {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  height: 100%;\n  min-height: 0;\n  overflow: hidden;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  box-sizing: border-box;\n}\n\n.addons-side-bar .sa-agent-container {\n  margin: 0;\n}\n\n.addons-bottom-panel .sa-agent-container {\n  width: calc(100% + 20px);\n  height: calc(100% + 20px);\n  margin: -10px;\n}\n\n.sa-agent-header {\n  position: relative;\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 8px;\n  flex-shrink: 0;\n  padding: 6px 8px 6px 12px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-heading {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  font-size: 13px;\n  font-weight: bold;\n}\n\n.sa-agent-heading-text {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.sa-agent-header-actions {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  flex-shrink: 0;\n}\n\n.sa-agent-session-menu {\n  position: static;\n}\n\n.sa-agent-session-summary {\n  list-style: none;\n  cursor: pointer;\n}\n\n.sa-agent-session-summary .sa-agent-icon {\n  width: 16px;\n  height: 16px;\n}\n\n.sa-agent-session-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-session-panel {\n  position: absolute;\n  z-index: 20;\n  top: calc(100% + 6px);\n  right: 8px;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n  box-sizing: border-box;\n  width: 240px;\n  max-width: calc(100% - 16px);\n  max-height: min(320px, 55vh);\n  overflow: auto;\n  padding: 12px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 8px;\n  background: var(--ui-white);\n  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);\n}\n\n.sa-agent-session-permission {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.sa-agent-conversation-toggle {\n  flex-shrink: 0;\n}\n\n.sa-agent-container.sa-agent-wide .sa-agent-conversation-toggle {\n  display: none;\n}\n\n.sa-agent-icon,\n.sa-agent-conversation-toggle-icon,\n.sa-agent-new-chat-button-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-icon-button:hover .sa-agent-icon,\n.sa-agent-icon-button:hover .sa-agent-conversation-toggle-icon,\n.sa-agent-icon-button:hover .sa-agent-new-chat-button-icon {\n  filter: none !important;\n}\n\n.sa-agent-content {\n  position: relative;\n  display: flex;\n  flex: 1;\n  min-height: 0;\n  overflow: hidden;\n}\n\n.sa-agent-main {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  min-width: 0;\n  min-height: 0;\n}\n\n.sa-agent-conversation-pane {\n  display: none;\n  flex-direction: column;\n  flex-shrink: 0;\n  width: 200px;\n  min-height: 0;\n  border-right: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-container.sa-agent-wide .sa-agent-conversation-pane {\n  display: flex;\n}\n\n.sa-agent-container.sa-agent-narrow.sa-agent-conversation-open .sa-agent-conversation-pane {\n  display: flex;\n  position: absolute;\n  inset: 0;\n  z-index: 10;\n  width: 100%;\n  border-right: 0;\n}\n\n.sa-agent-conversation-pane-header {\n  display: flex;\n  align-items: center;\n  flex-shrink: 0;\n  padding: 8px 10px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-conversation-pane-title {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: 11px;\n  font-weight: bold;\n  opacity: 0.65;\n}\n\n.sa-agent-conversation-list {\n  position: relative;\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding: 6px;\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n\n.sa-agent-conversation-item {\n  display: flex;\n  align-items: center;\n  gap: 2px;\n  min-width: 0;\n  border-radius: 4px;\n}\n\n.sa-agent-conversation-item:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-conversation-item-active {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-conversation-item-confirming {\n  flex-wrap: wrap;\n}\n\n.sa-agent-delete-confirm {\n  flex: 0 0 100%;\n  box-sizing: border-box;\n  padding: 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n  font-size: 11px;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-delete-actions {\n  display: flex;\n  justify-content: flex-end;\n  gap: 6px;\n  margin-top: 8px;\n}\n\n.sa-agent-delete-accept {\n  color: #d93025;\n}\n\n.sa-agent-conversation-item-title {\n  flex: 1;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  padding: 6px 4px 6px 8px;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  text-align: left;\n}\n\n.sa-agent-conversation-item-active .sa-agent-conversation-item-title {\n  font-weight: bold;\n}\n\n.sa-agent-conversation-item-actions {\n  display: flex;\n  align-items: center;\n  flex-shrink: 0;\n  opacity: 0.65;\n}\n\n.sa-agent-conversation-item:hover .sa-agent-conversation-item-actions,\n.sa-agent-conversation-item:focus-within .sa-agent-conversation-item-actions {\n  opacity: 1;\n}\n\n.sa-agent-conversation-action {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 22px;\n  height: 22px;\n  padding: 0;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1;\n}\n\n.sa-agent-conversation-action:hover {\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-conversation-action-icon {\n  width: 14px;\n  height: 14px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-conversation-action:hover .sa-agent-conversation-action-icon {\n  filter: none !important;\n}\n\n.sa-agent-conversation-rename {\n  box-sizing: border-box;\n  flex: 1;\n  min-width: 0;\n  height: 24px;\n  margin: 2px 0;\n  padding: 0 6px;\n  border: 1px solid var(--looks-secondary);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  font-family: inherit;\n  font-size: 12px;\n}\n\n.sa-agent-icon-button {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 14px;\n  line-height: 1;\n  transition: none;\n}\n\n.sa-agent-icon-button:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-icon-button:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.sa-agent-settings-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\nbutton:hover .sa-agent-settings-icon {\n  filter: none !important;\n}\n\n.sa-agent-position-switch {\n  position: relative;\n  display: flex;\n  align-items: center;\n}\n\n.sa-agent-rotate-button {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  min-width: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1;\n  transition: none;\n}\n\n.sa-agent-rotate-button:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-rotate-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-rotate-button:hover .sa-agent-rotate-icon {\n  filter: none !important;\n}\n\n.sa-agent-position-popup {\n  position: absolute;\n  top: 100%;\n  right: 0;\n  z-index: 20;\n  display: none;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 132px;\n  margin-top: 4px;\n  padding: 4px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: var(--ui-white);\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);\n}\n\n.sa-agent-popup-button {\n  box-sizing: border-box;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  width: 100%;\n  padding: 6px 10px;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  text-align: left;\n  transition: none;\n}\n\n.sa-agent-popup-button:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-popup-button:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.sa-agent-popup-button.sa-agent-position-active {\n  color: var(--looks-secondary);\n  background: var(--ui-primary-transparent);\n  font-weight: bold;\n}\n\n.sa-agent-popup-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-popup-button:hover .sa-agent-popup-icon,\n.sa-agent-popup-button.sa-agent-position-active .sa-agent-popup-icon {\n  filter: none !important;\n}\n\n.sa-agent-messages {\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding: 12px;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.addons-bottom-panel .sa-agent-messages,\n.addons-bottom-panel .sa-agent-composer {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 960px;\n  align-self: center;\n}\n\n.sa-agent-welcome {\n  margin: auto;\n  padding: 16px;\n  max-width: 420px;\n  text-align: center;\n  color: var(--text-primary);\n}\n\n.sa-agent-welcome-title {\n  margin-bottom: 8px;\n  font-size: 16px;\n  font-weight: bold;\n}\n\n.sa-agent-welcome-text {\n  font-size: 12px;\n  line-height: 1.5;\n  opacity: 0.8;\n}\n\n.sa-agent-message {\n  display: flex;\n  flex-direction: column;\n  max-width: 100%;\n  min-width: 0;\n  flex-shrink: 0;\n  gap: 6px;\n}\n\n.sa-agent-message-user {\n  align-items: flex-end;\n}\n\n.sa-agent-message-assistant {\n  align-items: flex-start;\n}\n\n.sa-agent-message-role {\n  margin: 0 4px 4px;\n  font-size: 10px;\n  font-weight: bold;\n  opacity: 0.65;\n}\n\n.sa-agent-bubble {\n  box-sizing: border-box;\n  min-width: 0;\n  max-width: 92%;\n  padding: 8px 10px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 8px;\n  font-size: 12px;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-message-user .sa-agent-bubble {\n  color: #ffffff;\n  background: var(--looks-secondary);\n  border-color: transparent;\n  border-bottom-right-radius: 2px;\n}\n\n.sa-agent-user-actions {\n  display: flex;\n  align-items: center;\n  gap: 3px;\n  margin-top: 3px;\n  opacity: 0.5;\n  transition: opacity 0.15s ease;\n}\n\n.sa-agent-message-user:hover .sa-agent-user-actions,\n.sa-agent-user-actions:focus-within {\n  opacity: 1;\n}\n\n.sa-agent-user-action-btn {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  gap: 3px;\n  height: 20px;\n  padding: 0 5px;\n  border: 1px solid transparent;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 11px;\n  line-height: 1;\n  white-space: nowrap;\n  user-select: none;\n  transition: all 0.15s ease;\n}\n\n.sa-agent-user-action-btn:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n  border-color: var(--ui-black-transparent);\n}\n\n.sa-agent-user-action-btn:active:not(:disabled) {\n  transform: scale(0.96);\n}\n\n.sa-agent-user-action-btn:disabled {\n  opacity: 0.4;\n  cursor: not-allowed;\n}\n\n.sa-agent-user-action-icon {\n  width: 12px;\n  height: 12px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.15s ease;\n}\n\n.sa-agent-user-action-btn:hover:not(:disabled) .sa-agent-user-action-icon {\n  filter: none !important;\n}\n\n.sa-agent-message-assistant .sa-agent-bubble {\n  color: var(--text-primary);\n  background: var(--ui-primary-transparent);\n  border-bottom-left-radius: 2px;\n}\n\n.sa-agent-text {\n  white-space: pre-wrap;\n}\n\n.sa-agent-streaming-bubble {\n  white-space: normal;\n}\n\n.sa-agent-streaming-bubble::after {\n  content: none;\n}\n\n.sa-agent-streaming-bubble .sa-agent-md > :last-child::after {\n  content: '▍';\n  margin-left: 1px;\n  opacity: 0.6;\n  animation: sa-agent-blink 1s steps(2, start) infinite;\n}\n\n@keyframes sa-agent-blink {\n  to {\n    visibility: hidden;\n  }\n}\n\n.sa-agent-md {\n  font-size: 12px;\n  line-height: 1.5;\n  white-space: normal;\n}\n\n.sa-agent-md > :first-child {\n  margin-top: 0;\n}\n\n.sa-agent-md > :last-child {\n  margin-bottom: 0;\n}\n\n.sa-agent-md p {\n  margin: 0 0 8px;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md h1,\n.sa-agent-md h2,\n.sa-agent-md h3,\n.sa-agent-md h4,\n.sa-agent-md h5,\n.sa-agent-md h6 {\n  margin: 12px 0 6px;\n  font-weight: bold;\n  line-height: 1.25;\n}\n\n.sa-agent-md h1 {\n  font-size: 16px;\n}\n\n.sa-agent-md h2 {\n  font-size: 15px;\n}\n\n.sa-agent-md h3 {\n  font-size: 14px;\n}\n\n.sa-agent-md h4 {\n  font-size: 13px;\n}\n\n.sa-agent-md h5,\n.sa-agent-md h6 {\n  font-size: 12px;\n}\n\n.sa-agent-md ul,\n.sa-agent-md ol {\n  margin: 4px 0 8px;\n  padding-left: 20px;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md li {\n  margin: 3px 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md blockquote {\n  margin: 6px 0;\n  padding: 2px 8px;\n  border-left: 3px solid var(--ui-black-transparent);\n  font-size: 12px;\n  line-height: 1.5;\n  opacity: 0.85;\n}\n\n.sa-agent-md a {\n  color: var(--looks-secondary);\n  text-decoration: underline;\n}\n\n.sa-agent-md code {\n  padding: 1px 4px;\n  border-radius: 3px;\n  background: rgba(0, 0, 0, 0.08);\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.4;\n}\n\n.sa-agent-md pre code {\n  padding: 0;\n  background: transparent;\n  font-size: inherit;\n}\n\n.sa-agent-message-user .sa-agent-md code {\n  background: rgba(0, 0, 0, 0.18);\n}\n\n.sa-agent-message-user .sa-agent-md a {\n  color: #ffffff;\n}\n\n.sa-agent-md-rule {\n  margin: 8px 0;\n  border: 0;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-code {\n  max-width: 100%;\n  margin: 6px 0;\n  padding: 8px;\n  overflow-x: auto;\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.08);\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.5;\n  white-space: pre;\n}\n\n.sa-agent-message-user .sa-agent-code {\n  background: rgba(0, 0, 0, 0.16);\n}\n\n.sa-agent-trace {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  width: 92%;\n  max-width: 640px;\n  min-width: 0;\n  margin: 2px 0 8px;\n  font-size: 11px;\n  line-height: 1.4;\n}\n\n.sa-agent-tool-stack {\n  min-width: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 7px;\n  background: var(--ui-white);\n}\n\n.sa-agent-tool-stack-multiple:not([open]) {\n  margin-bottom: 6px;\n  box-shadow: 0 3px 0 -1px var(--ui-white), 0 3px 0 var(--ui-black-transparent),\n    0 6px 0 -1px var(--ui-white), 0 6px 0 var(--ui-black-transparent);\n}\n\n.sa-agent-tool-stack-summary {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding: 7px 9px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.sa-agent-tool-stack-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-tool-stack-summary::before {\n  content: '▸';\n  flex-shrink: 0;\n}\n\n.sa-agent-tool-stack[open] > .sa-agent-tool-stack-summary::before {\n  content: '▾';\n}\n\n.sa-agent-tool-stack-summary > span:first-of-type {\n  flex-shrink: 0;\n}\n\n.sa-agent-tool-stack-state {\n  min-width: 0;\n  margin-left: auto;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  opacity: 0.65;\n}\n\n.sa-agent-tool-stack-body {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  padding: 0 6px 6px;\n}\n\n.sa-agent-reasoning {\n  box-sizing: border-box;\n  width: 92%;\n  min-width: 0;\n  border-left: 2px solid var(--ui-black-transparent);\n  padding-left: 10px;\n  font-size: 11px;\n  line-height: 1.5;\n}\n\n.sa-agent-reasoning > summary {\n  padding: 4px 0;\n  cursor: pointer;\n  opacity: 0.75;\n}\n\n.sa-agent-reasoning-body {\n  max-height: 280px;\n  overflow: auto;\n  padding: 6px 0;\n  overflow-wrap: anywhere;\n  opacity: 0.85;\n}\n\n.sa-agent-tool-row {\n  overflow: hidden;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: rgba(0, 0, 0, 0.03);\n}\n\n.sa-agent-tool {\n  display: block;\n}\n\n.sa-agent-tool-summary {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 5px 8px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.sa-agent-tool-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-tool-summary::marker {\n  content: '';\n}\n\n.sa-agent-tool-name {\n  min-width: 0;\n  overflow: hidden;\n  font-weight: bold;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.sa-agent-tool-status {\n  flex-shrink: 0;\n  opacity: 0.7;\n}\n\n.sa-agent-tool-expand,\n.sa-agent-tool-collapse {\n  flex-shrink: 0;\n  margin-left: auto;\n  opacity: 0.55;\n}\n\n.sa-agent-tool-collapse {\n  display: none;\n}\n\n.sa-agent-tool[open] .sa-agent-tool-expand {\n  display: none;\n}\n\n.sa-agent-tool[open] .sa-agent-tool-collapse {\n  display: inline;\n}\n\n.sa-agent-tool-body {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  padding: 6px 8px 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-tool-line {\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-tool-line-label {\n  margin-right: 4px;\n  font-weight: bold;\n  opacity: 0.6;\n}\n\n.sa-agent-tool-approval {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 6px;\n  padding: 6px 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n  background: rgba(0, 0, 0, 0.04);\n}\n\n.sa-agent-tool-approval-hint {\n  flex: 1 1 140px;\n  min-width: 0;\n  opacity: 0.75;\n}\n\n.sa-agent-tool-approval-button {\n  flex-shrink: 0;\n  padding: 3px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  background: var(--ui-white);\n  color: var(--text-primary);\n  font-size: 11px;\n  cursor: pointer;\n}\n\n.sa-agent-tool-approval-button:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-tool-allow {\n  border-color: var(--looks-secondary);\n  background: var(--looks-secondary);\n  color: #ffffff;\n}\n\n.sa-agent-tool-allow:hover {\n  background: var(--looks-secondary);\n  opacity: 0.9;\n}\n\n.sa-agent-tool-allow-all {\n  border-style: dashed;\n}\n\n.sa-agent-trace-dot {\n  width: 6px;\n  height: 6px;\n  flex-shrink: 0;\n  border-radius: 50%;\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-trace-ok .sa-agent-trace-dot {\n  background: #2e9e4f;\n}\n\n.sa-agent-trace-error .sa-agent-trace-dot,\n.sa-agent-trace-denied .sa-agent-trace-dot {\n  background: #d93025;\n}\n\n.sa-agent-trace-pending .sa-agent-trace-dot,\n.sa-agent-trace-awaiting .sa-agent-trace-dot {\n  background: var(--looks-secondary);\n  animation: sa-agent-pulse 1s ease-in-out infinite;\n}\n\n.sa-agent-tool-write {\n  border-left: 2px solid var(--looks-secondary);\n}\n\n.sa-agent-session-write span {\n  font-weight: bold;\n}\n\n@keyframes sa-agent-pulse {\n  0%,\n  100% {\n    opacity: 0.25;\n  }\n  50% {\n    opacity: 1;\n  }\n}\n\n.sa-agent-trace-pre {\n  max-height: 160px;\n  margin: 4px 0 0;\n  padding: 6px;\n  overflow: auto;\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.06);\n  font-family: 'Courier New', monospace;\n  font-size: 10px;\n  line-height: 1.4;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-status {\n  flex-shrink: 0;\n  font-size: 11px;\n  line-height: 1.4;\n  color: var(--text-primary);\n  opacity: 0.75;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-status.sa-agent-status-error {\n  color: #d93025;\n  opacity: 1;\n}\n\n.sa-agent-context-bar {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n  flex-wrap: wrap;\n  font-size: 10px;\n  color: var(--text-primary);\n}\n\n.sa-agent-context-text {\n  flex: 1 1 100%;\n  min-width: 0;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n  opacity: 0.75;\n}\n\n.sa-agent-compress-button {\n  min-height: 20px;\n  padding: 0 6px;\n  font-size: 10px;\n  flex-shrink: 0;\n}\n\n.sa-agent-composer {\n  flex-shrink: 0;\n  padding: 8px 10px 10px;\n  border-top: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-composer-card {\n  display: flex;\n  flex-direction: column;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: var(--ui-white);\n  padding: 5px 6px 4px;\n  box-sizing: border-box;\n  transition: border-color 0.15s ease, box-shadow 0.15s ease;\n}\n\n.sa-agent-composer-card:focus-within {\n  border-color: var(--looks-secondary);\n  box-shadow: 0 0 0 1px var(--looks-secondary);\n}\n\n.sa-agent-input {\n  width: 100%;\n  min-width: 0;\n  height: 20px;\n  min-height: 20px;\n  max-height: 160px;\n  padding: 0 4px;\n  overflow-y: hidden;\n  resize: none;\n  border: 0;\n  outline: none;\n  color: var(--text-primary);\n  background: transparent;\n  box-sizing: border-box;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 20px;\n  vertical-align: middle;\n}\n\n.sa-agent-input::placeholder {\n  color: var(--text-primary);\n  opacity: 0.45;\n  line-height: 20px;\n}\n\n.sa-agent-composer-toolbar {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 8px;\n  padding-top: 4px;\n  margin-top: 4px;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-composer-toolbar-left {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  flex: 1;\n}\n\n.sa-agent-composer-toolbar-right {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  flex-shrink: 0;\n}\n\n.sa-agent-mode-button {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  height: 24px;\n  padding: 0 7px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 11px;\n  font-weight: 500;\n  white-space: nowrap;\n  user-select: none;\n  transition: all 0.15s ease;\n}\n\n.sa-agent-mode-icon {\n  width: 13px;\n  height: 13px;\n  flex-shrink: 0;\n  transition: filter 0.15s ease;\n}\n\n.sa-agent-mode-button:hover {\n  background: var(--ui-primary-transparent);\n  border-color: var(--looks-secondary);\n}\n\n.sa-agent-mode-button:active {\n  transform: scale(0.96);\n}\n\n.sa-agent-mode-button.sa-agent-mode-build {\n  color: #ffffff;\n  border-color: var(--looks-secondary);\n  background: var(--looks-secondary);\n  font-weight: 600;\n}\n\n.sa-agent-mode-button.sa-agent-mode-build .sa-agent-mode-icon {\n  filter: brightness(0) invert(1) !important;\n}\n\n.sa-agent-mode-button.sa-agent-mode-build:hover {\n  filter: brightness(1.08);\n}\n\n.sa-agent-mode-button.sa-agent-mode-plan {\n  color: var(--text-primary);\n  opacity: 0.85;\n}\n\n.sa-agent-mode-button.sa-agent-mode-plan .sa-agent-mode-icon {\n  filter: grayscale(100%);\n}\n\n.sa-agent-mode-button.sa-agent-mode-plan:hover .sa-agent-mode-icon {\n  filter: none !important;\n}\n\n.sa-agent-model-select-wrapper {\n  position: relative;\n  display: inline-flex;\n  align-items: center;\n  flex: 0 1 auto;\n  min-width: 0;\n  max-width: none;\n}\n\n.sa-agent-model-select {\n  height: 24px;\n  width: auto;\n  min-width: 0;\n  max-width: none;\n  padding: 0 18px 0 7px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background-color: var(--ui-white);\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 11px;\n  font-weight: 500;\n  white-space: nowrap;\n  appearance: none;\n  -webkit-appearance: none;\n  transition: border-color 0.15s ease, background-color 0.15s ease;\n}\n\n.sa-agent-model-select:hover {\n  border-color: var(--looks-secondary);\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-agent-model-select:focus {\n  border-color: var(--looks-secondary);\n  box-shadow: 0 0 0 1px var(--looks-secondary);\n}\n\n/* 显式定义下拉展开选项的文字颜色与背景，杜绝因系统深浅色差异导致白底浅灰字或可读性差的问题 */\n.sa-agent-model-select option {\n  color: var(--text-primary) !important;\n  background-color: var(--ui-white) !important;\n  font-size: 12px;\n  font-weight: normal;\n  padding: 4px 8px;\n}\n\n.sa-agent-model-select option:checked {\n  color: var(--looks-secondary) !important;\n  background-color: var(--ui-primary-transparent) !important;\n  font-weight: 600;\n}\n\n.sa-agent-model-select-wrapper::after {\n  content: '';\n  position: absolute;\n  right: 6px;\n  pointer-events: none;\n  width: 0;\n  height: 0;\n  border-left: 3.5px solid transparent;\n  border-right: 3.5px solid transparent;\n  border-top: 4px solid var(--text-primary);\n  opacity: 0.6;\n  transition: opacity 0.15s ease;\n}\n\n.sa-agent-model-select-wrapper:hover::after {\n  opacity: 0.9;\n}\n\n.sa-agent-button {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 4px;\n  height: 24px;\n  min-height: 24px;\n  padding: 0 10px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  font-weight: 600;\n  white-space: nowrap;\n  transition: opacity 0.15s ease, background 0.15s ease, transform 0.1s ease;\n}\n\n.sa-agent-button:disabled {\n  opacity: 0.45;\n  cursor: not-allowed;\n}\n\n.sa-agent-button:active:not(:disabled) {\n  transform: scale(0.96);\n}\n\n.sa-agent-button-primary {\n  color: #ffffff;\n  background: var(--looks-secondary);\n  border-color: transparent;\n}\n\n.sa-agent-button-primary:hover:not(:disabled) {\n  filter: brightness(1.08);\n  opacity: 0.95;\n}\n\n.sa-agent-button-secondary {\n  color: var(--text-primary);\n  background: transparent;\n}\n\n.sa-agent-button-secondary:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-stop-button {\n  color: #d93025;\n  border-color: rgba(217, 48, 37, 0.3);\n}\n\n.sa-agent-stop-button:hover:not(:disabled) {\n  background: rgba(217, 48, 37, 0.08);\n}\n\n.sa-agent-message-meta {\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  margin-top: 4px;\n  font-size: 10px;\n  color: var(--text-primary);\n  opacity: 0.65;\n}\n\n.sa-agent-meta-badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 3px;\n  padding: 1px 5px;\n  border-radius: 3px;\n  background: var(--ui-black-transparent);\n  font-size: 10px;\n  line-height: 1.3;\n}\n\n.sa-agent-meta-icon {\n  width: 11px;\n  height: 11px;\n  flex-shrink: 0;\n}\n\n.sa-agent-meta-mode-build {\n  color: var(--looks-secondary);\n  background: var(--ui-primary-transparent);\n  font-weight: 600;\n}\n\n.sa-agent-meta-mode-build .sa-agent-meta-icon {\n  filter: none !important;\n}\n\n.sa-agent-meta-mode-plan {\n  color: var(--text-primary);\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-meta-mode-plan .sa-agent-meta-icon {\n  filter: grayscale(100%);\n}\n\n.addons-side-bar .sa-agent-header {\n  padding: 6px 8px;\n}\n\n.addons-side-bar .sa-agent-heading {\n  font-size: 12px;\n}\n\n.addons-side-bar .sa-agent-messages {\n  padding: 8px;\n}\n\n.addons-side-bar .sa-agent-composer {\n  padding: 6px 6px 8px;\n}\n\n.addons-side-bar .sa-agent-message-role {\n  display: none;\n}\n\n.addons-side-bar .sa-agent-bubble {\n  max-width: 100%;\n}\n\n.addons-side-bar .sa-agent-button {\n  min-height: 24px;\n  padding: 0 7px;\n}\n\n.addons-side-bar .sa-agent-input {\n  height: 20px;\n  min-height: 20px;\n  max-height: 120px;\n  padding: 0 4px;\n  font-size: 12px;\n  line-height: 20px;\n}\n\n.sa-agent-toggle-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n}\n\n.sa-agent-toggle-label {\n  font-size: 12px;\n  color: var(--text-primary-transparent);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button {\n  box-sizing: border-box;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 6px;\n  height: 24px;\n  min-height: 24px;\n  margin: 0;\n  padding: 0 12px;\n  border: 0;\n  border-top: 2px solid transparent;\n  border-right: 1px solid var(--ui-black-transparent);\n  border-bottom: 0;\n  border-left: 2px solid transparent;\n  border-radius: 0;\n  color: var(--text-primary-transparent);\n  background: var(--ui-white);\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  font-weight: normal;\n  line-height: 1;\n  white-space: nowrap;\n  transition: none;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button:hover {\n  background: var(--ui-primary);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active {\n  color: var(--looks-secondary) !important;\n  background: var(--ui-white) !important;\n  border-bottom: 2px solid var(--looks-secondary) !important;\n  font-weight: bold !important;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active:hover {\n  background: var(--ui-white) !important;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-label {\n  color: var(--looks-secondary) !important;\n  font-weight: bold !important;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button .sa-agent-toggle-icon {\n  width: 16px !important;\n  height: 16px !important;\n  margin: 0 !important;\n  filter: grayscale(100%) !important;\n  transition: filter 0.2s ease !important;\n}\n\n/* 仅在激活状态下图标恢复主题色，hover 状态保持灰度 */\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-icon {\n  filter: none !important;\n}\n\n/* VSCode 布局下的侧边栏按钮样式 - 严格对齐 SPA、AddToBar 与 Terminal 规范 */\n.sa-agent-toggle-tab.vscode-tab,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab {\n  box-sizing: border-box;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  width: 40px;\n  height: 40px !important;\n  min-width: 40px;\n  min-height: 40px !important;\n  flex-grow: 0;\n  flex-shrink: 0;\n  padding: 5px 0 !important;\n  margin: 0 !important;\n  border: 0 !important;\n  border-radius: 0 !important;\n  color: inherit;\n  background-color: transparent !important;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 0;\n  line-height: 0;\n  outline: none;\n  appearance: none;\n  position: relative;\n  transition: none;\n}\n\n.sa-agent-toggle-tab.vscode-tab:hover,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:hover {\n  border-color: transparent !important;\n}\n\n/* VSCode 侧边栏按钮图标 - 默认未激活状态为 100% 灰度 */\n.sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab img {\n  width: 22px;\n  height: auto;\n  margin: 0 !important;\n  filter: grayscale(100%);\n  -webkit-filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n/* VSCode 侧边栏按钮 hover 状态：规范只提升亮度（brightness(150%)），保持灰度，不包含饱和度 */\n.sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover img {\n  filter: brightness(150%) grayscale(100%) !important;\n  -webkit-filter: brightness(150%) grayscale(100%) !important;\n}\n\n.sa-agent-toggle-tab.vscode-tab:focus-visible,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:focus-visible {\n  outline: 2px solid var(--looks-secondary);\n  outline-offset: -2px;\n}\n\n/* VSCode 布局下按钮激活/选中状态：背景变白，左侧呈现主题强调色指示条 */\n.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active,\n.sa-agent-toggle-tab.vscode-tab.is-selected,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected {\n  background-color: var(--ui-white) !important;\n  box-shadow: inset 3px 0px 0px 0px var(--looks-secondary) !important;\n}\n\n/* 激活状态下图标恢复主题色（移除灰度，展现饱和度） */\n.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active img,\n.sa-agent-toggle-tab.vscode-tab.is-selected .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab.is-selected img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected img {\n  filter: grayscale(0%) !important;\n  -webkit-filter: grayscale(0%) !important;\n}\n\n.sa-agent-settings-panel {\n  display: none;\n  flex: 1;\n  flex-direction: column;\n  min-height: 0;\n  overflow-y: auto;\n  box-sizing: border-box;\n  padding: 10px 12px 12px;\n  color: var(--text-primary);\n  background: var(--ui-white);\n}\n\n.sa-agent-settings-header {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n  padding-bottom: 8px;\n  margin-bottom: 12px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-settings-back {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  min-width: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  transition: all 0.15s ease;\n}\n\n.sa-agent-settings-back:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-settings-back:active {\n  transform: scale(0.95);\n}\n\n.sa-agent-settings-back-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-settings-back:hover .sa-agent-settings-back-icon {\n  filter: none !important;\n}\n\n.sa-agent-settings-title {\n  font-size: 13px;\n  font-weight: bold;\n}\n\n.addons-bottom-panel .sa-agent-settings-panel {\n  width: 100%;\n  max-width: 960px;\n  align-self: center;\n}\n\n.addons-side-bar .sa-agent-settings-panel {\n  padding: 8px;\n}\n\n.sa-agent-settings {\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.sa-agent-settings-field {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.sa-agent-settings-field-toggle {\n  flex-direction: row;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  cursor: pointer;\n}\n\n.sa-agent-settings-label {\n  font-size: 12px;\n  font-weight: bold;\n  color: var(--text-primary);\n}\n\n.sa-agent-settings-input {\n  box-sizing: border-box;\n  width: 100%;\n  min-height: 32px;\n  padding: 6px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  font-family: inherit;\n  font-size: 12px;\n  transition: none;\n}\n\n.sa-agent-settings-input:focus {\n  border-color: var(--looks-secondary);\n}\n\n.sa-agent-settings-checkbox {\n  flex-shrink: 0;\n  width: 16px;\n  height: 16px;\n  margin: 2px 0;\n  align-self: flex-start;\n  cursor: pointer;\n}\n\n.sa-agent-settings-textarea {\n  min-height: 100px;\n  resize: vertical;\n  font-family: 'Courier New', monospace;\n}\n\n.sa-agent-settings-select {\n  height: auto;\n  min-height: 28px;\n  padding: 4px 6px;\n  cursor: pointer;\n}\n\n.sa-agent-settings-note {\n  font-size: 11px;\n  line-height: 1.4;\n  opacity: 0.7;\n}\n\n.sa-agent-settings-error {\n  color: #d93025;\n  font-size: 12px;\n}\n\n.sa-agent-settings-buttons {\n  display: flex;\n  justify-content: flex-end;\n  gap: 8px;\n  padding-top: 4px;\n}\n\n/* 内部滚动条统一规范：细长矩形（无圆角，现代 IDE 极简风格） */\n.sa-agent-container *::-webkit-scrollbar,\n.sa-agent-messages::-webkit-scrollbar,\n.sa-agent-settings-panel::-webkit-scrollbar,\n.sa-agent-conversation-list::-webkit-scrollbar,\n.sa-agent-session-panel::-webkit-scrollbar {\n  width: 4px !important;\n  height: 4px !important;\n}\n\n.sa-agent-container *::-webkit-scrollbar-track,\n.sa-agent-messages::-webkit-scrollbar-track,\n.sa-agent-settings-panel::-webkit-scrollbar-track,\n.sa-agent-conversation-list::-webkit-scrollbar-track,\n.sa-agent-session-panel::-webkit-scrollbar-track {\n  background: transparent !important;\n}\n\n.sa-agent-container *::-webkit-scrollbar-thumb,\n.sa-agent-messages::-webkit-scrollbar-thumb,\n.sa-agent-settings-panel::-webkit-scrollbar-thumb,\n.sa-agent-conversation-list::-webkit-scrollbar-thumb,\n.sa-agent-session-panel::-webkit-scrollbar-thumb {\n  border-radius: 0 !important;\n  background: rgba(128, 128, 128, 0.35) !important;\n  transition: background 0.15s ease;\n}\n\n.sa-agent-container *::-webkit-scrollbar-thumb:hover,\n.sa-agent-messages::-webkit-scrollbar-thumb:hover,\n.sa-agent-settings-panel::-webkit-scrollbar-thumb:hover,\n.sa-agent-conversation-list::-webkit-scrollbar-thumb:hover,\n.sa-agent-session-panel::-webkit-scrollbar-thumb:hover {\n  background: rgba(128, 128, 128, 0.6) !important;\n}\n\n.sa-agent-container *::-webkit-scrollbar-corner {\n  background: transparent !important;\n}\n\n.sa-agent-container,\n.sa-agent-container * {\n  scrollbar-width: thin;\n  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;\n}\n\n.sa-agent-md-table-wrap {\n  max-width: 100%;\n  margin: 8px 0;\n  overflow-x: auto;\n  -webkit-overflow-scrolling: touch;\n}\n\n.sa-agent-md-table {\n  width: max-content;\n  min-width: 100%;\n  border-collapse: collapse;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md-table th,\n.sa-agent-md-table td {\n  padding: 4px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  text-align: left;\n  vertical-align: top;\n}\n\n.sa-agent-md-table th {\n  font-weight: bold;\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-md-table tr:nth-child(even) td {\n  background: rgba(0, 0, 0, 0.04);\n}\n\n.sa-agent-md-table pre,\n.sa-agent-md-table code {\n  white-space: pre-wrap;\n}\n\n.sa-agent-md-task {\n  width: 14px;\n  height: 14px;\n  margin: 0 6px 0 0;\n  vertical-align: middle;\n  cursor: default;\n  accent-color: var(--looks-secondary);\n}\n\n.sa-agent-md-image {\n  display: inline-block;\n  padding: 1px 6px;\n  border: 1px dashed var(--ui-black-transparent);\n  border-radius: 3px;\n  font-size: 12px;\n  opacity: 0.85;\n}\n"],"sourceRoot":""}]);
+
+/* Scrathon converter & debug window (standalone, draggable) */
+.sa-agent-scrathon-window {
+  position: fixed;
+  top: 90px;
+  left: 90px;
+  display: none;
+  flex-direction: column;
+  width: 560px;
+  height: 480px;
+  min-width: 360px;
+  min-height: 280px;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 8px;
+  background: var(--ui-white);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  z-index: 1000;
+  overflow: hidden;
+  resize: both;
+}
+
+.sa-agent-scrathon-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ui-black-transparent);
+  background: var(--ui-primary-transparent);
+  cursor: move;
+  user-select: none;
+}
+
+.sa-agent-scrathon-title {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.sa-agent-scrathon-close {
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.sa-agent-scrathon-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px;
+}
+
+.sa-agent-scrathon-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.sa-agent-scrathon-target-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.sa-agent-scrathon-label {
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.sa-agent-scrathon-select {
+  flex: 1;
+  min-height: 28px;
+  padding: 4px 6px;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 4px;
+  background: var(--ui-white);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.sa-agent-scrathon-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.sa-agent-scrathon-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px;
+  font-size: 11px;
+}
+
+.sa-agent-scrathon-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sa-agent-scrathon-panel-btn {
+  border: 1px solid var(--ui-black-transparent);
+  background: var(--ui-white);
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 2px 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.sa-agent-scrathon-panel-btn:hover {
+  background: var(--ui-primary-transparent);
+}
+
+.sa-agent-scrathon-code {
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--ui-black-transparent);
+  border-radius: 4px;
+  outline: none;
+  resize: none;
+  background: var(--ui-white);
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 4;
+}
+
+.sa-agent-scrathon-code:focus {
+  border-color: var(--looks-secondary);
+}
+
+.sa-agent-scrathon-status {
+  flex-shrink: 0;
+  max-height: 90px;
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.03);
+  overflow: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+}
+
+.sa-agent-scrathon-status-error {
+  color: #d93025;
+  background: rgba(217, 48, 37, 0.08);
+}
+
+.sa-agent-scrathon-status-success {
+  color: #0d8050;
+  background: rgba(13, 128, 80, 0.08);
+}
+
+.sa-agent-scrathon-window ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sa-agent-scrathon-window ::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  background: rgba(128, 128, 128, 0.35);
+}
+
+.sa-agent-scrathon-window ::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.6);
+}
+`, "",{"version":3,"sources":["webpack://./src/addons/addons/astras-copilot/agent.css"],"names":[],"mappings":"AAAA;EACE,aAAa;EACb,sBAAsB;EACtB,WAAW;EACX,YAAY;EACZ,aAAa;EACb,gBAAgB;EAChB,0BAA0B;EAC1B,2BAA2B;EAC3B,sBAAsB;AACxB;;AAEA;EACE,SAAS;AACX;;AAEA;EACE,wBAAwB;EACxB,yBAAyB;EACzB,aAAa;AACf;;AAEA;EACE,kBAAkB;EAClB,aAAa;EACb,mBAAmB;EACnB,8BAA8B;EAC9B,QAAQ;EACR,cAAc;EACd,yBAAyB;EACzB,oDAAoD;EACpD,2BAA2B;AAC7B;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,YAAY;EACZ,eAAe;EACf,iBAAiB;AACnB;;AAEA;EACE,gBAAgB;EAChB,uBAAuB;EACvB,mBAAmB;AACrB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,cAAc;AAChB;;AAEA;EACE,gBAAgB;AAClB;;AAEA;EACE,gBAAgB;EAChB,eAAe;AACjB;;AAEA;EACE,WAAW;EACX,YAAY;AACd;;AAEA;EACE,aAAa;AACf;;AAEA;EACE,kBAAkB;EAClB,WAAW;EACX,qBAAqB;EACrB,UAAU;EACV,aAAa;EACb,sBAAsB;EACtB,SAAS;EACT,sBAAsB;EACtB,YAAY;EACZ,4BAA4B;EAC5B,4BAA4B;EAC5B,cAAc;EACd,aAAa;EACb,6CAA6C;EAC7C,kBAAkB;EAClB,2BAA2B;EAC3B,0CAA0C;AAC5C;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,8BAA8B;EAC9B,SAAS;EACT,eAAe;EACf,eAAe;AACjB;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,aAAa;AACf;;AAEA;;;EAGE,WAAW;EACX,YAAY;EACZ,cAAc;EACd,uBAAuB;EACvB,4BAA4B;AAC9B;;AAEA;;;EAGE,uBAAuB;AACzB;;AAEA;EACE,kBAAkB;EAClB,aAAa;EACb,OAAO;EACP,aAAa;EACb,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,OAAO;EACP,sBAAsB;EACtB,YAAY;EACZ,aAAa;AACf;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,cAAc;EACd,YAAY;EACZ,aAAa;EACb,mDAAmD;EACnD,2BAA2B;AAC7B;;AAEA;EACE,aAAa;AACf;;AAEA;EACE,aAAa;EACb,kBAAkB;EAClB,QAAQ;EACR,WAAW;EACX,WAAW;EACX,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,cAAc;EACd,iBAAiB;EACjB,oDAAoD;AACtD;;AAEA;EACE,gBAAgB;EAChB,uBAAuB;EACvB,mBAAmB;EACnB,eAAe;EACf,iBAAiB;EACjB,aAAa;AACf;;AAEA;EACE,kBAAkB;EAClB,OAAO;EACP,aAAa;EACb,gBAAgB;EAChB,kBAAkB;EAClB,YAAY;EACZ,aAAa;EACb,sBAAsB;EACtB,QAAQ;AACV;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,YAAY;EACZ,kBAAkB;AACpB;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,cAAc;EACd,sBAAsB;EACtB,YAAY;EACZ,iDAAiD;EACjD,eAAe;EACf,gBAAgB;EAChB,uBAAuB;AACzB;;AAEA;EACE,aAAa;EACb,yBAAyB;EACzB,QAAQ;EACR,eAAe;AACjB;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,OAAO;EACP,YAAY;EACZ,gBAAgB;EAChB,uBAAuB;EACvB,mBAAmB;EACnB,wBAAwB;EACxB,SAAS;EACT,kBAAkB;EAClB,0BAA0B;EAC1B,uBAAuB;EACvB,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,iBAAiB;AACnB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,cAAc;EACd,aAAa;AACf;;AAEA;;EAEE,UAAU;AACZ;;AAEA;EACE,sBAAsB;EACtB,oBAAoB;EACpB,mBAAmB;EACnB,uBAAuB;EACvB,WAAW;EACX,YAAY;EACZ,UAAU;EACV,SAAS;EACT,kBAAkB;EAClB,0BAA0B;EAC1B,uBAAuB;EACvB,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,cAAc;AAChB;;AAEA;EACE,uCAAuC;AACzC;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;EACd,uBAAuB;EACvB,4BAA4B;AAC9B;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,sBAAsB;EACtB,OAAO;EACP,YAAY;EACZ,YAAY;EACZ,aAAa;EACb,cAAc;EACd,wCAAwC;EACxC,kBAAkB;EAClB,aAAa;EACb,0BAA0B;EAC1B,2BAA2B;EAC3B,oBAAoB;EACpB,eAAe;AACjB;;AAEA;EACE,sBAAsB;EACtB,oBAAoB;EACpB,mBAAmB;EACnB,uBAAuB;EACvB,WAAW;EACX,YAAY;EACZ,UAAU;EACV,6CAA6C;EAC7C,kBAAkB;EAClB,0BAA0B;EAC1B,uBAAuB;EACvB,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,cAAc;EACd,gBAAgB;AAClB;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,aAAa;EACb,mBAAmB;AACrB;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;EACd,uBAAuB;EACvB,4BAA4B;AAC9B;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;EACd,uBAAuB;EACvB,4BAA4B;AAC9B;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,kBAAkB;EAClB,aAAa;EACb,mBAAmB;AACrB;;AAEA;EACE,sBAAsB;EACtB,oBAAoB;EACpB,mBAAmB;EACnB,uBAAuB;EACvB,WAAW;EACX,YAAY;EACZ,eAAe;EACf,UAAU;EACV,6CAA6C;EAC7C,kBAAkB;EAClB,0BAA0B;EAC1B,uBAAuB;EACvB,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,cAAc;EACd,gBAAgB;AAClB;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;EACd,uBAAuB;EACvB,4BAA4B;AAC9B;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,kBAAkB;EAClB,SAAS;EACT,QAAQ;EACR,WAAW;EACX,aAAa;EACb,sBAAsB;EACtB,QAAQ;EACR,gBAAgB;EAChB,eAAe;EACf,YAAY;EACZ,6CAA6C;EAC7C,kBAAkB;EAClB,2BAA2B;EAC3B,0CAA0C;AAC5C;;AAEA;EACE,sBAAsB;EACtB,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,WAAW;EACX,iBAAiB;EACjB,SAAS;EACT,kBAAkB;EAClB,0BAA0B;EAC1B,uBAAuB;EACvB,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,gBAAgB;EAChB,gBAAgB;AAClB;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,aAAa;EACb,mBAAmB;AACrB;;AAEA;EACE,6BAA6B;EAC7B,yCAAyC;EACzC,iBAAiB;AACnB;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;EACd,uBAAuB;EACvB,4BAA4B;AAC9B;;AAEA;;EAEE,uBAAuB;AACzB;;AAEA;EACE,OAAO;EACP,aAAa;EACb,gBAAgB;EAChB,kBAAkB;EAClB,aAAa;EACb,aAAa;EACb,sBAAsB;EACtB,SAAS;AACX;;AAEA;;EAEE,sBAAsB;EACtB,WAAW;EACX,gBAAgB;EAChB,kBAAkB;AACpB;;AAEA;EACE,YAAY;EACZ,aAAa;EACb,gBAAgB;EAChB,kBAAkB;EAClB,0BAA0B;AAC5B;;AAEA;EACE,kBAAkB;EAClB,eAAe;EACf,iBAAiB;AACnB;;AAEA;EACE,eAAe;EACf,gBAAgB;EAChB,YAAY;AACd;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,eAAe;EACf,YAAY;EACZ,cAAc;EACd,QAAQ;AACV;;AAEA;EACE,qBAAqB;AACvB;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,iBAAiB;EACjB,eAAe;EACf,iBAAiB;EACjB,aAAa;AACf;;AAEA;EACE,sBAAsB;EACtB,YAAY;EACZ,cAAc;EACd,iBAAiB;EACjB,6CAA6C;EAC7C,kBAAkB;EAClB,eAAe;EACf,gBAAgB;EAChB,uBAAuB;AACzB;;AAEA;EACE,cAAc;EACd,kCAAkC;EAClC,yBAAyB;EACzB,+BAA+B;AACjC;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,eAAe;EACf,YAAY;EACZ,8BAA8B;AAChC;;AAEA;;EAEE,UAAU;AACZ;;AAEA;EACE,sBAAsB;EACtB,oBAAoB;EACpB,mBAAmB;EACnB,QAAQ;EACR,YAAY;EACZ,cAAc;EACd,6BAA6B;EAC7B,kBAAkB;EAClB,0BAA0B;EAC1B,uBAAuB;EACvB,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,cAAc;EACd,mBAAmB;EACnB,iBAAiB;EACjB,0BAA0B;AAC5B;;AAEA;EACE,yCAAyC;EACzC,yCAAyC;AAC3C;;AAEA;EACE,sBAAsB;AACxB;;AAEA;EACE,YAAY;EACZ,mBAAmB;AACrB;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;EACd,uBAAuB;EACvB,6BAA6B;AAC/B;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,0BAA0B;EAC1B,yCAAyC;EACzC,8BAA8B;AAChC;;AAEA;EACE,qBAAqB;AACvB;;AAEA;EACE,mBAAmB;AACrB;;AAEA;EACE,aAAa;AACf;;AAEA;EACE,YAAY;EACZ,gBAAgB;EAChB,YAAY;EACZ,qDAAqD;AACvD;;AAEA;EACE;IACE,kBAAkB;EACpB;AACF;;AAEA;EACE,eAAe;EACf,gBAAgB;EAChB,mBAAmB;AACrB;;AAEA;EACE,aAAa;AACf;;AAEA;EACE,gBAAgB;AAClB;;AAEA;EACE,eAAe;EACf,eAAe;EACf,gBAAgB;AAClB;;AAEA;;;;;;EAME,kBAAkB;EAClB,iBAAiB;EACjB,iBAAiB;AACnB;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,eAAe;AACjB;;AAEA;;EAEE,eAAe;AACjB;;AAEA;;EAEE,iBAAiB;EACjB,kBAAkB;EAClB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,gBAAgB;EAChB,kDAAkD;EAClD,eAAe;EACf,gBAAgB;EAChB,aAAa;AACf;;AAEA;EACE,6BAA6B;EAC7B,0BAA0B;AAC5B;;AAEA;EACE,gBAAgB;EAChB,kBAAkB;EAClB,+BAA+B;EAC/B,qCAAqC;EACrC,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,UAAU;EACV,uBAAuB;EACvB,kBAAkB;AACpB;;AAEA;EACE,+BAA+B;AACjC;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,aAAa;EACb,SAAS;EACT,iDAAiD;AACnD;;AAEA;EACE,eAAe;EACf,aAAa;EACb,YAAY;EACZ,gBAAgB;EAChB,kBAAkB;EAClB,+BAA+B;EAC/B,qCAAqC;EACrC,eAAe;EACf,gBAAgB;EAChB,gBAAgB;AAClB;;AAEA;EACE,+BAA+B;AACjC;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,QAAQ;EACR,UAAU;EACV,gBAAgB;EAChB,YAAY;EACZ,iBAAiB;EACjB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,YAAY;EACZ,6CAA6C;EAC7C,kBAAkB;EAClB,2BAA2B;AAC7B;;AAEA;EACE,kBAAkB;EAClB;;;;uCAIqC;AACvC;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;AACf;;AAEA;EACE,YAAY;EACZ,cAAc;AAChB;;AAEA;EACE,YAAY;AACd;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,YAAY;EACZ,iBAAiB;EACjB,gBAAgB;EAChB,uBAAuB;EACvB,mBAAmB;EACnB,aAAa;AACf;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,QAAQ;EACR,kBAAkB;AACpB;;AAEA;EACE,sBAAsB;EACtB,UAAU;EACV,YAAY;EACZ,kDAAkD;EAClD,kBAAkB;EAClB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,cAAc;EACd,eAAe;EACf,aAAa;AACf;;AAEA;EACE,iBAAiB;EACjB,cAAc;EACd,cAAc;EACd,uBAAuB;EACvB,aAAa;AACf;;AAEA;EACE,gBAAgB;EAChB,6CAA6C;EAC7C,kBAAkB;EAClB,+BAA+B;AACjC;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;AACf;;AAEA;EACE,WAAW;AACb;;AAEA;EACE,YAAY;EACZ,gBAAgB;EAChB,iBAAiB;EACjB,uBAAuB;EACvB,mBAAmB;AACrB;;AAEA;EACE,cAAc;EACd,YAAY;AACd;;AAEA;;EAEE,cAAc;EACd,iBAAiB;EACjB,aAAa;AACf;;AAEA;EACE,aAAa;AACf;;AAEA;EACE,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,QAAQ;EACR,oBAAoB;EACpB,iDAAiD;AACnD;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,iBAAiB;EACjB,iBAAiB;EACjB,YAAY;AACd;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,oBAAoB;EACpB,QAAQ;EACR,gBAAgB;EAChB,iDAAiD;EACjD,+BAA+B;AACjC;;AAEA;EACE,aAAa;EACb,eAAe;EACf,mBAAmB;EACnB,QAAQ;AACV;;AAEA;EACE,eAAe;EACf,YAAY;EACZ,aAAa;AACf;;AAEA;EACE,cAAc;EACd,gBAAgB;EAChB,6CAA6C;EAC7C,kBAAkB;EAClB,2BAA2B;EAC3B,0BAA0B;EAC1B,eAAe;EACf,eAAe;AACjB;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,oCAAoC;EACpC,kCAAkC;EAClC,cAAc;AAChB;;AAEA;EACE,kCAAkC;EAClC,YAAY;AACd;;AAEA;EACE,oBAAoB;AACtB;;AAEA,mDAAmD;AACnD;EACE,aAAa;EACb,sBAAsB;EACtB,WAAW;EACX,sBAAsB;EACtB,oBAAoB;EACpB,YAAY;EACZ,uBAAuB;EACvB,uDAAuD;EACvD,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,8BAA8B;EAC9B,oBAAoB;EACpB,eAAe;EACf,gBAAgB;EAChB,0BAA0B;EAC1B,uDAAuD;EACvD,iBAAiB;AACnB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;AACV;;AAEA;EACE,0BAA0B;EAC1B,qBAAqB;AACvB;;AAEA;EACE,sCAAsC;EACtC,iBAAiB;AACnB;;AAEA;EACE,sCAAsC;AACxC;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;AACV;;AAEA;EACE,aAAa;EACb,QAAQ;EACR,iBAAiB;EACjB,eAAe;AACjB;;AAEA;EACE,qBAAqB;EACrB,gBAAgB;EAChB,kBAAkB;EAClB,eAAe;EACf,iBAAiB;EACjB,0BAA0B;AAC5B;;AAEA;EACE,mCAAmC;EACnC,cAAc;AAChB;;AAEA;EACE,mCAAmC;EACnC,cAAc;AAChB;;AAEA;;EAEE,mCAAmC;EACnC,cAAc;AAChB;;AAEA;EACE,WAAW;EACX,iBAAiB;EACjB,gBAAgB;EAChB,kBAAkB;EAClB,kBAAkB;EAClB,uBAAuB;AACzB;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,WAAW;EACX,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,oBAAoB;EACpB,WAAW;EACX,gBAAgB;EAChB,iBAAiB;EACjB,uDAAuD;EACvD,eAAe;EACf,kBAAkB;AACpB;;AAEA;EACE,qCAAqC;AACvC;;AAEA;EACE,OAAO;EACP,YAAY;EACZ,sBAAsB;EACtB,aAAa;EACb,uBAAuB;EACvB,kBAAkB;EAClB,0BAA0B;AAC5B;;AAEA;EACE,WAAW;EACX,eAAe;EACf,cAAc;EACd,kBAAkB;EAClB,iBAAiB;EACjB,0BAA0B;EAC1B,aAAa;EACb,gBAAgB;EAChB,aAAa;EACb,mBAAmB;EACnB,uBAAuB;AACzB;;AAEA;EACE,OAAO;EACP,YAAY;EACZ,sBAAsB;EACtB,aAAa;EACb,uBAAuB;EACvB,kBAAkB;EAClB,0BAA0B;AAC5B;;AAEA;EACE,WAAW;EACX,eAAe;EACf,cAAc;EACd,kBAAkB;EAClB,iBAAiB;EACjB,iBAAiB;AACnB;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,WAAW;EACX,eAAe;EACf,cAAc;EACd,iBAAiB;EACjB,kBAAkB;EAClB,iBAAiB;EACjB,0BAA0B;EAC1B,YAAY;EACZ,eAAe;AACjB;;AAEA;+DAC+D;AAC/D;EACE,OAAO;EACP,YAAY;EACZ,qBAAqB;EACrB,uBAAuB;EACvB,WAAW;EACX,0BAA0B;AAC5B;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,cAAc;EACd,YAAY;AACd;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,gBAAgB;EAChB,0BAA0B;EAC1B,aAAa;EACb,eAAe;EACf,iBAAiB;EACjB,aAAa;AACf;;AAEA;EACE,oBAAoB;EACpB,gBAAgB;EAChB,eAAe;EACf,0BAA0B;EAC1B,aAAa;AACf;;AAEA;EACE,eAAe;EACf,cAAc;AAChB;;AAEA;EACE,cAAc;EACd,YAAY;EACZ,kBAAkB;EAClB,eAAe;AACjB;;AAEA;EACE,eAAe;EACf,gBAAgB;EAChB,kBAAkB;EAClB,kCAAkC;EAClC,cAAc;EACd,eAAe;AACjB;;AAEA,qBAAqB;AACrB;EACE,aAAa;EACb,sBAAsB;EACtB,WAAW;EACX,sBAAsB;EACtB,6CAA6C;EAC7C,kBAAkB;EAClB,gBAAgB;EAChB,2BAA2B;EAC3B,uDAAuD;EACvD,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,8BAA8B;EAC9B,mBAAmB;EACnB,gBAAgB;EAChB,+BAA+B;EAC/B,oDAAoD;EACpD,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;AACV;;AAEA;EACE,qBAAqB;EACrB,gBAAgB;EAChB,kBAAkB;EAClB,yCAAyC;EACzC,6BAA6B;EAC7B,eAAe;EACf,iBAAiB;AACnB;;AAEA;EACE,0BAA0B;AAC5B;;AAEA;EACE,aAAa;EACb,QAAQ;EACR,iBAAiB;EACjB,eAAe;AACjB;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,iBAAiB;EACjB,gBAAgB;EAChB,gBAAgB;EAChB,2BAA2B;AAC7B;;AAEA;EACE,oDAAoD;AACtD;;AAEA;EACE,mBAAmB;AACrB;;AAEA;EACE,aAAa;EACb,8BAA8B;EAC9B,mBAAmB;EACnB,gBAAgB;EAChB,+BAA+B;EAC/B,4CAA4C;EAC5C,gBAAgB;EAChB,eAAe;EACf,0BAA0B;AAC5B;;AAEA;EACE,cAAc;EACd,gBAAgB;EAChB,kBAAkB;EAClB,iBAAiB;AACnB;;AAEA;EACE,mCAAmC;EACnC,cAAc;AAChB;;AAEA;EACE,mCAAmC;EACnC,cAAc;AAChB;;AAEA;EACE,mCAAmC;EACnC,cAAc;AAChB;;AAEA;EACE,aAAa;EACb,sBAAsB;AACxB;;AAEA;EACE,gBAAgB;EAChB,mCAAmC;EACnC,0BAA0B;EAC1B,aAAa;EACb,eAAe;EACf,yCAAyC;EACzC,4CAA4C;AAC9C;;AAEA;EACE,aAAa;EACb,qBAAqB;EACrB,gBAAgB;EAChB,iBAAiB;EACjB,gBAAgB;AAClB;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,6BAA6B;EAC7B,aAAa;AACf;;AAEA;EACE,WAAW;EACX,eAAe;EACf,iBAAiB;EACjB,kBAAkB;EAClB,iBAAiB;EACjB,0BAA0B;EAC1B,aAAa;EACb,eAAe;AACjB;;AAEA;EACE,WAAW;EACX,eAAe;EACf,kBAAkB;EAClB,iBAAiB;EACjB,iBAAiB;AACnB;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,OAAO;EACP,kBAAkB;EAClB,WAAW;EACX,0BAA0B;AAC5B;;AAEA;EACE,YAAY;EACZ,kBAAkB;EAClB,YAAY;EACZ,kBAAkB;EAClB,0BAA0B;AAC5B;;AAEA;EACE,UAAU;EACV,WAAW;EACX,cAAc;EACd,kBAAkB;EAClB,uCAAuC;AACzC;;AAEA;EACE,mBAAmB;AACrB;;AAEA;;EAEE,mBAAmB;AACrB;;AAEA;;EAEE,kCAAkC;EAClC,iDAAiD;AACnD;;AAEA;EACE,6CAA6C;AAC/C;;AAEA;EACE,iBAAiB;AACnB;;AAEA;EACE;;IAEE,aAAa;EACf;EACA;IACE,UAAU;EACZ;AACF;;AAEA;EACE,iBAAiB;EACjB,eAAe;EACf,YAAY;EACZ,cAAc;EACd,kBAAkB;EAClB,+BAA+B;EAC/B,qCAAqC;EACrC,eAAe;EACf,gBAAgB;EAChB,qBAAqB;EACrB,uBAAuB;AACzB;;AAEA;EACE,cAAc;EACd,eAAe;EACf,gBAAgB;EAChB,0BAA0B;EAC1B,aAAa;EACb,uBAAuB;AACzB;;AAEA;EACE,cAAc;EACd,UAAU;AACZ;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,cAAc;EACd,eAAe;EACf,eAAe;EACf,0BAA0B;AAC5B;;AAEA;EACE,cAAc;EACd,YAAY;EACZ,gBAAgB;EAChB,uBAAuB;EACvB,aAAa;AACf;;AAEA;EACE,gBAAgB;EAChB,cAAc;EACd,eAAe;EACf,cAAc;AAChB;;AAEA;EACE,cAAc;EACd,sBAAsB;EACtB,iDAAiD;EACjD,2BAA2B;AAC7B;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,6CAA6C;EAC7C,kBAAkB;EAClB,2BAA2B;EAC3B,oBAAoB;EACpB,sBAAsB;EACtB;;yBAEuB;AACzB;;AAEA;EACE,oCAAoC;EACpC,4CAA4C;AAC9C;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,YAAY;EACZ,gBAAgB;EAChB,iBAAiB;EACjB,cAAc;EACd,kBAAkB;EAClB,YAAY;EACZ,SAAS;EACT,aAAa;EACb,0BAA0B;EAC1B,uBAAuB;EACvB,sBAAsB;EACtB,oBAAoB;EACpB,eAAe;EACf,iBAAiB;EACjB,sBAAsB;AACxB;;AAEA;EACE,0BAA0B;EAC1B,aAAa;EACb,iBAAiB;AACnB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,8BAA8B;EAC9B,QAAQ;EACR,gBAAgB;EAChB,eAAe;EACf,iDAAiD;AACnD;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,YAAY;EACZ,OAAO;AACT;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,cAAc;AAChB;;AAEA;EACE,oBAAoB;EACpB,mBAAmB;EACnB,QAAQ;EACR,YAAY;EACZ,cAAc;EACd,6CAA6C;EAC7C,kBAAkB;EAClB,0BAA0B;EAC1B,uBAAuB;EACvB,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,gBAAgB;EAChB,mBAAmB;EACnB,iBAAiB;EACjB,0BAA0B;AAC5B;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;EACd,6BAA6B;AAC/B;;AAEA;EACE,yCAAyC;EACzC,oCAAoC;AACtC;;AAEA;EACE,sBAAsB;AACxB;;AAEA;EACE,cAAc;EACd,oCAAoC;EACpC,kCAAkC;EAClC,gBAAgB;AAClB;;AAEA;EACE,0CAA0C;AAC5C;;AAEA;EACE,wBAAwB;AAC1B;;AAEA;EACE,0BAA0B;EAC1B,aAAa;AACf;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,kBAAkB;EAClB,oBAAoB;EACpB,mBAAmB;EACnB,cAAc;EACd,YAAY;EACZ,eAAe;AACjB;;AAEA;EACE,YAAY;EACZ,WAAW;EACX,YAAY;EACZ,eAAe;EACf,qBAAqB;EACrB,6CAA6C;EAC7C,kBAAkB;EAClB,aAAa;EACb,0BAA0B;EAC1B,iCAAiC;EACjC,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,gBAAgB;EAChB,mBAAmB;EACnB,gBAAgB;EAChB,wBAAwB;EACxB;;+BAE6B;AAC/B;;AAEA;EACE,oCAAoC;EACpC,+CAA+C;AACjD;;AAEA;EACE,oCAAoC;EACpC,4CAA4C;AAC9C;;AAEA,iDAAiD;AACjD;EACE,qCAAqC;EACrC,4CAA4C;EAC5C,eAAe;EACf,mBAAmB;EACnB,gBAAgB;AAClB;;AAEA;EACE,wCAAwC;EACxC,0DAA0D;EAC1D,gBAAgB;AAClB;;AAEA;EACE,WAAW;EACX,kBAAkB;EAClB,UAAU;EACV,oBAAoB;EACpB,QAAQ;EACR,SAAS;EACT,oCAAoC;EACpC,qCAAqC;EACrC,yCAAyC;EACzC,YAAY;EACZ,8BAA8B;AAChC;;AAEA;EACE,YAAY;AACd;;AAEA;EACE,oBAAoB;EACpB,mBAAmB;EACnB,uBAAuB;EACvB,QAAQ;EACR,YAAY;EACZ,gBAAgB;EAChB,eAAe;EACf,6CAA6C;EAC7C,kBAAkB;EAClB,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,gBAAgB;EAChB,mBAAmB;EACnB;;;uBAGqB;AACvB;;AAEA;EACE,aAAa;EACb,mBAAmB;AACrB;;AAEA;EACE,sBAAsB;AACxB;;AAEA;EACE,cAAc;EACd,kCAAkC;EAClC,yBAAyB;AAC3B;;AAEA;EACE,wBAAwB;EACxB,aAAa;AACf;;AAEA;EACE,0BAA0B;EAC1B,uBAAuB;AACzB;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,cAAc;EACd,oCAAoC;AACtC;;AAEA;EACE,mCAAmC;AACrC;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,eAAe;EACf,eAAe;EACf,0BAA0B;EAC1B,aAAa;AACf;;AAEA;EACE,oBAAoB;EACpB,mBAAmB;EACnB,QAAQ;EACR,gBAAgB;EAChB,kBAAkB;EAClB,uCAAuC;EACvC,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;AAChB;;AAEA;EACE,6BAA6B;EAC7B,yCAAyC;EACzC,gBAAgB;AAClB;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,0BAA0B;EAC1B,uCAAuC;AACzC;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,gBAAgB;AAClB;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,YAAY;AACd;;AAEA;EACE,oBAAoB;AACtB;;AAEA;EACE,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,gBAAgB;EAChB,cAAc;AAChB;;AAEA;EACE,YAAY;EACZ,gBAAgB;EAChB,iBAAiB;EACjB,cAAc;EACd,eAAe;EACf,iBAAiB;AACnB;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;AAChB;;AAEA;EACE,eAAe;EACf,sCAAsC;AACxC;;AAEA;EACE,sBAAsB;EACtB,aAAa;EACb,mBAAmB;EACnB,uBAAuB;EACvB,QAAQ;EACR,YAAY;EACZ,gBAAgB;EAChB,SAAS;EACT,eAAe;EACf,SAAS;EACT,iCAAiC;EACjC,mDAAmD;EACnD,gBAAgB;EAChB,kCAAkC;EAClC,gBAAgB;EAChB,sCAAsC;EACtC,2BAA2B;EAC3B,eAAe;EACf,oBAAoB;EACpB,eAAe;EACf,mBAAmB;EACnB,cAAc;EACd,mBAAmB;EACnB,gBAAgB;AAClB;;AAEA;EACE,6BAA6B;AAC/B;;AAEA;EACE,wCAAwC;EACxC,sCAAsC;EACtC,0DAA0D;EAC1D,4BAA4B;AAC9B;;AAEA;EACE,sCAAsC;AACxC;;AAEA;EACE,wCAAwC;EACxC,4BAA4B;AAC9B;;AAEA;EACE,sBAAsB;EACtB,uBAAuB;EACvB,oBAAoB;EACpB,kCAAkC;EAClC,uCAAuC;AACzC;;AAEA,gCAAgC;AAChC;EACE,uBAAuB;AACzB;;AAEA,yDAAyD;AACzD;;EAEE,sBAAsB;EACtB,aAAa;EACb,sBAAsB;EACtB,mBAAmB;EACnB,uBAAuB;EACvB,WAAW;EACX,uBAAuB;EACvB,eAAe;EACf,2BAA2B;EAC3B,YAAY;EACZ,cAAc;EACd,yBAAyB;EACzB,oBAAoB;EACpB,oBAAoB;EACpB,2BAA2B;EAC3B,cAAc;EACd,wCAAwC;EACxC,eAAe;EACf,oBAAoB;EACpB,YAAY;EACZ,cAAc;EACd,aAAa;EACb,gBAAgB;EAChB,kBAAkB;EAClB,gBAAgB;AAClB;;AAEA;;EAEE,oCAAoC;AACtC;;AAEA,sCAAsC;AACtC;;;;EAIE,WAAW;EACX,YAAY;EACZ,oBAAoB;EACpB,uBAAuB;EACvB,+BAA+B;EAC/B,4BAA4B;AAC9B;;AAEA,gEAAgE;AAChE;;;;;;;;EAQE,mDAAmD;EACnD,2DAA2D;AAC7D;;AAEA;;EAEE,yCAAyC;EACzC,oBAAoB;AACtB;;AAEA,0CAA0C;AAC1C;;;;EAIE,4CAA4C;EAC5C,mEAAmE;AACrE;;AAEA,6BAA6B;AAC7B;;;;;;;;EAQE,gCAAgC;EAChC,wCAAwC;AAC1C;;AAEA;EACE,aAAa;EACb,OAAO;EACP,sBAAsB;EACtB,aAAa;EACb,gBAAgB;EAChB,sBAAsB;EACtB,uBAAuB;EACvB,0BAA0B;EAC1B,2BAA2B;AAC7B;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,cAAc;EACd,mBAAmB;EACnB,mBAAmB;EACnB,oDAAoD;AACtD;;AAEA;EACE,sBAAsB;EACtB,oBAAoB;EACpB,mBAAmB;EACnB,uBAAuB;EACvB,WAAW;EACX,YAAY;EACZ,eAAe;EACf,UAAU;EACV,6CAA6C;EAC7C,kBAAkB;EAClB,0BAA0B;EAC1B,uBAAuB;EACvB,eAAe;EACf,0BAA0B;AAC5B;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,sBAAsB;AACxB;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,cAAc;EACd,uBAAuB;EACvB,4BAA4B;AAC9B;;AAEA;EACE,uBAAuB;AACzB;;AAEA;EACE,eAAe;EACf,iBAAiB;AACnB;;AAEA;EACE,WAAW;EACX,gBAAgB;EAChB,kBAAkB;AACpB;;AAEA;EACE,YAAY;AACd;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,SAAS;AACX;;AAEA;EACE,aAAa;EACb,sBAAsB;EACtB,QAAQ;AACV;;AAEA;EACE,mBAAmB;EACnB,mBAAmB;EACnB,8BAA8B;EAC9B,SAAS;EACT,eAAe;AACjB;;AAEA;EACE,eAAe;EACf,iBAAiB;EACjB,0BAA0B;AAC5B;;AAEA;EACE,sBAAsB;EACtB,WAAW;EACX,gBAAgB;EAChB,gBAAgB;EAChB,6CAA6C;EAC7C,kBAAkB;EAClB,aAAa;EACb,0BAA0B;EAC1B,2BAA2B;EAC3B,oBAAoB;EACpB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,oCAAoC;AACtC;;AAEA;EACE,cAAc;EACd,WAAW;EACX,YAAY;EACZ,aAAa;EACb,sBAAsB;EACtB,eAAe;AACjB;;AAEA;EACE,iBAAiB;EACjB,gBAAgB;EAChB,qCAAqC;AACvC;;AAEA;EACE,YAAY;EACZ,gBAAgB;EAChB,gBAAgB;EAChB,eAAe;AACjB;;AAEA;EACE,eAAe;EACf,gBAAgB;EAChB,YAAY;AACd;;AAEA;EACE,eAAe;EACf,gBAAgB;EAChB,YAAY;EACZ,uBAAuB;AACzB;;AAEA;EACE,sBAAsB;EACtB,iBAAiB;EACjB,SAAS;EACT,YAAY;EACZ,cAAc;EACd,6CAA6C;EAC7C,kBAAkB;EAClB,+BAA+B;EAC/B,0BAA0B;EAC1B,qCAAqC;EACrC,eAAe;EACf,gBAAgB;EAChB,gBAAgB;AAClB;;AAEA;EACE,cAAc;EACd,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,yBAAyB;EACzB,QAAQ;EACR,gBAAgB;AAClB;;AAEA,oCAAoC;AACpC;;;;;EAKE,qBAAqB;EACrB,sBAAsB;AACxB;;AAEA;;;;;EAKE,kCAAkC;AACpC;;AAEA;;;;;EAKE,2BAA2B;EAC3B,gDAAgD;EAChD,iCAAiC;AACnC;;AAEA;;;;;EAKE,+CAA+C;AACjD;;AAEA;EACE,kCAAkC;AACpC;;AAEA;;EAEE,qBAAqB;EACrB,sDAAsD;AACxD;;AAEA;EACE,eAAe;EACf,aAAa;EACb,gBAAgB;EAChB,iCAAiC;AACnC;;AAEA;EACE,kBAAkB;EAClB,eAAe;EACf,yBAAyB;EACzB,eAAe;EACf,gBAAgB;AAClB;;AAEA;;EAEE,gBAAgB;EAChB,6CAA6C;EAC7C,gBAAgB;EAChB,mBAAmB;AACrB;;AAEA;EACE,iBAAiB;EACjB,yCAAyC;AAC3C;;AAEA;EACE,+BAA+B;AACjC;;AAEA;;EAEE,qBAAqB;AACvB;;AAEA;EACE,WAAW;EACX,YAAY;EACZ,iBAAiB;EACjB,sBAAsB;EACtB,eAAe;EACf,oCAAoC;AACtC;;AAEA;EACE,qBAAqB;EACrB,gBAAgB;EAChB,8CAA8C;EAC9C,kBAAkB;EAClB,eAAe;EACf,aAAa;AACf;;AAEA,8DAA8D;AAC9D;EACE,eAAe;EACf,SAAS;EACT,UAAU;EACV,aAAa;EACb,sBAAsB;EACtB,YAAY;EACZ,aAAa;EACb,gBAAgB;EAChB,iBAAiB;EACjB,sBAAsB;EACtB,6CAA6C;EAC7C,kBAAkB;EAClB,2BAA2B;EAC3B,0CAA0C;EAC1C,0BAA0B;EAC1B,aAAa;EACb,gBAAgB;EAChB,YAAY;AACd;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,8BAA8B;EAC9B,cAAc;EACd,iBAAiB;EACjB,oDAAoD;EACpD,yCAAyC;EACzC,YAAY;EACZ,iBAAiB;AACnB;;AAEA;EACE,eAAe;EACf,iBAAiB;AACnB;;AAEA;EACE,YAAY;EACZ,gBAAgB;EAChB,cAAc;EACd,eAAe;EACf,cAAc;EACd,cAAc;EACd,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,OAAO;EACP,sBAAsB;EACtB,QAAQ;EACR,aAAa;EACb,aAAa;AACf;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,8BAA8B;EAC9B,QAAQ;EACR,cAAc;EACd,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,gBAAgB;AAClB;;AAEA;EACE,eAAe;EACf,iBAAiB;EACjB,mBAAmB;AACrB;;AAEA;EACE,OAAO;EACP,gBAAgB;EAChB,gBAAgB;EAChB,6CAA6C;EAC7C,kBAAkB;EAClB,2BAA2B;EAC3B,0BAA0B;EAC1B,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;EACR,cAAc;EACd,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,8BAA8B;EAC9B,gBAAgB;EAChB,eAAe;AACjB;;AAEA;EACE,aAAa;EACb,mBAAmB;EACnB,QAAQ;AACV;;AAEA;EACE,6CAA6C;EAC7C,2BAA2B;EAC3B,kBAAkB;EAClB,eAAe;EACf,gBAAgB;EAChB,eAAe;EACf,0BAA0B;EAC1B,gBAAgB;AAClB;;AAEA;EACE,yCAAyC;AAC3C;;AAEA;EACE,OAAO;EACP,aAAa;EACb,sBAAsB;EACtB,WAAW;EACX,YAAY;EACZ,6CAA6C;EAC7C,kBAAkB;EAClB,aAAa;EACb,YAAY;EACZ,2BAA2B;EAC3B,0BAA0B;EAC1B,qCAAqC;EACrC,eAAe;EACf,gBAAgB;EAChB,gBAAgB;EAChB,cAAc;EACd,WAAW;AACb;;AAEA;EACE,oCAAoC;AACtC;;AAEA;EACE,cAAc;EACd,gBAAgB;EAChB,SAAS;EACT,gBAAgB;EAChB,kBAAkB;EAClB,+BAA+B;EAC/B,cAAc;EACd,qCAAqC;EACrC,eAAe;EACf,gBAAgB;EAChB,qBAAqB;EACrB,0BAA0B;AAC5B;;AAEA;EACE,cAAc;EACd,mCAAmC;AACrC;;AAEA;EACE,cAAc;EACd,mCAAmC;AACrC;;AAEA;EACE,UAAU;EACV,WAAW;AACb;;AAEA;EACE,gBAAgB;EAChB,qCAAqC;AACvC;;AAEA;EACE,oCAAoC;AACtC","sourcesContent":[".sa-agent-container {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  height: 100%;\n  min-height: 0;\n  overflow: hidden;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  box-sizing: border-box;\n}\n\n.addons-side-bar .sa-agent-container {\n  margin: 0;\n}\n\n.addons-bottom-panel .sa-agent-container {\n  width: calc(100% + 20px);\n  height: calc(100% + 20px);\n  margin: -10px;\n}\n\n.sa-agent-header {\n  position: relative;\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 8px;\n  flex-shrink: 0;\n  padding: 6px 8px 6px 12px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-heading {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  font-size: 13px;\n  font-weight: bold;\n}\n\n.sa-agent-heading-text {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.sa-agent-header-actions {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  flex-shrink: 0;\n}\n\n.sa-agent-session-menu {\n  position: static;\n}\n\n.sa-agent-session-summary {\n  list-style: none;\n  cursor: pointer;\n}\n\n.sa-agent-session-summary .sa-agent-icon {\n  width: 16px;\n  height: 16px;\n}\n\n.sa-agent-session-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-session-panel {\n  position: absolute;\n  z-index: 20;\n  top: calc(100% + 6px);\n  right: 8px;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n  box-sizing: border-box;\n  width: 240px;\n  max-width: calc(100% - 16px);\n  max-height: min(320px, 55vh);\n  overflow: auto;\n  padding: 12px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 8px;\n  background: var(--ui-white);\n  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);\n}\n\n.sa-agent-session-permission {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.sa-agent-conversation-toggle {\n  flex-shrink: 0;\n}\n\n.sa-agent-container.sa-agent-wide .sa-agent-conversation-toggle {\n  display: none;\n}\n\n.sa-agent-icon,\n.sa-agent-conversation-toggle-icon,\n.sa-agent-new-chat-button-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-icon-button:hover .sa-agent-icon,\n.sa-agent-icon-button:hover .sa-agent-conversation-toggle-icon,\n.sa-agent-icon-button:hover .sa-agent-new-chat-button-icon {\n  filter: none !important;\n}\n\n.sa-agent-content {\n  position: relative;\n  display: flex;\n  flex: 1;\n  min-height: 0;\n  overflow: hidden;\n}\n\n.sa-agent-main {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  min-width: 0;\n  min-height: 0;\n}\n\n.sa-agent-conversation-pane {\n  display: none;\n  flex-direction: column;\n  flex-shrink: 0;\n  width: 200px;\n  min-height: 0;\n  border-right: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-container.sa-agent-wide .sa-agent-conversation-pane {\n  display: flex;\n}\n\n.sa-agent-container.sa-agent-narrow.sa-agent-conversation-open .sa-agent-conversation-pane {\n  display: flex;\n  position: absolute;\n  inset: 0;\n  z-index: 10;\n  width: 100%;\n  border-right: 0;\n}\n\n.sa-agent-conversation-pane-header {\n  display: flex;\n  align-items: center;\n  flex-shrink: 0;\n  padding: 8px 10px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-conversation-pane-title {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: 11px;\n  font-weight: bold;\n  opacity: 0.65;\n}\n\n.sa-agent-conversation-list {\n  position: relative;\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding: 6px;\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n\n.sa-agent-conversation-item {\n  display: flex;\n  align-items: center;\n  gap: 2px;\n  min-width: 0;\n  border-radius: 4px;\n}\n\n.sa-agent-conversation-item:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-conversation-item-active {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-conversation-item-confirming {\n  flex-wrap: wrap;\n}\n\n.sa-agent-delete-confirm {\n  flex: 0 0 100%;\n  box-sizing: border-box;\n  padding: 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n  font-size: 11px;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-delete-actions {\n  display: flex;\n  justify-content: flex-end;\n  gap: 6px;\n  margin-top: 8px;\n}\n\n.sa-agent-delete-accept {\n  color: #d93025;\n}\n\n.sa-agent-conversation-item-title {\n  flex: 1;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  padding: 6px 4px 6px 8px;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  text-align: left;\n}\n\n.sa-agent-conversation-item-active .sa-agent-conversation-item-title {\n  font-weight: bold;\n}\n\n.sa-agent-conversation-item-actions {\n  display: flex;\n  align-items: center;\n  flex-shrink: 0;\n  opacity: 0.65;\n}\n\n.sa-agent-conversation-item:hover .sa-agent-conversation-item-actions,\n.sa-agent-conversation-item:focus-within .sa-agent-conversation-item-actions {\n  opacity: 1;\n}\n\n.sa-agent-conversation-action {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 22px;\n  height: 22px;\n  padding: 0;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1;\n}\n\n.sa-agent-conversation-action:hover {\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-conversation-action-icon {\n  width: 14px;\n  height: 14px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-conversation-action:hover .sa-agent-conversation-action-icon {\n  filter: none !important;\n}\n\n.sa-agent-conversation-rename {\n  box-sizing: border-box;\n  flex: 1;\n  min-width: 0;\n  height: 24px;\n  margin: 2px 0;\n  padding: 0 6px;\n  border: 1px solid var(--looks-secondary);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  font-family: inherit;\n  font-size: 12px;\n}\n\n.sa-agent-icon-button {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 14px;\n  line-height: 1;\n  transition: none;\n}\n\n.sa-agent-icon-button:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-icon-button:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.sa-agent-settings-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\nbutton:hover .sa-agent-settings-icon {\n  filter: none !important;\n}\n\n.sa-agent-scrathon-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\nbutton:hover .sa-agent-scrathon-icon {\n  filter: none !important;\n}\n\n.sa-agent-position-switch {\n  position: relative;\n  display: flex;\n  align-items: center;\n}\n\n.sa-agent-rotate-button {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  min-width: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1;\n  transition: none;\n}\n\n.sa-agent-rotate-button:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-rotate-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-rotate-button:hover .sa-agent-rotate-icon {\n  filter: none !important;\n}\n\n.sa-agent-position-popup {\n  position: absolute;\n  top: 100%;\n  right: 0;\n  z-index: 20;\n  display: none;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 132px;\n  margin-top: 4px;\n  padding: 4px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: var(--ui-white);\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);\n}\n\n.sa-agent-popup-button {\n  box-sizing: border-box;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  width: 100%;\n  padding: 6px 10px;\n  border: 0;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  text-align: left;\n  transition: none;\n}\n\n.sa-agent-popup-button:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-popup-button:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.sa-agent-popup-button.sa-agent-position-active {\n  color: var(--looks-secondary);\n  background: var(--ui-primary-transparent);\n  font-weight: bold;\n}\n\n.sa-agent-popup-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-popup-button:hover .sa-agent-popup-icon,\n.sa-agent-popup-button.sa-agent-position-active .sa-agent-popup-icon {\n  filter: none !important;\n}\n\n.sa-agent-messages {\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding: 12px;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.addons-bottom-panel .sa-agent-messages,\n.addons-bottom-panel .sa-agent-composer {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 960px;\n  align-self: center;\n}\n\n.sa-agent-welcome {\n  margin: auto;\n  padding: 16px;\n  max-width: 420px;\n  text-align: center;\n  color: var(--text-primary);\n}\n\n.sa-agent-welcome-title {\n  margin-bottom: 8px;\n  font-size: 16px;\n  font-weight: bold;\n}\n\n.sa-agent-welcome-text {\n  font-size: 12px;\n  line-height: 1.5;\n  opacity: 0.8;\n}\n\n.sa-agent-message {\n  display: flex;\n  flex-direction: column;\n  max-width: 100%;\n  min-width: 0;\n  flex-shrink: 0;\n  gap: 6px;\n}\n\n.sa-agent-message-user {\n  align-items: flex-end;\n}\n\n.sa-agent-message-assistant {\n  align-items: flex-start;\n}\n\n.sa-agent-message-role {\n  margin: 0 4px 4px;\n  font-size: 10px;\n  font-weight: bold;\n  opacity: 0.65;\n}\n\n.sa-agent-bubble {\n  box-sizing: border-box;\n  min-width: 0;\n  max-width: 92%;\n  padding: 8px 10px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 8px;\n  font-size: 12px;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-message-user .sa-agent-bubble {\n  color: #ffffff;\n  background: var(--looks-secondary);\n  border-color: transparent;\n  border-bottom-right-radius: 2px;\n}\n\n.sa-agent-user-actions {\n  display: flex;\n  align-items: center;\n  gap: 3px;\n  margin-top: 3px;\n  opacity: 0.5;\n  transition: opacity 0.15s ease;\n}\n\n.sa-agent-message-user:hover .sa-agent-user-actions,\n.sa-agent-user-actions:focus-within {\n  opacity: 1;\n}\n\n.sa-agent-user-action-btn {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  gap: 3px;\n  height: 20px;\n  padding: 0 5px;\n  border: 1px solid transparent;\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 11px;\n  line-height: 1;\n  white-space: nowrap;\n  user-select: none;\n  transition: all 0.15s ease;\n}\n\n.sa-agent-user-action-btn:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n  border-color: var(--ui-black-transparent);\n}\n\n.sa-agent-user-action-btn:active:not(:disabled) {\n  transform: scale(0.96);\n}\n\n.sa-agent-user-action-btn:disabled {\n  opacity: 0.4;\n  cursor: not-allowed;\n}\n\n.sa-agent-user-action-icon {\n  width: 12px;\n  height: 12px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.15s ease;\n}\n\n.sa-agent-user-action-btn:hover:not(:disabled) .sa-agent-user-action-icon {\n  filter: none !important;\n}\n\n.sa-agent-message-assistant .sa-agent-bubble {\n  color: var(--text-primary);\n  background: var(--ui-primary-transparent);\n  border-bottom-left-radius: 2px;\n}\n\n.sa-agent-text {\n  white-space: pre-wrap;\n}\n\n.sa-agent-streaming-bubble {\n  white-space: normal;\n}\n\n.sa-agent-streaming-bubble::after {\n  content: none;\n}\n\n.sa-agent-streaming-bubble .sa-agent-md > :last-child::after {\n  content: '▍';\n  margin-left: 1px;\n  opacity: 0.6;\n  animation: sa-agent-blink 1s steps(2, start) infinite;\n}\n\n@keyframes sa-agent-blink {\n  to {\n    visibility: hidden;\n  }\n}\n\n.sa-agent-md {\n  font-size: 12px;\n  line-height: 1.5;\n  white-space: normal;\n}\n\n.sa-agent-md > :first-child {\n  margin-top: 0;\n}\n\n.sa-agent-md > :last-child {\n  margin-bottom: 0;\n}\n\n.sa-agent-md p {\n  margin: 0 0 8px;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md h1,\n.sa-agent-md h2,\n.sa-agent-md h3,\n.sa-agent-md h4,\n.sa-agent-md h5,\n.sa-agent-md h6 {\n  margin: 12px 0 6px;\n  font-weight: bold;\n  line-height: 1.25;\n}\n\n.sa-agent-md h1 {\n  font-size: 16px;\n}\n\n.sa-agent-md h2 {\n  font-size: 15px;\n}\n\n.sa-agent-md h3 {\n  font-size: 14px;\n}\n\n.sa-agent-md h4 {\n  font-size: 13px;\n}\n\n.sa-agent-md h5,\n.sa-agent-md h6 {\n  font-size: 12px;\n}\n\n.sa-agent-md ul,\n.sa-agent-md ol {\n  margin: 4px 0 8px;\n  padding-left: 20px;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md li {\n  margin: 3px 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md blockquote {\n  margin: 6px 0;\n  padding: 2px 8px;\n  border-left: 3px solid var(--ui-black-transparent);\n  font-size: 12px;\n  line-height: 1.5;\n  opacity: 0.85;\n}\n\n.sa-agent-md a {\n  color: var(--looks-secondary);\n  text-decoration: underline;\n}\n\n.sa-agent-md code {\n  padding: 1px 4px;\n  border-radius: 3px;\n  background: rgba(0, 0, 0, 0.08);\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.4;\n}\n\n.sa-agent-md pre code {\n  padding: 0;\n  background: transparent;\n  font-size: inherit;\n}\n\n.sa-agent-message-user .sa-agent-md code {\n  background: rgba(0, 0, 0, 0.18);\n}\n\n.sa-agent-message-user .sa-agent-md a {\n  color: #ffffff;\n}\n\n.sa-agent-md-rule {\n  margin: 8px 0;\n  border: 0;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-code {\n  max-width: 100%;\n  margin: 6px 0;\n  padding: 8px;\n  overflow-x: auto;\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.08);\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.5;\n  white-space: pre;\n}\n\n.sa-agent-message-user .sa-agent-code {\n  background: rgba(0, 0, 0, 0.16);\n}\n\n.sa-agent-trace {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  width: 92%;\n  max-width: 640px;\n  min-width: 0;\n  margin: 2px 0 8px;\n  font-size: 11px;\n  line-height: 1.4;\n}\n\n.sa-agent-tool-stack {\n  min-width: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 7px;\n  background: var(--ui-white);\n}\n\n.sa-agent-tool-stack-multiple:not([open]) {\n  margin-bottom: 6px;\n  box-shadow:\n    0 3px 0 -1px var(--ui-white),\n    0 3px 0 var(--ui-black-transparent),\n    0 6px 0 -1px var(--ui-white),\n    0 6px 0 var(--ui-black-transparent);\n}\n\n.sa-agent-tool-stack-summary {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding: 7px 9px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.sa-agent-tool-stack-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-tool-stack-summary::before {\n  content: '▸';\n  flex-shrink: 0;\n}\n\n.sa-agent-tool-stack[open] > .sa-agent-tool-stack-summary::before {\n  content: '▾';\n}\n\n.sa-agent-tool-stack-summary > span:first-of-type {\n  flex-shrink: 0;\n}\n\n.sa-agent-tool-stack-state {\n  min-width: 0;\n  margin-left: auto;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  opacity: 0.65;\n}\n\n.sa-agent-tool-stack-body {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  padding: 0 6px 6px;\n}\n\n.sa-agent-reasoning {\n  box-sizing: border-box;\n  width: 92%;\n  min-width: 0;\n  border-left: 2px solid var(--ui-black-transparent);\n  padding-left: 10px;\n  font-size: 11px;\n  line-height: 1.5;\n}\n\n.sa-agent-reasoning > summary {\n  padding: 4px 0;\n  cursor: pointer;\n  opacity: 0.75;\n}\n\n.sa-agent-reasoning-body {\n  max-height: 280px;\n  overflow: auto;\n  padding: 6px 0;\n  overflow-wrap: anywhere;\n  opacity: 0.85;\n}\n\n.sa-agent-tool-row {\n  overflow: hidden;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: rgba(0, 0, 0, 0.03);\n}\n\n.sa-agent-tool {\n  display: block;\n}\n\n.sa-agent-tool-summary {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 5px 8px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.sa-agent-tool-summary::-webkit-details-marker {\n  display: none;\n}\n\n.sa-agent-tool-summary::marker {\n  content: '';\n}\n\n.sa-agent-tool-name {\n  min-width: 0;\n  overflow: hidden;\n  font-weight: bold;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.sa-agent-tool-status {\n  flex-shrink: 0;\n  opacity: 0.7;\n}\n\n.sa-agent-tool-expand,\n.sa-agent-tool-collapse {\n  flex-shrink: 0;\n  margin-left: auto;\n  opacity: 0.55;\n}\n\n.sa-agent-tool-collapse {\n  display: none;\n}\n\n.sa-agent-tool[open] .sa-agent-tool-expand {\n  display: none;\n}\n\n.sa-agent-tool[open] .sa-agent-tool-collapse {\n  display: inline;\n}\n\n.sa-agent-tool-body {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  padding: 6px 8px 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-tool-line {\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-tool-line-label {\n  margin-right: 4px;\n  font-weight: bold;\n  opacity: 0.6;\n}\n\n.sa-agent-tool-approval {\n  display: flex;\n  flex-direction: column;\n  align-items: stretch;\n  gap: 6px;\n  padding: 6px 8px;\n  border-top: 1px solid var(--ui-black-transparent);\n  background: rgba(0, 0, 0, 0.04);\n}\n\n.sa-agent-tool-approval-controls {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 6px;\n}\n\n.sa-agent-tool-approval-hint {\n  flex: 1 1 140px;\n  min-width: 0;\n  opacity: 0.75;\n}\n\n.sa-agent-tool-approval-button {\n  flex-shrink: 0;\n  padding: 3px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  background: var(--ui-white);\n  color: var(--text-primary);\n  font-size: 11px;\n  cursor: pointer;\n}\n\n.sa-agent-tool-approval-button:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-tool-allow {\n  border-color: var(--looks-secondary);\n  background: var(--looks-secondary);\n  color: #ffffff;\n}\n\n.sa-agent-tool-allow:hover {\n  background: var(--looks-secondary);\n  opacity: 0.9;\n}\n\n.sa-agent-tool-allow-all {\n  border-style: dashed;\n}\n\n/* Standalone Code Edit & Side-by-Side Split Diff */\n.sa-agent-code-edit {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  margin: 6px 0 10px 0;\n  border: none;\n  background: transparent;\n  font-family: Consolas, Monaco, 'Courier New', monospace;\n  font-size: 11px;\n}\n\n.sa-agent-code-edit-header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  padding: 4px 0 6px 0;\n  font-size: 11px;\n  font-weight: 700;\n  color: var(--text-primary);\n  font-family: Consolas, Monaco, 'Courier New', monospace;\n  user-select: none;\n}\n\n.sa-agent-code-edit-title {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.sa-agent-code-edit-label {\n  color: var(--text-primary);\n  letter-spacing: 0.5px;\n}\n\n.sa-agent-code-edit-arrow {\n  color: var(--looks-secondary, #4c97ff);\n  font-weight: bold;\n}\n\n.sa-agent-code-edit-target {\n  color: var(--looks-secondary, #4c97ff);\n}\n\n.sa-agent-code-edit-meta {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.sa-agent-code-edit-stats {\n  display: flex;\n  gap: 6px;\n  font-weight: bold;\n  font-size: 11px;\n}\n\n.sa-agent-code-edit-status {\n  display: inline-block;\n  padding: 1px 6px;\n  border-radius: 4px;\n  font-size: 10px;\n  font-weight: bold;\n  text-transform: capitalize;\n}\n\n.sa-agent-code-edit-status.sa-agent-status-ok {\n  background: rgba(46, 160, 67, 0.15);\n  color: #2e9e4f;\n}\n\n.sa-agent-code-edit-status.sa-agent-status-awaiting {\n  background: rgba(217, 119, 6, 0.15);\n  color: #d97706;\n}\n\n.sa-agent-code-edit-status.sa-agent-status-denied,\n.sa-agent-code-edit-status.sa-agent-status-error {\n  background: rgba(207, 34, 46, 0.15);\n  color: #cf222e;\n}\n\n.sa-agent-code-edit-content {\n  width: 100%;\n  max-height: 420px;\n  overflow-y: auto;\n  overflow-x: hidden;\n  border-radius: 4px;\n  background: transparent;\n}\n\n.sa-agent-split-table {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  min-width: 100%;\n}\n\n.sa-agent-split-row {\n  display: flex;\n  align-items: stretch;\n  width: 100%;\n  min-height: 20px;\n  line-height: 20px;\n  font-family: Consolas, Monaco, 'Courier New', monospace;\n  font-size: 11px;\n  border-radius: 2px;\n}\n\n.sa-agent-split-row:hover {\n  background-color: rgba(0, 0, 0, 0.03);\n}\n\n.sa-agent-split-left {\n  flex: 1;\n  min-width: 0;\n  box-sizing: border-box;\n  display: flex;\n  align-items: flex-start;\n  padding: 0 4px 0 0;\n  border-radius: 2px 0 0 2px;\n}\n\n.sa-agent-split-divider {\n  width: 16px;\n  min-width: 16px;\n  flex-shrink: 0;\n  text-align: center;\n  user-select: none;\n  color: var(--text-primary);\n  opacity: 0.35;\n  font-weight: 300;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.sa-agent-split-right {\n  flex: 1;\n  min-width: 0;\n  box-sizing: border-box;\n  display: flex;\n  align-items: flex-start;\n  padding: 0 0 0 4px;\n  border-radius: 0 2px 2px 0;\n}\n\n.sa-agent-split-mark {\n  width: 14px;\n  min-width: 14px;\n  flex-shrink: 0;\n  text-align: center;\n  user-select: none;\n  font-weight: bold;\n}\n\n.sa-agent-split-mark.is-add {\n  color: #2e9e4f;\n}\n\n.sa-agent-split-mark.is-mod {\n  color: #0969da;\n}\n\n.sa-agent-split-mark.is-del {\n  color: #cf222e;\n}\n\n.sa-agent-split-lineno {\n  width: 26px;\n  min-width: 26px;\n  flex-shrink: 0;\n  text-align: right;\n  padding-right: 6px;\n  user-select: none;\n  color: var(--text-primary);\n  opacity: 0.4;\n  font-size: 10px;\n}\n\n/* Wrap long lines inside each column so the center divider, row backgrounds\n   and line numbers stay aligned even in a narrow chat panel. */\n.sa-agent-split-text {\n  flex: 1;\n  min-width: 0;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n  tab-size: 4;\n  color: var(--text-primary);\n}\n\n.sa-agent-split-left.is-del {\n  background-color: rgba(248, 81, 73, 0.15);\n}\n\n.sa-agent-split-left.is-del .sa-agent-split-lineno {\n  color: #cf222e;\n  opacity: 0.8;\n}\n\n.sa-agent-split-right.is-add {\n  background-color: rgba(46, 160, 67, 0.15);\n}\n\n.sa-agent-split-right.is-mod {\n  background-color: rgba(9, 105, 218, 0.12);\n}\n\n.sa-agent-split-hunk-header {\n  padding: 2px 4px;\n  color: var(--text-primary);\n  opacity: 0.55;\n  font-size: 10px;\n  user-select: none;\n  margin: 2px 0;\n}\n\n.sa-agent-code-edit-script-title {\n  padding: 4px 0 2px 0;\n  font-weight: 600;\n  font-size: 10px;\n  color: var(--text-primary);\n  opacity: 0.75;\n}\n\n.sa-agent-code-edit-approval {\n  margin-top: 6px;\n  padding: 6px 0;\n}\n\n.sa-agent-code-edit-empty {\n  padding: 6px 0;\n  opacity: 0.5;\n  font-style: italic;\n  font-size: 11px;\n}\n\n.sa-agent-code-edit-error {\n  margin-top: 4px;\n  padding: 4px 6px;\n  border-radius: 4px;\n  background: rgba(207, 34, 46, 0.1);\n  color: #cf222e;\n  font-size: 11px;\n}\n\n/* Diff Review Card */\n.sa-agent-diff-card {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  overflow: hidden;\n  background: var(--ui-white);\n  font-family: Consolas, Monaco, 'Courier New', monospace;\n  font-size: 11px;\n}\n\n.sa-agent-diff-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 4px 8px;\n  background: rgba(0, 0, 0, 0.04);\n  border-bottom: 1px solid var(--ui-black-transparent);\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.sa-agent-diff-title {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.sa-agent-diff-target-badge {\n  display: inline-block;\n  padding: 1px 6px;\n  border-radius: 4px;\n  background: var(--ui-primary-transparent);\n  color: var(--looks-secondary);\n  font-size: 10px;\n  font-weight: bold;\n}\n\n.sa-agent-diff-header-text {\n  color: var(--text-primary);\n}\n\n.sa-agent-diff-stats {\n  display: flex;\n  gap: 6px;\n  font-weight: bold;\n  font-size: 11px;\n}\n\n.sa-agent-diff-stat-add {\n  color: #2e9e4f;\n}\n\n.sa-agent-diff-stat-del {\n  color: #cf222e;\n}\n\n.sa-agent-diff-body {\n  max-height: 220px;\n  overflow-y: auto;\n  overflow-x: auto;\n  background: var(--ui-white);\n}\n\n.sa-agent-diff-script {\n  border-bottom: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-diff-script:last-child {\n  border-bottom: none;\n}\n\n.sa-agent-diff-script-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 3px 8px;\n  background: rgba(0, 0, 0, 0.02);\n  border-bottom: 1px solid rgba(0, 0, 0, 0.03);\n  font-weight: 600;\n  font-size: 11px;\n  color: var(--text-primary);\n}\n\n.sa-agent-diff-script-badge {\n  font-size: 9px;\n  padding: 1px 4px;\n  border-radius: 3px;\n  font-weight: bold;\n}\n\n.sa-agent-diff-script-badge.is-new {\n  background: rgba(46, 160, 67, 0.18);\n  color: #2e9e4f;\n}\n\n.sa-agent-diff-script-badge.is-delete {\n  background: rgba(207, 34, 46, 0.18);\n  color: #cf222e;\n}\n\n.sa-agent-diff-script-badge.is-modified {\n  background: rgba(9, 105, 218, 0.18);\n  color: #0969da;\n}\n\n.sa-agent-diff-lines {\n  display: flex;\n  flex-direction: column;\n}\n\n.sa-agent-diff-hunk-header {\n  padding: 2px 8px;\n  background: rgba(9, 105, 218, 0.08);\n  color: var(--text-primary);\n  opacity: 0.65;\n  font-size: 10px;\n  border-top: 1px solid rgba(0, 0, 0, 0.04);\n  border-bottom: 1px solid rgba(0, 0, 0, 0.04);\n}\n\n.sa-agent-diff-line {\n  display: flex;\n  align-items: baseline;\n  min-height: 18px;\n  line-height: 18px;\n  white-space: pre;\n}\n\n.sa-agent-diff-line-add {\n  background-color: rgba(46, 160, 67, 0.15);\n}\n\n.sa-agent-diff-line-del {\n  background-color: rgba(248, 81, 73, 0.15);\n}\n\n.sa-agent-diff-line-same {\n  background-color: transparent;\n  opacity: 0.85;\n}\n\n.sa-agent-diff-lineno {\n  width: 26px;\n  min-width: 26px;\n  text-align: right;\n  padding-right: 6px;\n  user-select: none;\n  color: var(--text-primary);\n  opacity: 0.35;\n  font-size: 10px;\n}\n\n.sa-agent-diff-prefix {\n  width: 14px;\n  min-width: 14px;\n  text-align: center;\n  user-select: none;\n  font-weight: bold;\n}\n\n.sa-agent-diff-line-add .sa-agent-diff-prefix {\n  color: #2e9e4f;\n}\n\n.sa-agent-diff-line-del .sa-agent-diff-prefix {\n  color: #cf222e;\n}\n\n.sa-agent-diff-text {\n  flex: 1;\n  padding-right: 8px;\n  tab-size: 4;\n  color: var(--text-primary);\n}\n\n.sa-agent-diff-empty {\n  padding: 8px;\n  text-align: center;\n  opacity: 0.6;\n  font-style: italic;\n  color: var(--text-primary);\n}\n\n.sa-agent-trace-dot {\n  width: 6px;\n  height: 6px;\n  flex-shrink: 0;\n  border-radius: 50%;\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-trace-ok .sa-agent-trace-dot {\n  background: #2e9e4f;\n}\n\n.sa-agent-trace-error .sa-agent-trace-dot,\n.sa-agent-trace-denied .sa-agent-trace-dot {\n  background: #d93025;\n}\n\n.sa-agent-trace-pending .sa-agent-trace-dot,\n.sa-agent-trace-awaiting .sa-agent-trace-dot {\n  background: var(--looks-secondary);\n  animation: sa-agent-pulse 1s ease-in-out infinite;\n}\n\n.sa-agent-tool-write {\n  border-left: 2px solid var(--looks-secondary);\n}\n\n.sa-agent-session-write span {\n  font-weight: bold;\n}\n\n@keyframes sa-agent-pulse {\n  0%,\n  100% {\n    opacity: 0.25;\n  }\n  50% {\n    opacity: 1;\n  }\n}\n\n.sa-agent-trace-pre {\n  max-height: 160px;\n  margin: 4px 0 0;\n  padding: 6px;\n  overflow: auto;\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.06);\n  font-family: 'Courier New', monospace;\n  font-size: 10px;\n  line-height: 1.4;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-status {\n  flex-shrink: 0;\n  font-size: 11px;\n  line-height: 1.4;\n  color: var(--text-primary);\n  opacity: 0.75;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-status.sa-agent-status-error {\n  color: #d93025;\n  opacity: 1;\n}\n\n.sa-agent-context-bar {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n  flex-wrap: wrap;\n  font-size: 10px;\n  color: var(--text-primary);\n}\n\n.sa-agent-context-text {\n  flex: 1 1 100%;\n  min-width: 0;\n  line-height: 1.5;\n  overflow-wrap: anywhere;\n  opacity: 0.75;\n}\n\n.sa-agent-compress-button {\n  min-height: 20px;\n  padding: 0 6px;\n  font-size: 10px;\n  flex-shrink: 0;\n}\n\n.sa-agent-composer {\n  flex-shrink: 0;\n  padding: 8px 10px 10px;\n  border-top: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n}\n\n.sa-agent-composer-card {\n  display: flex;\n  flex-direction: column;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 6px;\n  background: var(--ui-white);\n  padding: 5px 6px 4px;\n  box-sizing: border-box;\n  transition:\n    border-color 0.15s ease,\n    box-shadow 0.15s ease;\n}\n\n.sa-agent-composer-card:focus-within {\n  border-color: var(--looks-secondary);\n  box-shadow: 0 0 0 1px var(--looks-secondary);\n}\n\n.sa-agent-input {\n  width: 100%;\n  min-width: 0;\n  height: 20px;\n  min-height: 20px;\n  max-height: 160px;\n  padding: 0 4px;\n  overflow-y: hidden;\n  resize: none;\n  border: 0;\n  outline: none;\n  color: var(--text-primary);\n  background: transparent;\n  box-sizing: border-box;\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 20px;\n  vertical-align: middle;\n}\n\n.sa-agent-input::placeholder {\n  color: var(--text-primary);\n  opacity: 0.45;\n  line-height: 20px;\n}\n\n.sa-agent-composer-toolbar {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 8px;\n  padding-top: 4px;\n  margin-top: 4px;\n  border-top: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-composer-toolbar-left {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  flex: 1;\n}\n\n.sa-agent-composer-toolbar-right {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  flex-shrink: 0;\n}\n\n.sa-agent-mode-button {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  height: 24px;\n  padding: 0 7px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 11px;\n  font-weight: 500;\n  white-space: nowrap;\n  user-select: none;\n  transition: all 0.15s ease;\n}\n\n.sa-agent-mode-icon {\n  width: 13px;\n  height: 13px;\n  flex-shrink: 0;\n  transition: filter 0.15s ease;\n}\n\n.sa-agent-mode-button:hover {\n  background: var(--ui-primary-transparent);\n  border-color: var(--looks-secondary);\n}\n\n.sa-agent-mode-button:active {\n  transform: scale(0.96);\n}\n\n.sa-agent-mode-button.sa-agent-mode-build {\n  color: #ffffff;\n  border-color: var(--looks-secondary);\n  background: var(--looks-secondary);\n  font-weight: 600;\n}\n\n.sa-agent-mode-button.sa-agent-mode-build .sa-agent-mode-icon {\n  filter: brightness(0) invert(1) !important;\n}\n\n.sa-agent-mode-button.sa-agent-mode-build:hover {\n  filter: brightness(1.08);\n}\n\n.sa-agent-mode-button.sa-agent-mode-plan {\n  color: var(--text-primary);\n  opacity: 0.85;\n}\n\n.sa-agent-mode-button.sa-agent-mode-plan .sa-agent-mode-icon {\n  filter: grayscale(100%);\n}\n\n.sa-agent-mode-button.sa-agent-mode-plan:hover .sa-agent-mode-icon {\n  filter: none !important;\n}\n\n.sa-agent-model-select-wrapper {\n  position: relative;\n  display: inline-flex;\n  align-items: center;\n  flex: 0 1 auto;\n  min-width: 0;\n  max-width: none;\n}\n\n.sa-agent-model-select {\n  height: 24px;\n  width: auto;\n  min-width: 0;\n  max-width: none;\n  padding: 0 18px 0 7px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background-color: var(--ui-white);\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 11px;\n  font-weight: 500;\n  white-space: nowrap;\n  appearance: none;\n  -webkit-appearance: none;\n  transition:\n    border-color 0.15s ease,\n    background-color 0.15s ease;\n}\n\n.sa-agent-model-select:hover {\n  border-color: var(--looks-secondary);\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-agent-model-select:focus {\n  border-color: var(--looks-secondary);\n  box-shadow: 0 0 0 1px var(--looks-secondary);\n}\n\n/* 显式定义下拉展开选项的文字颜色与背景，杜绝因系统深浅色差异导致白底浅灰字或可读性差的问题 */\n.sa-agent-model-select option {\n  color: var(--text-primary) !important;\n  background-color: var(--ui-white) !important;\n  font-size: 12px;\n  font-weight: normal;\n  padding: 4px 8px;\n}\n\n.sa-agent-model-select option:checked {\n  color: var(--looks-secondary) !important;\n  background-color: var(--ui-primary-transparent) !important;\n  font-weight: 600;\n}\n\n.sa-agent-model-select-wrapper::after {\n  content: '';\n  position: absolute;\n  right: 6px;\n  pointer-events: none;\n  width: 0;\n  height: 0;\n  border-left: 3.5px solid transparent;\n  border-right: 3.5px solid transparent;\n  border-top: 4px solid var(--text-primary);\n  opacity: 0.6;\n  transition: opacity 0.15s ease;\n}\n\n.sa-agent-model-select-wrapper:hover::after {\n  opacity: 0.9;\n}\n\n.sa-agent-button {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 4px;\n  height: 24px;\n  min-height: 24px;\n  padding: 0 10px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  font-weight: 600;\n  white-space: nowrap;\n  transition:\n    opacity 0.15s ease,\n    background 0.15s ease,\n    transform 0.1s ease;\n}\n\n.sa-agent-button:disabled {\n  opacity: 0.45;\n  cursor: not-allowed;\n}\n\n.sa-agent-button:active:not(:disabled) {\n  transform: scale(0.96);\n}\n\n.sa-agent-button-primary {\n  color: #ffffff;\n  background: var(--looks-secondary);\n  border-color: transparent;\n}\n\n.sa-agent-button-primary:hover:not(:disabled) {\n  filter: brightness(1.08);\n  opacity: 0.95;\n}\n\n.sa-agent-button-secondary {\n  color: var(--text-primary);\n  background: transparent;\n}\n\n.sa-agent-button-secondary:hover:not(:disabled) {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-stop-button {\n  color: #d93025;\n  border-color: rgba(217, 48, 37, 0.3);\n}\n\n.sa-agent-stop-button:hover:not(:disabled) {\n  background: rgba(217, 48, 37, 0.08);\n}\n\n.sa-agent-message-meta {\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  margin-top: 4px;\n  font-size: 10px;\n  color: var(--text-primary);\n  opacity: 0.65;\n}\n\n.sa-agent-meta-badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 3px;\n  padding: 1px 5px;\n  border-radius: 3px;\n  background: var(--ui-black-transparent);\n  font-size: 10px;\n  line-height: 1.3;\n}\n\n.sa-agent-meta-icon {\n  width: 11px;\n  height: 11px;\n  flex-shrink: 0;\n}\n\n.sa-agent-meta-mode-build {\n  color: var(--looks-secondary);\n  background: var(--ui-primary-transparent);\n  font-weight: 600;\n}\n\n.sa-agent-meta-mode-build .sa-agent-meta-icon {\n  filter: none !important;\n}\n\n.sa-agent-meta-mode-plan {\n  color: var(--text-primary);\n  background: var(--ui-black-transparent);\n}\n\n.sa-agent-meta-mode-plan .sa-agent-meta-icon {\n  filter: grayscale(100%);\n}\n\n.addons-side-bar .sa-agent-header {\n  padding: 6px 8px;\n}\n\n.addons-side-bar .sa-agent-heading {\n  font-size: 12px;\n}\n\n.addons-side-bar .sa-agent-messages {\n  padding: 8px;\n}\n\n.addons-side-bar .sa-agent-composer {\n  padding: 6px 6px 8px;\n}\n\n.addons-side-bar .sa-agent-message-role {\n  display: none;\n}\n\n.addons-side-bar .sa-agent-bubble {\n  max-width: 100%;\n}\n\n.addons-side-bar .sa-agent-button {\n  min-height: 24px;\n  padding: 0 7px;\n}\n\n.addons-side-bar .sa-agent-input {\n  height: 20px;\n  min-height: 20px;\n  max-height: 120px;\n  padding: 0 4px;\n  font-size: 12px;\n  line-height: 20px;\n}\n\n.sa-agent-toggle-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n}\n\n.sa-agent-toggle-label {\n  font-size: 12px;\n  color: var(--text-primary-transparent);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button {\n  box-sizing: border-box;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 6px;\n  height: 24px;\n  min-height: 24px;\n  margin: 0;\n  padding: 0 12px;\n  border: 0;\n  border-top: 2px solid transparent;\n  border-right: 1px solid var(--ui-black-transparent);\n  border-bottom: 0;\n  border-left: 2px solid transparent;\n  border-radius: 0;\n  color: var(--text-primary-transparent);\n  background: var(--ui-white);\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 12px;\n  font-weight: normal;\n  line-height: 1;\n  white-space: nowrap;\n  transition: none;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button:hover {\n  background: var(--ui-primary);\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active {\n  color: var(--looks-secondary) !important;\n  background: var(--ui-white) !important;\n  border-bottom: 2px solid var(--looks-secondary) !important;\n  font-weight: bold !important;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active:hover {\n  background: var(--ui-white) !important;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-label {\n  color: var(--looks-secondary) !important;\n  font-weight: bold !important;\n}\n\n.addons-bottom-panel-button-bar .sa-agent-toggle-button .sa-agent-toggle-icon {\n  width: 16px !important;\n  height: 16px !important;\n  margin: 0 !important;\n  filter: grayscale(100%) !important;\n  transition: filter 0.2s ease !important;\n}\n\n/* 仅在激活状态下图标恢复主题色，hover 状态保持灰度 */\n.addons-bottom-panel-button-bar .sa-agent-toggle-button.sa-agent-toggle-active .sa-agent-toggle-icon {\n  filter: none !important;\n}\n\n/* VSCode 布局下的侧边栏按钮样式 - 严格对齐 SPA、AddToBar 与 Terminal 规范 */\n.sa-agent-toggle-tab.vscode-tab,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab {\n  box-sizing: border-box;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  width: 40px;\n  height: 40px !important;\n  min-width: 40px;\n  min-height: 40px !important;\n  flex-grow: 0;\n  flex-shrink: 0;\n  padding: 5px 0 !important;\n  margin: 0 !important;\n  border: 0 !important;\n  border-radius: 0 !important;\n  color: inherit;\n  background-color: transparent !important;\n  cursor: pointer;\n  font-family: inherit;\n  font-size: 0;\n  line-height: 0;\n  outline: none;\n  appearance: none;\n  position: relative;\n  transition: none;\n}\n\n.sa-agent-toggle-tab.vscode-tab:hover,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:hover {\n  border-color: transparent !important;\n}\n\n/* VSCode 侧边栏按钮图标 - 默认未激活状态为 100% 灰度 */\n.sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab img {\n  width: 22px;\n  height: auto;\n  margin: 0 !important;\n  filter: grayscale(100%);\n  -webkit-filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n/* VSCode 侧边栏按钮 hover 状态：规范只提升亮度（brightness(150%)），保持灰度，不包含饱和度 */\n.sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover img,\n[class*='tabs'][class*='vscodeList']\n  .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover\n  .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList']\n  .sa-agent-toggle-tab.vscode-tab:not(.sa-agent-toggle-active):not(.is-selected):hover\n  img {\n  filter: brightness(150%) grayscale(100%) !important;\n  -webkit-filter: brightness(150%) grayscale(100%) !important;\n}\n\n.sa-agent-toggle-tab.vscode-tab:focus-visible,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab:focus-visible {\n  outline: 2px solid var(--looks-secondary);\n  outline-offset: -2px;\n}\n\n/* VSCode 布局下按钮激活/选中状态：背景变白，左侧呈现主题强调色指示条 */\n.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active,\n.sa-agent-toggle-tab.vscode-tab.is-selected,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected {\n  background-color: var(--ui-white) !important;\n  box-shadow: inset 3px 0px 0px 0px var(--looks-secondary) !important;\n}\n\n/* 激活状态下图标恢复主题色（移除灰度，展现饱和度） */\n.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active img,\n.sa-agent-toggle-tab.vscode-tab.is-selected .sa-agent-toggle-icon,\n.sa-agent-toggle-tab.vscode-tab.is-selected img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.sa-agent-toggle-active img,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected .sa-agent-toggle-icon,\n[class*='tabs'][class*='vscodeList'] .sa-agent-toggle-tab.vscode-tab.is-selected img {\n  filter: grayscale(0%) !important;\n  -webkit-filter: grayscale(0%) !important;\n}\n\n.sa-agent-settings-panel {\n  display: none;\n  flex: 1;\n  flex-direction: column;\n  min-height: 0;\n  overflow-y: auto;\n  box-sizing: border-box;\n  padding: 10px 12px 12px;\n  color: var(--text-primary);\n  background: var(--ui-white);\n}\n\n.sa-agent-settings-header {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n  padding-bottom: 8px;\n  margin-bottom: 12px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n}\n\n.sa-agent-settings-back {\n  box-sizing: border-box;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  min-width: 24px;\n  padding: 0;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  color: var(--text-primary);\n  background: transparent;\n  cursor: pointer;\n  transition: all 0.15s ease;\n}\n\n.sa-agent-settings-back:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-settings-back:active {\n  transform: scale(0.95);\n}\n\n.sa-agent-settings-back-icon {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n  transition: filter 0.2s ease;\n}\n\n.sa-agent-settings-back:hover .sa-agent-settings-back-icon {\n  filter: none !important;\n}\n\n.sa-agent-settings-title {\n  font-size: 13px;\n  font-weight: bold;\n}\n\n.addons-bottom-panel .sa-agent-settings-panel {\n  width: 100%;\n  max-width: 960px;\n  align-self: center;\n}\n\n.addons-side-bar .sa-agent-settings-panel {\n  padding: 8px;\n}\n\n.sa-agent-settings {\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.sa-agent-settings-field {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.sa-agent-settings-field-toggle {\n  flex-direction: row;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  cursor: pointer;\n}\n\n.sa-agent-settings-label {\n  font-size: 12px;\n  font-weight: bold;\n  color: var(--text-primary);\n}\n\n.sa-agent-settings-input {\n  box-sizing: border-box;\n  width: 100%;\n  min-height: 32px;\n  padding: 6px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  outline: none;\n  color: var(--text-primary);\n  background: var(--ui-white);\n  font-family: inherit;\n  font-size: 12px;\n  transition: none;\n}\n\n.sa-agent-settings-input:focus {\n  border-color: var(--looks-secondary);\n}\n\n.sa-agent-settings-checkbox {\n  flex-shrink: 0;\n  width: 16px;\n  height: 16px;\n  margin: 2px 0;\n  align-self: flex-start;\n  cursor: pointer;\n}\n\n.sa-agent-settings-textarea {\n  min-height: 100px;\n  resize: vertical;\n  font-family: 'Courier New', monospace;\n}\n\n.sa-agent-settings-select {\n  height: auto;\n  min-height: 28px;\n  padding: 4px 6px;\n  cursor: pointer;\n}\n\n.sa-agent-settings-note {\n  font-size: 11px;\n  line-height: 1.4;\n  opacity: 0.7;\n}\n\n.sa-agent-settings-hint {\n  font-size: 11px;\n  line-height: 1.4;\n  opacity: 0.7;\n  overflow-wrap: anywhere;\n}\n\n.sa-agent-settings-request-json {\n  box-sizing: border-box;\n  max-height: 260px;\n  margin: 0;\n  padding: 8px;\n  overflow: auto;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.08);\n  color: var(--text-primary);\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.5;\n  white-space: pre;\n}\n\n.sa-agent-settings-error {\n  color: #d93025;\n  font-size: 12px;\n}\n\n.sa-agent-settings-buttons {\n  display: flex;\n  justify-content: flex-end;\n  gap: 8px;\n  padding-top: 4px;\n}\n\n/* 内部滚动条统一规范：细长矩形（无圆角，现代 IDE 极简风格） */\n.sa-agent-container *::-webkit-scrollbar,\n.sa-agent-messages::-webkit-scrollbar,\n.sa-agent-settings-panel::-webkit-scrollbar,\n.sa-agent-conversation-list::-webkit-scrollbar,\n.sa-agent-session-panel::-webkit-scrollbar {\n  width: 4px !important;\n  height: 4px !important;\n}\n\n.sa-agent-container *::-webkit-scrollbar-track,\n.sa-agent-messages::-webkit-scrollbar-track,\n.sa-agent-settings-panel::-webkit-scrollbar-track,\n.sa-agent-conversation-list::-webkit-scrollbar-track,\n.sa-agent-session-panel::-webkit-scrollbar-track {\n  background: transparent !important;\n}\n\n.sa-agent-container *::-webkit-scrollbar-thumb,\n.sa-agent-messages::-webkit-scrollbar-thumb,\n.sa-agent-settings-panel::-webkit-scrollbar-thumb,\n.sa-agent-conversation-list::-webkit-scrollbar-thumb,\n.sa-agent-session-panel::-webkit-scrollbar-thumb {\n  border-radius: 0 !important;\n  background: rgba(128, 128, 128, 0.35) !important;\n  transition: background 0.15s ease;\n}\n\n.sa-agent-container *::-webkit-scrollbar-thumb:hover,\n.sa-agent-messages::-webkit-scrollbar-thumb:hover,\n.sa-agent-settings-panel::-webkit-scrollbar-thumb:hover,\n.sa-agent-conversation-list::-webkit-scrollbar-thumb:hover,\n.sa-agent-session-panel::-webkit-scrollbar-thumb:hover {\n  background: rgba(128, 128, 128, 0.6) !important;\n}\n\n.sa-agent-container *::-webkit-scrollbar-corner {\n  background: transparent !important;\n}\n\n.sa-agent-container,\n.sa-agent-container * {\n  scrollbar-width: thin;\n  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;\n}\n\n.sa-agent-md-table-wrap {\n  max-width: 100%;\n  margin: 8px 0;\n  overflow-x: auto;\n  -webkit-overflow-scrolling: touch;\n}\n\n.sa-agent-md-table {\n  width: max-content;\n  min-width: 100%;\n  border-collapse: collapse;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.sa-agent-md-table th,\n.sa-agent-md-table td {\n  padding: 4px 8px;\n  border: 1px solid var(--ui-black-transparent);\n  text-align: left;\n  vertical-align: top;\n}\n\n.sa-agent-md-table th {\n  font-weight: bold;\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-md-table tr:nth-child(even) td {\n  background: rgba(0, 0, 0, 0.04);\n}\n\n.sa-agent-md-table pre,\n.sa-agent-md-table code {\n  white-space: pre-wrap;\n}\n\n.sa-agent-md-task {\n  width: 14px;\n  height: 14px;\n  margin: 0 6px 0 0;\n  vertical-align: middle;\n  cursor: default;\n  accent-color: var(--looks-secondary);\n}\n\n.sa-agent-md-image {\n  display: inline-block;\n  padding: 1px 6px;\n  border: 1px dashed var(--ui-black-transparent);\n  border-radius: 3px;\n  font-size: 12px;\n  opacity: 0.85;\n}\n\n/* Scrathon converter & debug window (standalone, draggable) */\n.sa-agent-scrathon-window {\n  position: fixed;\n  top: 90px;\n  left: 90px;\n  display: none;\n  flex-direction: column;\n  width: 560px;\n  height: 480px;\n  min-width: 360px;\n  min-height: 280px;\n  box-sizing: border-box;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 8px;\n  background: var(--ui-white);\n  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);\n  color: var(--text-primary);\n  z-index: 1000;\n  overflow: hidden;\n  resize: both;\n}\n\n.sa-agent-scrathon-header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  flex-shrink: 0;\n  padding: 8px 12px;\n  border-bottom: 1px solid var(--ui-black-transparent);\n  background: var(--ui-primary-transparent);\n  cursor: move;\n  user-select: none;\n}\n\n.sa-agent-scrathon-title {\n  font-size: 13px;\n  font-weight: bold;\n}\n\n.sa-agent-scrathon-close {\n  border: none;\n  background: none;\n  color: inherit;\n  font-size: 20px;\n  line-height: 1;\n  padding: 0 4px;\n  cursor: pointer;\n}\n\n.sa-agent-scrathon-body {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  gap: 8px;\n  min-height: 0;\n  padding: 10px;\n}\n\n.sa-agent-scrathon-toolbar {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 8px;\n  flex-shrink: 0;\n  flex-wrap: wrap;\n}\n\n.sa-agent-scrathon-target-group {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 180px;\n}\n\n.sa-agent-scrathon-label {\n  font-size: 12px;\n  font-weight: bold;\n  white-space: nowrap;\n}\n\n.sa-agent-scrathon-select {\n  flex: 1;\n  min-height: 28px;\n  padding: 4px 6px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  background: var(--ui-white);\n  color: var(--text-primary);\n  font-size: 12px;\n}\n\n.sa-agent-scrathon-buttons {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  flex-shrink: 0;\n  flex-wrap: wrap;\n}\n\n.sa-agent-scrathon-editor-header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  padding: 2px 2px;\n  font-size: 11px;\n}\n\n.sa-agent-scrathon-panel-actions {\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n\n.sa-agent-scrathon-panel-btn {\n  border: 1px solid var(--ui-black-transparent);\n  background: var(--ui-white);\n  border-radius: 4px;\n  font-size: 11px;\n  padding: 2px 6px;\n  cursor: pointer;\n  color: var(--text-primary);\n  line-height: 1.2;\n}\n\n.sa-agent-scrathon-panel-btn:hover {\n  background: var(--ui-primary-transparent);\n}\n\n.sa-agent-scrathon-code {\n  flex: 1;\n  min-height: 0;\n  box-sizing: border-box;\n  width: 100%;\n  padding: 8px;\n  border: 1px solid var(--ui-black-transparent);\n  border-radius: 4px;\n  outline: none;\n  resize: none;\n  background: var(--ui-white);\n  color: var(--text-primary);\n  font-family: 'Courier New', monospace;\n  font-size: 12px;\n  line-height: 1.5;\n  white-space: pre;\n  overflow: auto;\n  tab-size: 4;\n}\n\n.sa-agent-scrathon-code:focus {\n  border-color: var(--looks-secondary);\n}\n\n.sa-agent-scrathon-status {\n  flex-shrink: 0;\n  max-height: 90px;\n  margin: 0;\n  padding: 4px 6px;\n  border-radius: 4px;\n  background: rgba(0, 0, 0, 0.03);\n  overflow: auto;\n  font-family: 'Courier New', monospace;\n  font-size: 11px;\n  line-height: 1.4;\n  white-space: pre-wrap;\n  color: var(--text-primary);\n}\n\n.sa-agent-scrathon-status-error {\n  color: #d93025;\n  background: rgba(217, 48, 37, 0.08);\n}\n\n.sa-agent-scrathon-status-success {\n  color: #0d8050;\n  background: rgba(13, 128, 80, 0.08);\n}\n\n.sa-agent-scrathon-window ::-webkit-scrollbar {\n  width: 8px;\n  height: 8px;\n}\n\n.sa-agent-scrathon-window ::-webkit-scrollbar-thumb {\n  border-radius: 0;\n  background: rgba(128, 128, 128, 0.35);\n}\n\n.sa-agent-scrathon-window ::-webkit-scrollbar-thumb:hover {\n  background: rgba(128, 128, 128, 0.6);\n}\n"],"sourceRoot":""}]);
 // Exports
 module.exports = ___CSS_LOADER_EXPORT___;
 
