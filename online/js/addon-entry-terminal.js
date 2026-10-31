@@ -31,6 +31,170 @@ const resources = {
 
 /***/ },
 
+/***/ "./src/addons/addons/Terminal/heatmap.js"
+/*!***********************************************!*\
+  !*** ./src/addons/addons/Terminal/heatmap.js ***!
+  \***********************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   HeatmapManager: () => (/* binding */ HeatmapManager),
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/**
+ * AstraEditor Terminal - Blockly Workspace Heatmap
+ * 积木执行热力图渲染与频次追踪管理器
+ */
+
+function valueToHeatmapColor(value) {
+  let min = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  let max = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
+  const clampedValue = Math.max(min, Math.min(max, value));
+  const normalizedValue = max <= min ? 1 : (clampedValue - min) / (max - min);
+  const r = Math.round(255 * normalizedValue);
+  const b = Math.round(255 * (1 - normalizedValue));
+  return "#".concat((1 << 24 | r << 16 | b).toString(16).slice(1).toUpperCase());
+}
+function recursiveFillBlock(block) {
+  let fill = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+  if (!block || !block.svgPath_) return;
+  const fillColor = fill === null ? block.colour_ : fill;
+  block.svgPath_.style.fill = fillColor;
+  if (block.svgGroup_) {
+    const textElements = block.svgGroup_.querySelectorAll(":scope > :not(.blocklyDraggable):not([data-shapes='stack']) > text, :scope > text");
+    if (fill !== null) {
+      textElements.forEach(textEl => {
+        textEl.style.setProperty('fill', 'white', 'important');
+      });
+    } else {
+      textElements.forEach(textEl => {
+        textEl.style.removeProperty('fill');
+      });
+    }
+  }
+  if (block.childBlocks_) {
+    block.childBlocks_.forEach(child => {
+      if (child.previousConnection === null) {
+        recursiveFillBlock(child, fill);
+      }
+    });
+  }
+  if (block.inputList) {
+    block.inputList.forEach(input => {
+      if (input.fieldRow) {
+        input.fieldRow.forEach(field => {
+          if (field.box_) field.box_.style.fill = fill || '';
+        });
+      }
+    });
+  }
+}
+class HeatmapManager {
+  constructor(getWorkspace, vm) {
+    this.getWorkspace = getWorkspace;
+    this.vm = vm;
+    this.isActive = false;
+    this.blockExecutionCounts = new Map(); // blockId -> count
+    this.coloredBlocks = new Set();
+    this.updateInterval = null;
+    this.customMax = null; // null for auto-scale
+  }
+  trackBlock(blockId) {
+    if (!blockId) return;
+    const current = this.blockExecutionCounts.get(blockId) || 0;
+    this.blockExecutionCounts.set(blockId, current + 1);
+  }
+  start() {
+    this.isActive = true;
+    this.updateWorkspace();
+    if (!this.updateInterval) {
+      this.updateInterval = setInterval(() => {
+        if (this.isActive) {
+          this.updateWorkspace();
+        }
+      }, 200);
+    }
+  }
+  stop() {
+    this.isActive = false;
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+      this.updateInterval = null;
+    }
+    this.clearWorkspaceColors();
+  }
+  reset() {
+    this.blockExecutionCounts.clear();
+    if (this.isActive) {
+      this.clearWorkspaceColors();
+      this.updateWorkspace();
+    }
+  }
+  setMax(val) {
+    const num = Number(val);
+    this.customMax = !isNaN(num) && num > 0 ? num : null;
+    if (this.isActive) {
+      this.updateWorkspace();
+    }
+  }
+  clearWorkspaceColors() {
+    const workspace = this.getWorkspace ? this.getWorkspace() : null;
+    if (!workspace || !workspace.blockDB_) return;
+    this.coloredBlocks.forEach(blockId => {
+      const block = workspace.blockDB_[blockId];
+      if (block) {
+        recursiveFillBlock(block, null);
+      }
+    });
+    this.coloredBlocks.clear();
+  }
+  updateWorkspace() {
+    const workspace = this.getWorkspace ? this.getWorkspace() : null;
+    if (!workspace || !workspace.blockDB_ || typeof workspace.getAllBlocks !== 'function') return;
+    const counts = this.blockExecutionCounts;
+    let maxCount = this.customMax;
+    if (!maxCount) {
+      let currentMax = 1;
+      for (const count of counts.values()) {
+        if (count > currentMax) currentMax = count;
+      }
+      maxCount = currentMax;
+    }
+    const allBlocks = workspace.getAllBlocks();
+    const coldColor = valueToHeatmapColor(0, 0, maxCount);
+    for (const block of allBlocks) {
+      if (block.isShadow && block.isShadow()) continue;
+      if (block.outputConnection && block.getParent && block.getParent()) continue;
+      const count = counts.get(block.id);
+      if (typeof count === 'number' && count > 0) {
+        const color = valueToHeatmapColor(count, 0, maxCount);
+        recursiveFillBlock(block, color);
+        this.coloredBlocks.add(block.id);
+      } else {
+        recursiveFillBlock(block, coldColor);
+        this.coloredBlocks.add(block.id);
+      }
+    }
+  }
+  getStatus() {
+    let max = 0;
+    for (const val of this.blockExecutionCounts.values()) {
+      if (val > max) max = val;
+    }
+    return {
+      active: this.isActive,
+      trackedBlocks: this.blockExecutionCounts.size,
+      maxExecutions: max,
+      customMax: this.customMax
+    };
+  }
+}
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (HeatmapManager);
+
+/***/ },
+
 /***/ "./src/addons/addons/Terminal/module.js"
 /*!**********************************************!*\
   !*** ./src/addons/addons/Terminal/module.js ***!
@@ -200,9 +364,23 @@ const singleStepThread = thread => {
   if (thread.status === STATUS_DONE) {
     return false;
   }
-  // TW: Can't single-step compiled threads
+  // TW: Compiled threads execution
   if (thread.isCompiled) {
-    return false;
+    pauseNewThreads = true;
+    vm.runtime.sequencer.activeThread = thread;
+    try {
+      thread.status = STATUS_RUNNING;
+      vm.runtime.sequencer.stepThread(thread);
+    } catch (e) {
+      // ignore
+    } finally {
+      pauseNewThreads = false;
+      vm.runtime.sequencer.activeThread = null;
+      if (thread.status !== STATUS_DONE) {
+        thread.status = STATUS_PROMISE_WAIT;
+      }
+    }
+    return thread.status !== STATUS_DONE;
   }
   const currentBlockId = thread.peekStack();
   if (!currentBlockId) {
@@ -306,10 +484,6 @@ const findNewSteppingThread = startingIndex => {
       // Never single-step monitor update threads.
       continue;
     }
-    // TW: Can't single-step compiled threads
-    if (possibleNewThread.isCompiled) {
-      continue;
-    }
     const status = getRealStatus(possibleNewThread);
     if (status === STATUS_RUNNING || status === STATUS_YIELD || status === STATUS_YIELD_TICK) {
       // Thread must not be running for single stepping to work.
@@ -321,8 +495,14 @@ const findNewSteppingThread = startingIndex => {
 };
 const singleStep = () => {
   if (steppingThread) {
-    const pauseState = pausedThreadState.get(steppingThread);
-    // We can assume pauseState is defined as any single stepping threads must already be paused.
+    let pauseState = pausedThreadState.get(steppingThread);
+    if (!pauseState) {
+      pauseThread(steppingThread);
+      pauseState = pausedThreadState.get(steppingThread) || {
+        time: vm.runtime.currentMSecs,
+        status: steppingThread.status
+      };
+    }
 
     // Make it look like no time has passed
     compensateForTimePassedWhilePaused(steppingThread, pauseState);
@@ -336,26 +516,37 @@ const singleStep = () => {
     }
   }
 
-  // If we don't have a thread, than we are between VM steps and should search for a new thread
+  // If we don't have a thread, then we are between VM steps and should search for a new thread
   if (!steppingThread) {
+    var _vm$runtime$ioDevices, _vm$runtime$ioDevices2;
     setSteppingThread(findNewSteppingThread(0));
 
     // End of VM step, emulate one frame of time passing.
-    vm.runtime.ioDevices.clock._pausedTime += vm.runtime.currentStepTime;
-    // Skip all sounds forward by vm.runtime.currentStepTime milliseconds so it's as
-    //  if they where playing for one frame.
-    const audioContext = vm.runtime.audioEngine.audioContext;
-    for (const target of vm.runtime.targets) {
-      for (const soundId of Object.keys(target.sprite.soundBank.soundPlayers)) {
-        const soundPlayer = target.sprite.soundBank.soundPlayers[soundId];
-        if (soundPlayer.outputNode) {
-          soundPlayer.outputNode.stop(audioContext.currentTime);
-          soundPlayer._createSource();
-          soundPlayer.outputNode.start(audioContext.currentTime, audioContext.currentTime - soundPlayer.startingUntil + vm.runtime.currentStepTime / 1000);
-          soundPlayer.startingUntil -= vm.runtime.currentStepTime / 1000;
+    if ((_vm$runtime$ioDevices = vm.runtime.ioDevices) !== null && _vm$runtime$ioDevices !== void 0 && (_vm$runtime$ioDevices2 = _vm$runtime$ioDevices.clock) !== null && _vm$runtime$ioDevices2 !== void 0 && _vm$runtime$ioDevices2._paused) {
+      vm.runtime.ioDevices.clock._pausedTime = (vm.runtime.ioDevices.clock._pausedTime || 0) + vm.runtime.currentStepTime;
+    }
+    try {
+      var _vm$runtime$audioEngi;
+      const audioContext = (_vm$runtime$audioEngi = vm.runtime.audioEngine) === null || _vm$runtime$audioEngi === void 0 ? void 0 : _vm$runtime$audioEngi.audioContext;
+      if (audioContext) {
+        for (const target of vm.runtime.targets) {
+          var _target$sprite, _target$sprite$soundB;
+          if (!(target !== null && target !== void 0 && (_target$sprite = target.sprite) !== null && _target$sprite !== void 0 && (_target$sprite$soundB = _target$sprite.soundBank) !== null && _target$sprite$soundB !== void 0 && _target$sprite$soundB.soundPlayers)) continue;
+          for (const soundId of Object.keys(target.sprite.soundBank.soundPlayers)) {
+            const soundPlayer = target.sprite.soundBank.soundPlayers[soundId];
+            if (soundPlayer !== null && soundPlayer !== void 0 && soundPlayer.outputNode) {
+              try {
+                soundPlayer.outputNode.stop(audioContext.currentTime);
+                soundPlayer._createSource();
+                soundPlayer.outputNode.start(audioContext.currentTime, audioContext.currentTime - soundPlayer.startingUntil + vm.runtime.currentStepTime / 1000);
+                soundPlayer.startingUntil -= vm.runtime.currentStepTime / 1000;
+              } catch (_) {}
+            }
+          }
         }
       }
-    }
+    } catch (_) {}
+
     // Move all threads forward one frame in time. For blocks like `wait () seconds`
     for (const thread of vm.runtime.threads) {
       if (pausedThreadState.has(thread)) {
@@ -459,10 +650,12 @@ Object.defineProperty(__WEBPACK_DEFAULT_EXPORT__, "name", { value: "default", co
 /* harmony import */ var _lib_tw_recolor_build_icon_bottom_svg__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-bottom.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-bottom.svg");
 /* harmony import */ var _lib_tw_recolor_build_icon_window_svg__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-window.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-window.svg");
 /* harmony import */ var _lib_tw_recolor_build_icon_continue_svg__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-continue.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-continue.svg");
-/* harmony import */ var _lib_tw_recolor_build_icon_export_svg__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-export.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-export.svg");
-/* harmony import */ var _lib_tw_recolor_build_icon_setting_svg__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-setting.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-setting.svg");
-/* harmony import */ var _module_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./module.js */ "./src/addons/addons/Terminal/module.js");
-/* harmony import */ var _lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../../lib/ae-version.js */ "./src/lib/ae-version.js");
+/* harmony import */ var _lib_tw_recolor_build_icon_step_svg__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-step.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-step.svg");
+/* harmony import */ var _lib_tw_recolor_build_icon_export_svg__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-export.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-export.svg");
+/* harmony import */ var _lib_tw_recolor_build_icon_setting_svg__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! !../../../lib/tw-recolor/build!./icon-setting.svg */ "./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-setting.svg");
+/* harmony import */ var _module_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./module.js */ "./src/addons/addons/Terminal/module.js");
+/* harmony import */ var _heatmap_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./heatmap.js */ "./src/addons/addons/Terminal/heatmap.js");
+/* harmony import */ var _lib_ae_version_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ../../../lib/ae-version.js */ "./src/lib/ae-version.js");
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
@@ -474,6 +667,8 @@ function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) 
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
 function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+
+
 
 
 
@@ -686,7 +881,7 @@ class TerminalVirtualList {
   const vm = addon.tab.traps.vm;
 
   // 初始化debugger模块
-  (0,_module_js__WEBPACK_IMPORTED_MODULE_9__.setup)(addon);
+  (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.setup)(addon);
 
   // Terminal 位置类型
   const POSITION_TYPES = {
@@ -1305,8 +1500,26 @@ class TerminalVirtualList {
   continueBtnIcon.style.filter = 'grayscale(100%)';
   continueButton.appendChild(continueBtnIcon);
   continueButton.addEventListener('click', () => {
-    (0,_module_js__WEBPACK_IMPORTED_MODULE_9__.setPaused)(false);
-    continueButton.style.display = 'none';
+    (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.setPaused)(false);
+  });
+
+  // 创建单步执行按钮（默认隐藏）
+  const stepButton = document.createElement('button');
+  stepButton.className = 'sa-terminal-step-button';
+  stepButton.title = msg('button-step') || '单步执行 (Step)';
+  stepButton.style.display = 'none';
+  const stepBtnIcon = document.createElement('img');
+  stepBtnIcon.src = (0,_lib_tw_recolor_build_icon_step_svg__WEBPACK_IMPORTED_MODULE_7__["default"])();
+  stepBtnIcon.style.width = '16px';
+  stepBtnIcon.style.height = '16px';
+  stepBtnIcon.style.filter = 'grayscale(100%)';
+  stepButton.appendChild(stepBtnIcon);
+  stepButton.addEventListener('click', () => {
+    (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.singleStep)();
+  });
+  (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.onPauseChanged)(paused => {
+    continueButton.style.display = paused ? 'flex' : 'none';
+    stepButton.style.display = paused ? 'flex' : 'none';
   });
 
   // 创建导出日志按钮
@@ -1317,7 +1530,7 @@ class TerminalVirtualList {
   // 为导出按钮添加SVG图标
   const exportBtnIcon = document.createElement('img');
   // 使用正确的图标导入方式
-  exportBtnIcon.src = (0,_lib_tw_recolor_build_icon_export_svg__WEBPACK_IMPORTED_MODULE_7__["default"])();
+  exportBtnIcon.src = (0,_lib_tw_recolor_build_icon_export_svg__WEBPACK_IMPORTED_MODULE_8__["default"])();
   exportBtnIcon.style.width = '16px';
   exportBtnIcon.style.height = '16px';
   exportBtnIcon.style.filter = 'grayscale(100%)';
@@ -1351,7 +1564,7 @@ class TerminalVirtualList {
   settingsButton.className = 'sa-terminal-settings-button';
   settingsButton.title = msg('button-settings') || '设置';
   const settingsBtnIcon = document.createElement('img');
-  settingsBtnIcon.src = (0,_lib_tw_recolor_build_icon_setting_svg__WEBPACK_IMPORTED_MODULE_8__["default"])();
+  settingsBtnIcon.src = (0,_lib_tw_recolor_build_icon_setting_svg__WEBPACK_IMPORTED_MODULE_9__["default"])();
   settingsBtnIcon.style.cssText = "\n    width: 16px;\n    height: 16px;\n    filter: grayscale(100%);\n  ";
   settingsButton.appendChild(settingsBtnIcon);
 
@@ -1716,6 +1929,7 @@ class TerminalVirtualList {
 
   // 将按钮添加到容器中
   buttonContainer.appendChild(continueButton);
+  buttonContainer.appendChild(stepButton);
   buttonContainer.appendChild(exportButton);
   buttonContainer.appendChild(settingsButton);
   buttonContainer.appendChild(positionSwitchContainer);
@@ -1741,7 +1955,7 @@ class TerminalVirtualList {
     contentHash: welcomeLine1.textContent
   });
   const welcomeLine2 = document.createElement('div');
-  welcomeLine2.textContent = msg('welcome-help') || "Type 'help' for available commands.";
+  welcomeLine2.textContent = msg('welcome-help') || "输入 'help' 查看可用命令。";
   virtualList.appendLog({
     element: welcomeLine2,
     contentHash: welcomeLine2.textContent
@@ -2135,8 +2349,9 @@ class TerminalVirtualList {
         }
         return;
       }
-      (0,_module_js__WEBPACK_IMPORTED_MODULE_9__.setPaused)(true);
-      continueButton.style.display = 'inline-block';
+      (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.setPaused)(true);
+      continueButton.style.display = 'flex';
+      stepButton.style.display = 'flex';
       if (terminalOutput) {
         const line = document.createElement('div');
         line.className = 'sa-terminal-log-line';
@@ -2169,7 +2384,7 @@ class TerminalVirtualList {
   });
   addon.tab.addBlock('\u200B\u200Bclear\u200B\u200B', {
     args: [],
-    displayName: msg('block-clear') || 'Clear Terminal',
+    displayName: msg('block-clear') || '清空终端',
     callback: () => {
       virtualList.clear();
       resetLogTracking();
@@ -2177,7 +2392,7 @@ class TerminalVirtualList {
   });
   addon.tab.addBlock('\u200B\u200Bdelete_last\u200B\u200B', {
     args: [],
-    displayName: msg('block-delete-last') || 'Delete Last Output',
+    displayName: msg('block-delete-last') || '删除上一句输出',
     callback: () => {
       if (lastLogData && lastLogData.count > 1) {
         lastLogData.count--;
@@ -2688,7 +2903,7 @@ class TerminalVirtualList {
   // 添加用户指令积木
   addon.tab.addBlock('\u200B\u200Badd_user_command\u200B\u200B %s %s', {
     args: ['name', 'description'],
-    displayName: msg('block-add-user-command') || 'Add User Command',
+    displayName: msg('block-add-user-command') || '添加用户指令 %s 简介 %s',
     callback: _ref10 => {
       let name = _ref10.name,
         description = _ref10.description;
@@ -2701,7 +2916,7 @@ class TerminalVirtualList {
   // 添加导出日志积木
   addon.tab.addBlock('\u200B\u200Bexport_logs\u200B\u200B', {
     args: [],
-    displayName: msg('block-export-logs') || 'Export Logs',
+    displayName: msg('block-export-logs') || '导出日志',
     callback: () => {
       exportLogs();
     }
@@ -2771,6 +2986,268 @@ class TerminalVirtualList {
     return: 1
   });
 
+  // 创建 CUI 性能监控状态条 (停靠在输入框上一行)
+  const cuiBar = document.createElement('div');
+  cuiBar.className = 'sa-terminal-cui-bar';
+  cuiBar.style.display = 'none';
+  const cuiBadge = document.createElement('span');
+  cuiBadge.className = 'sa-terminal-cui-badge';
+  cuiBadge.textContent = 'TOP';
+  const cuiChartBox = document.createElement('div');
+  cuiChartBox.className = 'sa-terminal-cui-chart-box';
+  const cuiCanvas = document.createElement('canvas');
+  cuiCanvas.className = 'sa-terminal-cui-canvas';
+  cuiCanvas.width = 110;
+  cuiCanvas.height = 24;
+  cuiChartBox.appendChild(cuiCanvas);
+  const cuiFps = document.createElement('span');
+  cuiFps.className = 'sa-terminal-cui-fps';
+  cuiFps.textContent = '60 FPS';
+  const createCuiSeparator = () => {
+    const sep = document.createElement('span');
+    sep.className = 'sa-terminal-cui-separator';
+    sep.textContent = '│';
+    return sep;
+  };
+  const cuiClones = document.createElement('div');
+  cuiClones.className = 'sa-terminal-cui-section';
+  cuiClones.title = '克隆体数量';
+  const cuiClonesVal = document.createElement('span');
+  cuiClonesVal.className = 'cui-val';
+  cuiClonesVal.textContent = '0/300';
+  cuiClones.append('Clones: ', cuiClonesVal);
+  const cuiThreads = document.createElement('div');
+  cuiThreads.className = 'sa-terminal-cui-section';
+  cuiThreads.title = '活动线程数量';
+  const cuiThreadsVal = document.createElement('span');
+  cuiThreadsVal.className = 'cui-val';
+  cuiThreadsVal.textContent = '0';
+  cuiThreads.append('Threads: ', cuiThreadsVal);
+  const cuiFrame = document.createElement('div');
+  cuiFrame.className = 'sa-terminal-cui-section';
+  cuiFrame.title = 'VM单帧耗时';
+  const cuiFrameVal = document.createElement('span');
+  cuiFrameVal.className = 'cui-val';
+  cuiFrameVal.textContent = '0.0ms';
+  cuiFrame.append('Step: ', cuiFrameVal);
+  const cuiTarget = document.createElement('div');
+  cuiTarget.className = 'sa-terminal-cui-section';
+  cuiTarget.title = '当前活动角色';
+  const cuiTargetVal = document.createElement('span');
+  cuiTargetVal.className = 'cui-val';
+  cuiTargetVal.textContent = 'Stage';
+  cuiTarget.append('Target: ', cuiTargetVal);
+  const cuiCloseBtn = document.createElement('button');
+  cuiCloseBtn.className = 'sa-terminal-cui-close';
+  cuiCloseBtn.title = '关闭监控条 (或输入 top)';
+  cuiCloseBtn.textContent = '✕';
+  cuiBar.append(cuiBadge, cuiChartBox, cuiFps, createCuiSeparator(), cuiClones, createCuiSeparator(), cuiThreads, createCuiSeparator(), cuiFrame, createCuiSeparator(), cuiTarget, cuiCloseBtn);
+  let isCuiActive = false;
+  const fpsHistory = Array(25).fill(60);
+  const renderTimes = [];
+  let lastFpsCalcTime = performance.now();
+  let currentFps = 60;
+  let lastStepDuration = 0;
+  const drawFpsChart = function drawFpsChart(fps) {
+    let maxFps = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 60;
+    const ctx = cuiCanvas.getContext('2d');
+    if (!ctx) return;
+    const w = cuiCanvas.width;
+    const h = cuiCanvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // 绘制微弱背景参考线 (30fps 和 60fps)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.5);
+    ctx.lineTo(w, h * 0.5);
+    ctx.stroke();
+    let strokeColor = '#29beb8';
+    let gradientStart = 'rgba(41, 190, 184, 0.4)';
+    if (fps < 30) {
+      strokeColor = '#e06c75';
+      gradientStart = 'rgba(224, 108, 117, 0.4)';
+    } else if (fps < 50) {
+      strokeColor = '#e5c07b';
+      gradientStart = 'rgba(229, 192, 123, 0.4)';
+    }
+    const len = fpsHistory.length;
+    const stepX = w / (len - 1);
+
+    // 渐变填充折线下方区域
+    const gradient = ctx.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, gradientStart);
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let i = 0; i < len; i++) {
+      const val = Math.max(0, Math.min(maxFps, fpsHistory[i]));
+      const x = i * stepX;
+      const y = h - val / maxFps * (h - 4) - 2;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // 绘制折线
+    ctx.beginPath();
+    for (let i = 0; i < len; i++) {
+      const val = Math.max(0, Math.min(maxFps, fpsHistory[i]));
+      const x = i * stepX;
+      const y = h - val / maxFps * (h - 4) - 2;
+      if (i === 0) ctx.moveTo(x, y);else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // 绘制末端指示光点
+    const lastVal = Math.max(0, Math.min(maxFps, fpsHistory[len - 1]));
+    const lastX = w - 1;
+    const lastY = h - lastVal / maxFps * (h - 4) - 2;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 2, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  const updateCuiDisplay = () => {
+    if (!isCuiActive) return;
+    const maxFps = vm.runtime.frameLoop.framerate === 0 ? 60 : vm.runtime.frameLoop.framerate;
+    cuiFps.textContent = "".concat(currentFps, " FPS");
+    cuiFps.style.color = currentFps >= 50 ? '#29beb8' : currentFps >= 30 ? '#e5c07b' : '#e06c75';
+    const clones = vm.runtime._cloneCounter || 0;
+    cuiClonesVal.textContent = "".concat(clones, "/300");
+    cuiClonesVal.style.color = clones > 250 ? '#e06c75' : '#ffffff';
+    const threadsCount = vm.runtime.threads ? vm.runtime.threads.length : 0;
+    cuiThreadsVal.textContent = threadsCount;
+    cuiFrameVal.textContent = "".concat(lastStepDuration.toFixed(1), "ms");
+    const target = vm.runtime.getEditingTarget();
+    cuiTargetVal.textContent = target ? target.getName() : 'Stage';
+    drawFpsChart(currentFps, maxFps);
+  };
+  const toggleCui = forceState => {
+    isCuiActive = typeof forceState === 'boolean' ? forceState : !isCuiActive;
+    cuiBar.style.display = isCuiActive ? 'flex' : 'none';
+    if (isCuiActive) {
+      updateCuiDisplay();
+    }
+    return isCuiActive;
+  };
+  cuiCloseBtn.addEventListener('click', () => {
+    toggleCui(false);
+  });
+
+  // 变量查找与监听管理
+  const findVariable = name => {
+    const target = vm.runtime.getEditingTarget();
+    const stage = vm.runtime.getTargetForStage();
+    if (target && !target.isStage && target.variables) {
+      for (const v of Object.values(target.variables)) {
+        if (v.name === name) {
+          return {
+            variable: v,
+            target,
+            isLocal: true
+          };
+        }
+      }
+    }
+    if (stage && stage.variables) {
+      for (const v of Object.values(stage.variables)) {
+        if (v.name === name) {
+          return {
+            variable: v,
+            target: stage,
+            isLocal: false
+          };
+        }
+      }
+    }
+    return null;
+  };
+  const watchedVariables = new Map();
+  // 积木执行热力图管理器
+  const heatmapManager = new _heatmap_js__WEBPACK_IMPORTED_MODULE_11__["default"](() => addon.tab.traps.getWorkspace(), vm);
+  const checkWatchedVariables = () => {
+    if (watchedVariables.size === 0) return;
+    for (const _ref11 of watchedVariables) {
+      var _ref12 = _slicedToArray(_ref11, 2);
+      const id = _ref12[0];
+      const info = _ref12[1];
+      const target = vm.runtime.getTargetById(info.targetId);
+      if (!target || !target.variables || !target.variables[id]) continue;
+      const v = target.variables[id];
+      const currentVal = Array.isArray(v.value) ? JSON.stringify(v.value) : v.value;
+      if (currentVal !== info.lastValue) {
+        const line = document.createElement('div');
+        line.className = 'sa-terminal-log-line';
+        const mark = document.createElement('span');
+        mark.className = 'sa-terminal-log-mark warn';
+        mark.textContent = '[watch]';
+        line.appendChild(mark);
+        const textSpan = document.createElement('span');
+        textSpan.className = 'sa-terminal-log-text';
+        textSpan.innerHTML = " \u53D8\u91CF <b>".concat(escapeHTML(info.name), "</b>: <code>").concat(escapeHTML(String(info.lastValue)), "</code> &rarr; <b style=\"color: #4ec9b0;\">").concat(escapeHTML(String(currentVal)), "</b>");
+        line.appendChild(textSpan);
+        addLogLineWithElement(line);
+        info.lastValue = currentVal;
+      }
+    }
+  };
+
+  // 挂钩 VM 执行步进，实时采集性能并检测监听变量与热力图
+  const originalStep = vm.runtime._step;
+  vm.runtime._step = function () {
+    const start = performance.now();
+    for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+      args[_key2] = arguments[_key2];
+    }
+    const ret = originalStep.call(this, ...args);
+    const end = performance.now();
+    lastStepDuration = end - start;
+    if (heatmapManager && heatmapManager.isActive && this.threads) {
+      for (const thread of this.threads) {
+        if (!thread.updateMonitor) {
+          const blockId = thread.peekStack ? thread.peekStack() : thread.topBlock;
+          if (blockId) {
+            heatmapManager.trackBlock(blockId);
+          }
+        }
+      }
+    }
+    renderTimes.push(end);
+    while (renderTimes.length > 0 && renderTimes[0] <= end - 1000) {
+      renderTimes.shift();
+    }
+    if (end - lastFpsCalcTime >= 200) {
+      lastFpsCalcTime = end;
+      const maxFps = vm.runtime.frameLoop.framerate === 0 ? 60 : vm.runtime.frameLoop.framerate;
+      currentFps = Math.min(renderTimes.length, maxFps);
+      fpsHistory.shift();
+      fpsHistory.push(currentFps);
+      if (isCuiActive) {
+        updateCuiDisplay();
+      }
+    }
+    checkWatchedVariables();
+    return ret;
+  };
+  if (vm.runtime.sequencer && vm.runtime.sequencer.stepThread) {
+    const originalStepThread = vm.runtime.sequencer.stepThread;
+    vm.runtime.sequencer.stepThread = function (thread) {
+      if (heatmapManager && heatmapManager.isActive && thread && !thread.updateMonitor) {
+        const blockId = thread.peekStack ? thread.peekStack() : thread.topBlock;
+        if (blockId) {
+          heatmapManager.trackBlock(blockId);
+        }
+      }
+      return originalStepThread.call(this, thread);
+    };
+  }
+
   // 创建输入行
   const inputLine = document.createElement('div');
   inputLine.className = 'sa-terminal-input-line';
@@ -2780,9 +3257,10 @@ class TerminalVirtualList {
   const terminalInput = document.createElement('input');
   terminalInput.type = 'text';
   terminalInput.className = 'sa-terminal-input';
-  terminalInput.placeholder = msg('input-placeholder') || 'Enter command...';
+  terminalInput.placeholder = msg('input-placeholder') || '输入命令... (输入 help 查看帮助)';
   inputLine.appendChild(prompt);
   inputLine.appendChild(terminalInput);
+  terminalContainer.appendChild(cuiBar);
   terminalContainer.appendChild(inputLine);
 
   // 命令历史
@@ -2797,121 +3275,175 @@ class TerminalVirtualList {
   // 存储用户指令
   const userCommands = {};
 
+  // 渲染多行输出并解析 BBCode 格式
+  const renderOutputLines = text => {
+    if (!text) return;
+    const lines = text.split('\n');
+    lines.forEach(lineContent => {
+      const resultLine = document.createElement('div');
+      resultLine.className = 'sa-terminal-result-line';
+      let parsedContent = parseBBCode(lineContent);
+      parsedContent = parsedContent.replace(/(^|>)([^<]*)(?=<|$)/g, (match, prefix, content) => prefix + content.replace(/ /g, '&nbsp;'));
+      resultLine.innerHTML = parsedContent;
+      resultLine.title = lineContent;
+      virtualList.appendLog({
+        element: resultLine,
+        contentHash: lineContent
+      });
+    });
+  };
+
+  // 生成格式化的指令帮助信息卡片
+  const formatCommandHelp = (name, cmd) => {
+    let out = "\u3010\u6307\u4EE4\u3011".concat(name.toUpperCase(), "\n");
+    out += "  \u8BF4\u660E\uFF1A".concat(cmd.description || '暂无说明', "\n");
+    if (cmd.usage) {
+      out += "  \u7528\u6CD5\uFF1A".concat(cmd.usage, "\n");
+    }
+    if (cmd.example) {
+      const exLines = cmd.example.split('\n');
+      if (exLines.length === 1) {
+        out += "  \u793A\u4F8B\uFF1A".concat(cmd.example, "\n");
+      } else {
+        out += "  \u793A\u4F8B\uFF1A".concat(exLines[0], "\n");
+        for (let i = 1; i < exLines.length; i++) {
+          out += "        ".concat(exLines[i], "\n");
+        }
+      }
+    }
+    if (cmd.aliases && cmd.aliases.length > 0) {
+      out += "  \u522B\u540D\uFF1A".concat(cmd.aliases.join(', '), "\n");
+    }
+    return out.trimEnd();
+  };
+
   // 可用命令
   const commands = {
     help: {
-      description: msg('command-help-desc') || 'Show available commands',
-      execute: () => {
-        let output = "".concat(msg('command-help-available') || 'Available commands:', "\n\n");
-        for (const _ref11 of Object.entries(commands)) {
-          var _ref12 = _slicedToArray(_ref11, 2);
-          const name = _ref12[0];
-          const cmd = _ref12[1];
+      description: msg('command-help-desc') || '显示可用命令列表，或查询指定指令的详细用法',
+      usage: 'help [指令名]',
+      example: 'help\nhelp step\nhelp heatmap',
+      aliases: ['?'],
+      execute: args => {
+        if (args && args.length > 0) {
+          const target = args[0].toLowerCase();
+          const targetCmd = commands[target];
+          if (targetCmd) {
+            return formatCommandHelp(target, targetCmd);
+          }
+          if (userCommands[target]) {
+            return "\u3010\u81EA\u5B9A\u4E49\u6307\u4EE4\u3011".concat(target, "\n  \u8BF4\u660E\uFF1A").concat(userCommands[target], "\n  \u7528\u6CD5\uFF1A").concat(target, " [\u53C2\u6570...]");
+          }
+          return "\u672A\u627E\u5230\u6307\u4EE4 \"".concat(target, "\"\u3002\u8F93\u5165 \"help\" \u67E5\u770B\u6240\u6709\u53EF\u7528\u6307\u4EE4\u3002");
+        }
+        let output = "".concat(msg('command-help-available') || '可用指令列表：', "\n\n");
+        for (const _ref13 of Object.entries(commands)) {
+          var _ref14 = _slicedToArray(_ref13, 2);
+          const name = _ref14[0];
+          const cmd = _ref14[1];
           if (name !== 'creeper?') {
-            output += "  ".concat(name, " - ").concat(cmd.description, "\n");
+            output += "  ".concat(name.padEnd(12), " - ").concat(cmd.description, "\n");
           }
         }
 
         // 显示用户指令
         const userCommandCount = Object.keys(userCommands).length;
         if (userCommandCount > 0) {
-          output += "\n".concat(msg('command-user-command') || 'User Command：', "\n");
-          for (const _ref13 of Object.entries(userCommands)) {
-            var _ref14 = _slicedToArray(_ref13, 2);
-            const name = _ref14[0];
-            const description = _ref14[1];
-            output += "  ".concat(name, " - ").concat(description, "\n");
+          output += "\n".concat(msg('command-user-command') || '自定义积木指令：', "\n");
+          for (const _ref15 of Object.entries(userCommands)) {
+            var _ref16 = _slicedToArray(_ref15, 2);
+            const name = _ref16[0];
+            const description = _ref16[1];
+            output += "  ".concat(name.padEnd(12), " - ").concat(description, "\n");
           }
         }
+        output += '\n提示: 输入 "<指令名> help" 或 "help <指令名>" 可查询指定指令的详细用法。';
         return output;
       }
     },
+    clear: {
+      description: '清空终端屏幕历史日志',
+      usage: 'clear',
+      example: 'clear',
+      aliases: [],
+      execute: () => {
+        virtualList.clear();
+        resetLogTracking();
+        return null;
+      }
+    },
     fastfetch: {
-      description: msg('command-fastfetch-desc') || 'Show device status information',
+      description: msg('command-fastfetch-desc') || '显示系统与设备运行环境状态信息',
+      usage: 'fastfetch',
+      example: 'fastfetch',
+      aliases: [],
       execute: async () => {
         const asciiArt = "               \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                                \n          \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                           \n       \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                        \n     \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                      \n   \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                    \n  \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                   \n \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                  \n \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591                \n\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591              \n\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591            \n\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591\u2591\u2591          \n\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591\u2591\u2591          \n \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591          \n  \u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2593\u2593\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591          \n  \u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2593\u2593\u2593\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591          \n   \u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2593\u2593\u2593\u2593\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591          \n  \u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2593\u2593\u2593\u2593\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591          \n  \u2591\u2591\u2591\u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2593\u2593\u2593\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591            \n  \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2592\u2593\u2592\u2592\u2592\u2592\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591              \n  \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591   \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                  \n    \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                                   \n     \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                                    \n       \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591                                       ";
-        let output = 'Device Status:\n\n';
-
-        // Navigator API information
+        let output = '【系统与设备环境状态】:\n\n';
         if (navigator.userAgent) {
-          output += "  User Agent: ".concat(navigator.userAgent.substring(0, 100)).concat(navigator.userAgent.length > 100 ? '...' : '', "\n");
+          output += "  \u7528\u6237\u4EE3\u7406 (UA): ".concat(navigator.userAgent.substring(0, 100)).concat(navigator.userAgent.length > 100 ? '...' : '', "\n");
         }
         if (navigator.platform) {
-          output += "  Platform: ".concat(navigator.platform, "\n");
+          output += "  \u64CD\u4F5C\u7CFB\u7EDF: ".concat(navigator.platform, "\n");
         }
         if (navigator.language) {
-          output += "  Language: ".concat(navigator.language, "\n");
+          output += "  \u7CFB\u7EDF\u8BED\u8A00: ".concat(navigator.language, "\n");
         }
         if (navigator.hardwareConcurrency) {
-          output += "  CPU Cores: ".concat(navigator.hardwareConcurrency, "\n");
+          output += "  CPU \u903B\u8F91\u6838\u5FC3: ".concat(navigator.hardwareConcurrency, "\n");
         }
         if (navigator.deviceMemory) {
-          output += "  Device Memory: ".concat(navigator.deviceMemory, " GB\n");
+          output += "  \u8BBE\u5907\u7269\u7406\u5185\u5B58: ".concat(navigator.deviceMemory, " GB\n");
         }
-
-        // Screen information
         if (screen.width && screen.height) {
-          output += "  Screen Resolution: ".concat(screen.width, "x").concat(screen.height, "\n");
+          output += "  \u5C4F\u5E55\u5206\u8FA8\u7387: ".concat(screen.width, "x").concat(screen.height, "\n");
         }
         if (screen.colorDepth) {
-          output += "  Color Depth: ".concat(screen.colorDepth, " bits\n");
+          output += "  \u8272\u5F69\u6DF1\u5EA6: ".concat(screen.colorDepth, " bits\n");
         }
-
-        // WebGPU support and details
         if ('gpu' in navigator) {
-          output += "  WebGPU: Supported\n";
+          output += "  WebGPU \u52A0\u901F: \u652F\u6301\n";
           try {
-            // Get GPU adapter information
             const adapter = await navigator.gpu.requestAdapter();
             if (adapter) {
-              output += "  GPU Adapter: ".concat(adapter.name, "\n");
-
-              // Get adapter features
+              output += "  \u56FE\u5F62\u9002\u914D\u5668: ".concat(adapter.name || '默认适配器', "\n");
               const features = [];
               for (const feature of adapter.features) {
                 features.push(feature);
               }
               if (features.length > 0) {
-                output += "  GPU Features: ".concat(features.slice(0, 5).join(', ')).concat(features.length > 5 ? '...' : '', "\n");
+                output += "  GPU \u7279\u6027: ".concat(features.slice(0, 5).join(', ')).concat(features.length > 5 ? '...' : '', "\n");
               }
-
-              // Get adapter limits
               const limits = adapter.limits;
               if (limits && limits.maxTextureDimension2D) {
-                output += "  Max Texture Size: ".concat(limits.maxTextureDimension2D, "x").concat(limits.maxTextureDimension2D, "\n");
+                output += "  \u6700\u5927\u7EB9\u7406\u5C3A\u5BF8: ".concat(limits.maxTextureDimension2D, "x").concat(limits.maxTextureDimension2D, "\n");
               }
-
-              // Try to get device info
               try {
                 const device = await adapter.requestDevice();
-                output += "  GPU Device: ".concat(device.label || 'Default Device', "\n");
-                device.destroy(); // Cleanup
-              } catch (deviceError) {
-                // Device request might fail, but that's okay
-              }
+                output += "  GPU \u8BBE\u5907\u540D\u79F0: ".concat(device.label || 'Default Device', "\n");
+                device.destroy();
+              } catch (deviceError) {}
             } else {
-              output += "  GPU Adapter: Not available\n";
+              output += "  \u56FE\u5F62\u9002\u914D\u5668: \u65E0\u6CD5\u83B7\u53D6\n";
             }
           } catch (error) {
-            output += "  GPU Info: Error retrieving details - ".concat(error.message, "\n");
+            output += "  GPU \u4FE1\u606F\u9519\u8BEF: ".concat(error.message, "\n");
           }
         } else {
-          output += "  WebGPU: Not Supported\n";
+          output += "  WebGPU \u52A0\u901F: \u4E0D\u652F\u6301\n";
         }
-
-        // Network information
         if (navigator.connection) {
           const connection = navigator.connection;
-          output += "  Network Type: ".concat(connection.type || 'Unknown', "\n");
+          output += "  \u7F51\u7EDC\u7C7B\u578B: ".concat(connection.type || '未知', "\n");
           if (connection.effectiveType) {
-            output += "  Effective Type: ".concat(connection.effectiveType, "\n");
+            output += "  \u7F51\u7EDC\u5236\u5F0F: ".concat(connection.effectiveType, "\n");
           }
           if (connection.downlink) {
-            output += "  Downlink: ".concat(connection.downlink, " Mbps\n");
+            output += "  \u4E0B\u884C\u901F\u7387: ".concat(connection.downlink, " Mbps\n");
           }
         }
-        output += "\n  AstraEditor Version: ".concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__["default"].version, " ( Built in ").concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__["default"].date, " )\n");
-        output += '  Terminal Version: 1.3.0\n';
+        output += "\n  AstraEditor \u7248\u672C: ".concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_12__["default"].version, " (\u6784\u5EFA\u4E8E ").concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_12__["default"].date, ")\n");
+        output += '  终端组件版本: 1.3.0\n';
         const asciiLines = asciiArt.split('\n');
         const infoLines = output.split('\n');
         let combined = '';
@@ -2926,81 +3458,466 @@ class TerminalVirtualList {
       }
     },
     echo: {
-      description: msg('command-echo-desc') || 'Echo the input text',
+      description: msg('command-echo-desc') || '在终端回显输出指定的文本内容（支持 BBCode 颜色与样式）',
+      usage: 'echo <文本内容>',
+      example: 'echo [color=#4ec9b0]Hello AstraEditor[/color]\necho [b]加粗文本[/b]',
+      aliases: [],
       execute: args => {
         const text = args.join(' ');
         if (text) {
-          // 直接走 BBCode 输出队列，支持颜色、链接、粗体等格式
           createBBCodeLogLines(text, null);
         }
         return null;
       }
     },
     project: {
-      description: msg('command-project-desc') || 'Show project information',
+      description: msg('command-project-desc') || '显示当前 Scratch 项目基本统计信息',
+      usage: 'project',
+      example: 'project',
+      aliases: [],
       execute: () => {
         try {
-          const vm = addon.tab.traps.vm;
           const target = vm.runtime.getEditingTarget();
           const stage = vm.runtime.getTargetForStage();
-          return "".concat(msg('command-project-output') || 'Project Information', ":\n  ").concat(msg('command-project-stage') || 'Stage', ": ").concat(stage.getName(), "\n  ").concat(msg('command-project-sprite') || 'Current Sprite', ": ").concat(target.getName(), "\n  ").concat(msg('command-project-sprites') || 'Sprites', ": ").concat(vm.runtime.targets.length - 1, "\n  ").concat(msg('command-project-variables') || 'Variables', ": ").concat(Object.keys(stage.variables).length, "\n  ").concat(msg('command-project-broadcasts') || 'Broadcasts', ": ").concat(Object.keys(stage.blocks).filter(k => k.startsWith('broadcast_')).length, "\n");
+          return "".concat(msg('command-project-output') || '项目统计信息', ":\n  ").concat(msg('command-project-stage') || '舞台背景', ": ").concat(stage ? stage.getName() : 'Stage', "\n  ").concat(msg('command-project-sprite') || '当前编辑角色', ": ").concat(target ? target.getName() : '无', "\n  ").concat(msg('command-project-sprites') || '角色总数', ": ").concat(Math.max(0, vm.runtime.targets.length - 1), "\n  ").concat(msg('command-project-variables') || '全局变量与列表数', ": ").concat(stage ? Object.keys(stage.variables).length : 0, "\n  ").concat(msg('command-project-broadcasts') || '广播事件数', ": ").concat(stage ? Object.keys(stage.blocks).filter(k => k.startsWith('broadcast_')).length : 0, "\n");
         } catch (e) {
-          return msg('command-project-error') || 'Error: Unable to get project information';
+          return msg('command-project-error') || '错误：无法获取项目信息';
         }
       }
     },
     variables: {
-      description: msg('command-variables-desc') || 'List all variables',
+      description: msg('command-variables-desc') || '列出当前角色的私有变量与舞台全局变量',
+      usage: 'variables',
+      example: 'variables',
+      aliases: [],
       execute: () => {
         try {
-          const vm = addon.tab.traps.vm;
           const target = vm.runtime.getEditingTarget();
           const stage = vm.runtime.getTargetForStage();
-          let output = msg('command-variables-global') || 'Global Variables:\n';
-          Object.values(stage.variables).forEach(v => {
-            if (v.type === '' || v.type === 'list') {
-              const value = v.type === 'list' ? "[".concat(v.value.join(', '), "]") : v.value;
-              output += "  ".concat(v.name, " = ").concat(value, "\n");
-            }
-          });
-          output += "\n".concat(msg('command-variables-local') || 'Local Variables:', "\n");
-          if (!target.isStage) {
-            Object.values(target.variables).forEach(v => {
+          let output = "".concat(msg('command-variables-global') || '全局变量与列表：', "\n");
+          let hasGlobal = false;
+          if (stage && stage.variables) {
+            Object.values(stage.variables).forEach(v => {
               if (v.type === '' || v.type === 'list') {
+                hasGlobal = true;
                 const value = v.type === 'list' ? "[".concat(v.value.join(', '), "]") : v.value;
                 output += "  ".concat(v.name, " = ").concat(value, "\n");
               }
             });
           }
+          if (!hasGlobal) output += '  (暂无全局变量)\n';
+          output += "\n".concat(msg('command-variables-local') || '当前角色私有变量与列表：', "\n");
+          let hasLocal = false;
+          if (target && !target.isStage && target.variables) {
+            Object.values(target.variables).forEach(v => {
+              if (v.type === '' || v.type === 'list') {
+                hasLocal = true;
+                const value = v.type === 'list' ? "[".concat(v.value.join(', '), "]") : v.value;
+                output += "  ".concat(v.name, " = ").concat(value, "\n");
+              }
+            });
+          }
+          if (!hasLocal) output += '  (暂无私有变量)\n';
           return output;
         } catch (e) {
-          return msg('command-variables-error') || 'Error: Unable to get variables';
+          return msg('command-variables-error') || '错误：无法获取变量信息';
         }
       }
     },
     sprites: {
-      description: msg('command-sprites-desc') || 'List all sprites',
+      description: msg('command-sprites-desc') || '列出项目中所有的角色名称',
+      usage: 'sprites',
+      example: 'sprites',
+      aliases: [],
       execute: () => {
         try {
-          const vm = addon.tab.traps.vm;
-          let output = "".concat(msg('command-sprites-output') || 'Sprites:', "\n");
+          let output = "".concat(msg('command-sprites-output') || '角色列表：', "\n");
+          let count = 0;
           vm.runtime.targets.forEach(target => {
             if (!target.isStage) {
-              output += "  ".concat(target.getName(), "\n");
+              count++;
+              output += "  ".concat(count, ". ").concat(target.getName(), "\n");
             }
           });
+          if (count === 0) output += '  (暂无角色)\n';
           return output;
         } catch (e) {
-          return msg('command-sprites-error') || 'Error: Unable to get sprites';
+          return msg('command-sprites-error') || '错误：无法获取角色列表';
         }
       }
     },
     version: {
-      description: msg('command-version-desc') || 'Show terminal version',
-      execute: () => "AstraEditor Terminal v".concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_10__["default"].version)
+      description: msg('command-version-desc') || '显示 AstraEditor Terminal 终端组件版本号',
+      usage: 'version',
+      example: 'version',
+      aliases: [],
+      execute: () => "AstraEditor Terminal v".concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_12__["default"].version, " (\u5185\u6838\u6784\u5EFA\u65E5\u671F: ").concat(_lib_ae_version_js__WEBPACK_IMPORTED_MODULE_12__["default"].date, ")")
+    },
+    top: {
+      description: msg('command-top-desc') || '切换输入框上方的实时 CUI 性能监控条 (FPS/克隆/线程)',
+      usage: 'top [-s | once]',
+      example: 'top  (开启或关闭 CUI 性能条)\ntop -s  (仅输出一次性能快照)',
+      aliases: ['perf'],
+      execute: args => {
+        if (args && (args[0] === '-s' || args[0] === 'once')) {
+          const maxFps = vm.runtime.frameLoop.framerate === 0 ? 60 : vm.runtime.frameLoop.framerate;
+          const clones = vm.runtime._cloneCounter || 0;
+          const threads = vm.runtime.threads ? vm.runtime.threads.length : 0;
+          const target = vm.runtime.getEditingTarget();
+          return "\u6027\u80FD\u5FEB\u7167:\n  \u5B9E\u65F6\u5E27\u7387 (FPS): ".concat(currentFps, " / ").concat(maxFps, "\n  \u514B\u9686\u4F53\u6570\u91CF: ").concat(clones, " / 300\n  \u8FD0\u884C\u4E2D\u79EF\u6728\u7EBF\u7A0B: ").concat(threads, "\n  \u5355\u5E27\u6B65\u8FDB\u8017\u65F6: ").concat(lastStepDuration.toFixed(2), "ms\n  \u5F53\u524D\u7F16\u8F91\u89D2\u8272: ").concat(target ? target.getName() : '舞台');
+        }
+        const active = toggleCui();
+        if (active) {
+          return msg('top-started') || 'CUI 性能监控条已在输入框上方开启。输入 "top" 或点击 ✕ 可关闭。';
+        }
+        return msg('top-closed') || 'CUI 性能监控条已关闭。';
+      }
+    },
+    perf: {
+      description: msg('command-perf-desc') || 'top 指令的快捷别名',
+      usage: 'perf [-s | once]',
+      example: 'perf',
+      aliases: [],
+      execute: args => commands.top.execute(args)
+    },
+    fps: {
+      description: msg('command-fps-desc') || '查看当前实时帧率与目标帧率',
+      usage: 'fps',
+      example: 'fps',
+      aliases: [],
+      execute: args => {
+        if (!args || args.length === 0) {
+          const maxFps = vm.runtime.frameLoop.framerate === 0 ? 60 : vm.runtime.frameLoop.framerate;
+          return "\u5F53\u524D\u5B9E\u65F6\u5E27\u7387: ".concat(currentFps, " FPS (\u76EE\u6807\u5E27\u7387: ").concat(maxFps, " FPS)");
+        }
+        return commands.top.execute(args);
+      }
+    },
+    threads: {
+      description: msg('command-threads-desc') || '列出所有当前正在运行的积木线程栈与跳转定位',
+      usage: 'threads',
+      example: 'threads',
+      aliases: ['ps'],
+      execute: () => {
+        const threads = vm.runtime.threads;
+        if (!threads || threads.length === 0) {
+          return msg('no-threads-running') || '当前没有正在运行的积木线程。';
+        }
+        const statusMap = {
+          0: '运行中 (RUNNING)',
+          1: '等待中 (PROMISE_WAIT)',
+          2: '让步 (YIELD)',
+          3: '等待下一帧 (YIELD_TICK)',
+          4: '已结束 (DONE)'
+        };
+        for (let i = 0; i < threads.length; i++) {
+          const thread = threads[i];
+          const target = thread.target;
+          const targetInfo = getTargetInfoById(target ? target.id : null);
+          const topBlockId = thread.peekStack ? thread.peekStack() : thread.topBlock;
+          const status = statusMap[thread.status] || thread.status;
+          const line = document.createElement('div');
+          line.className = 'sa-terminal-result-line';
+          const infoSpan = document.createElement('span');
+          infoSpan.textContent = "  #".concat(i + 1, " [\u89D2\u8272: ").concat(targetInfo.name, "] \u72B6\u6001: ").concat(status, " ");
+          line.appendChild(infoSpan);
+          if (topBlockId && targetInfo.exists) {
+            const linkWrapper = document.createElement('span');
+            linkWrapper.className = 'sa-terminal-log-link-wrapper';
+            linkWrapper.textContent = '[';
+            const link = createBlockLink(targetInfo, topBlockId);
+            link.className = 'sa-terminal-block-link';
+            linkWrapper.appendChild(link);
+            linkWrapper.appendChild(document.createTextNode(']'));
+            line.appendChild(linkWrapper);
+          }
+          virtualList.appendLog({
+            element: line,
+            contentHash: line.textContent
+          });
+        }
+        return "\u5F53\u524D\u6D3B\u8DC3\u7EBF\u7A0B\u603B\u6570: ".concat(threads.length);
+      }
+    },
+    ps: {
+      description: msg('command-ps-desc') || 'threads 指令的快捷别名',
+      usage: 'ps',
+      example: 'ps',
+      aliases: [],
+      execute: () => commands.threads.execute()
+    },
+    step: {
+      description: msg('command-step-desc') || '单步执行积木（项目运行中会自动挂起并单步推进）',
+      usage: 'step [步数]',
+      example: 'step  (单步执行 1 个积木)\nstep 5  (连续单步推进 5 步)',
+      aliases: ['s'],
+      execute: args => {
+        if (!vm.runtime.threads || vm.runtime.threads.length === 0) {
+          return '当前项目中没有正在执行的积木线程。请点击绿旗启动项目或点击积木运行。';
+        }
+        let count = 1;
+        if (args && args.length > 0) {
+          const parsed = parseInt(args[0], 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            count = Math.min(parsed, 100);
+          }
+        }
+        let autoPaused = false;
+        if (!(0,_module_js__WEBPACK_IMPORTED_MODULE_10__.isPaused)()) {
+          (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.setPaused)(true);
+          autoPaused = true;
+        }
+        let lastTargetName = '';
+        let lastBlockId = '';
+        for (let i = 0; i < count; i++) {
+          (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.singleStep)();
+          const running = _module_js__WEBPACK_IMPORTED_MODULE_10__.getRunningThread ? (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.getRunningThread)() : vm.runtime.sequencer ? vm.runtime.sequencer.activeThread : null;
+          if (running && running.target) {
+            lastTargetName = running.target.getName ? running.target.getName() : running.target.id;
+            lastBlockId = running.peekStack ? running.peekStack() : running.topBlock;
+          }
+        }
+        const isCompiled = vm.runtime.compilerOptions && vm.runtime.compilerOptions.enabled;
+        let compilerTip = '';
+        if (isCompiled) {
+          compilerTip = '\n提示: 当前处于 TurboWarp 编译模式。输入 "compiler off" 可切换为解释器模式，享受逐积木高亮高保真调试！';
+        }
+        const prefix = autoPaused ? '【已自动挂起项目】' : '';
+        if (lastTargetName) {
+          return "".concat(prefix, "\u5355\u6B65\u63A8\u8FDB ").concat(count, " \u6B65 (\u5F53\u524D\u89D2\u8272: ").concat(lastTargetName).concat(lastBlockId ? ", \u79EF\u6728ID: ".concat(lastBlockId) : '', ")").concat(compilerTip);
+        }
+        return "".concat(prefix, "\u5355\u6B65\u63A8\u8FDB ").concat(count, " \u6B65\u3002").concat(compilerTip);
+      }
+    },
+    s: {
+      description: 'step 指令的快捷别名',
+      usage: 's [步数]',
+      example: 's\ns 5',
+      aliases: [],
+      execute: args => commands.step.execute(args)
+    },
+    continue: {
+      description: msg('command-continue-desc') || '恢复被暂停的项目全速运行',
+      usage: 'continue',
+      example: 'continue',
+      aliases: ['c'],
+      execute: () => {
+        if ((0,_module_js__WEBPACK_IMPORTED_MODULE_10__.isPaused)()) {
+          (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.setPaused)(false);
+          return '已恢复项目运行。';
+        }
+        return '项目当前正在全速运行中。';
+      }
+    },
+    c: {
+      description: 'continue 指令的快捷别名',
+      usage: 'c',
+      example: 'c',
+      aliases: [],
+      execute: () => commands.continue.execute()
+    },
+    pause: {
+      description: msg('command-pause-desc') || '暂停项目运行，准备单步调试',
+      usage: 'pause',
+      example: 'pause',
+      aliases: [],
+      execute: () => {
+        if (!(0,_module_js__WEBPACK_IMPORTED_MODULE_10__.isPaused)()) {
+          (0,_module_js__WEBPACK_IMPORTED_MODULE_10__.setPaused)(true);
+          const threadCount = vm.runtime.threads ? vm.runtime.threads.length : 0;
+          return "\u5DF2\u6682\u505C\u9879\u76EE\u8FD0\u884C (\u5F53\u524D\u6D3B\u8DC3\u7EBF\u7A0B: ".concat(threadCount, ")\u3002\u4F7F\u7528 \"step\" (\u6216 \"s\") \u8FDB\u884C\u5355\u6B65\u8C03\u8BD5\uFF0C\u4F7F\u7528 \"continue\" (\u6216 \"c\") \u6062\u590D\u5168\u901F\u8FD0\u884C\u3002");
+        }
+        return '项目当前已处于暂停状态。';
+      }
+    },
+    kill: {
+      description: msg('command-kill-desc') || '强制终止指定编号的执行线程（排查卡顿与死循环利器）',
+      usage: 'kill <线程序号>',
+      example: 'kill 1',
+      aliases: [],
+      execute: args => {
+        const id = parseInt(args[0], 10);
+        if (isNaN(id) || id < 1 || !vm.runtime.threads || id > vm.runtime.threads.length) {
+          const max = vm.runtime.threads ? vm.runtime.threads.length : 0;
+          return "\u7528\u6CD5: kill <1-".concat(max, ">\u3002\u8F93\u5165 \"threads\" \u53EF\u67E5\u770B\u5F53\u524D\u6D3B\u8DC3\u7EBF\u7A0B\u7F16\u53F7\u3002");
+        }
+        const thread = vm.runtime.threads[id - 1];
+        if (thread) {
+          thread.status = 4; // STATUS_DONE
+          return "\u5DF2\u6210\u529F\u5F3A\u5236\u7EC8\u6B62\u7EBF\u7A0B #".concat(id, " (\u89D2\u8272: ").concat(thread.target ? thread.target.getName() : '未知', ")\u3002");
+        }
+        return "\u672A\u627E\u5230\u7EBF\u7A0B #".concat(id, "\u3002");
+      }
+    },
+    get: {
+      description: msg('command-get-desc') || '获取指定变量或列表的当前数值',
+      usage: 'get <变量名称>',
+      example: 'get 得分\nget 玩家列表',
+      aliases: [],
+      execute: args => {
+        const name = args.join(' ').trim();
+        if (!name) return '用法: get <变量名称>';
+        const found = findVariable(name);
+        if (!found) return "\u672A\u627E\u5230\u540D\u4E3A \"".concat(name, "\" \u7684\u53D8\u91CF\u6216\u5217\u8868\u3002");
+        const variable = found.variable,
+          isLocal = found.isLocal;
+        const scope = isLocal ? '私有' : '全局';
+        if (variable.type === 'list') {
+          return "[".concat(scope, "\u5217\u8868] ").concat(variable.name, " (\u5171 ").concat(variable.value.length, " \u9879):\n[ ").concat(variable.value.join(', '), " ]");
+        }
+        return "[".concat(scope, "] ").concat(variable.name, " = ").concat(JSON.stringify(variable.value));
+      }
+    },
+    set: {
+      description: msg('command-set-desc') || '直接动态修改运行中项目的变量或列表值',
+      usage: 'set <变量名称> <新数值>',
+      example: 'set 生命值 100\nset 游戏结束 true\nset 道具 [苹果, 香蕉]',
+      aliases: [],
+      execute: args => {
+        if (args.length < 2) return '用法: set <变量名称> <新数值>';
+        const name = args[0];
+        const rawVal = args.slice(1).join(' ').trim();
+        const found = findVariable(name);
+        if (!found) return "\u672A\u627E\u5230\u540D\u4E3A \"".concat(name, "\" \u7684\u53D8\u91CF\u6216\u5217\u8868\u3002");
+        const variable = found.variable,
+          target = found.target,
+          isLocal = found.isLocal;
+        let parsedVal = rawVal;
+        if (rawVal === 'true') parsedVal = true;else if (rawVal === 'false') parsedVal = false;else if (!isNaN(Number(rawVal)) && rawVal !== '') parsedVal = Number(rawVal);else if (variable.type === 'list') {
+          try {
+            parsedVal = JSON.parse(rawVal);
+            if (!Array.isArray(parsedVal)) parsedVal = rawVal.split(',');
+          } catch (_unused3) {
+            parsedVal = rawVal.split(',');
+          }
+        }
+        vm.setVariableValue(target.id, variable.id, parsedVal);
+        const scope = isLocal ? '私有' : '全局';
+        return "[".concat(scope, "] \u5DF2\u5C06 \"").concat(variable.name, "\" \u7684\u503C\u4FEE\u6539\u4E3A: ").concat(JSON.stringify(parsedVal));
+      }
+    },
+    watch: {
+      description: msg('command-watch-desc') || '监视指定变量数值变动（变动时在终端实时打日志）',
+      usage: 'watch [变量名称 | clear]',
+      example: 'watch 得分\nwatch  (查看监视列表)\nwatch clear  (清空所有监视)',
+      aliases: [],
+      execute: args => {
+        const name = args.join(' ').trim();
+        if (!name) {
+          if (watchedVariables.size === 0) return '当前没有监视任何变量。用法: watch <变量名称>';
+          let list = '当前监视的变量列表:\n';
+          for (const _ref17 of watchedVariables) {
+            var _ref18 = _slicedToArray(_ref17, 2);
+            const id = _ref18[0];
+            const info = _ref18[1];
+            list += "  - ".concat(info.name, " (\u5F53\u524D\u6570\u503C: ").concat(JSON.stringify(info.lastValue), ")\n");
+          }
+          return list;
+        }
+        if (name === 'clear') {
+          const count = watchedVariables.size;
+          watchedVariables.clear();
+          return "\u5DF2\u6E05\u7A7A\u6240\u6709 ".concat(count, " \u4E2A\u88AB\u76D1\u89C6\u7684\u53D8\u91CF\u3002");
+        }
+        const found = findVariable(name);
+        if (!found) return "\u672A\u627E\u5230\u540D\u4E3A \"".concat(name, "\" \u7684\u53D8\u91CF\u3002");
+        const variable = found.variable,
+          target = found.target,
+          isLocal = found.isLocal;
+        const currentVal = Array.isArray(variable.value) ? JSON.stringify(variable.value) : variable.value;
+        watchedVariables.set(variable.id, {
+          name: variable.name,
+          targetId: target.id,
+          lastValue: currentVal,
+          isLocal
+        });
+        return "\u5DF2\u5F00\u59CB\u76D1\u89C6\u53D8\u91CF \"".concat(variable.name, "\"\u3002\u5F53\u8BE5\u53D8\u91CF\u5728\u9879\u76EE\u8FD0\u884C\u4E2D\u53D8\u52A8\u65F6\uFF0C\u5C06\u5728\u7EC8\u7AEF\u5B9E\u65F6\u8F93\u51FA\u65E5\u5FD7\u3002");
+      }
+    },
+    unwatch: {
+      description: msg('command-unwatch-desc') || '取消对指定变量的数值变动监视',
+      usage: 'unwatch <变量名称>',
+      example: 'unwatch 得分',
+      aliases: [],
+      execute: args => {
+        const name = args.join(' ').trim();
+        if (!name) return '用法: unwatch <变量名称>';
+        for (const _ref19 of watchedVariables) {
+          var _ref20 = _slicedToArray(_ref19, 2);
+          const id = _ref20[0];
+          const info = _ref20[1];
+          if (info.name === name) {
+            watchedVariables.delete(id);
+            return "\u5DF2\u505C\u6B62\u5BF9\u53D8\u91CF \"".concat(name, "\" \u7684\u53D8\u52A8\u76D1\u89C6\u3002");
+          }
+        }
+        return "\u53D8\u91CF \"".concat(name, "\" \u5F53\u524D\u5E76\u672A\u88AB\u76D1\u89C6\u3002");
+      }
+    },
+    heatmap: {
+      description: msg('command-heatmap-desc') || '积木执行热力图（在 Blockly 编辑区直观染色展示执行热度）',
+      usage: 'heatmap [on | off | reset | max <数值> | status]',
+      example: 'heatmap on  (开启热力图实时染色)\nheatmap off  (关闭热力图并恢复原本色彩)\nheatmap reset  (重置频次计数)\nheatmap max 1000  (手动指定热度峰值)\nheatmap status  (查看统计状态)',
+      aliases: [],
+      execute: args => {
+        if (!args || args.length === 0 || args[0] === 'on' || args[0] === 'start') {
+          heatmapManager.start();
+          const status = heatmapManager.getStatus();
+          return "".concat(msg('heatmap-started') || '已开启积木执行热力图！', "\n  \u5F53\u524D\u8FFD\u8E2A\u79EF\u6728\u6570: ").concat(status.trackedBlocks, "\n  \u6700\u9AD8\u6267\u884C\u9891\u6B21: ").concat(status.maxExecutions, "\n  \u8F93\u5165 \"heatmap off\" \u53EF\u5173\u95ED\u3002");
+        }
+        const sub = args[0].toLowerCase();
+        if (sub === 'off' || sub === 'stop') {
+          heatmapManager.stop();
+          return msg('heatmap-stopped') || '已关闭热力图并恢复积木原本色彩。';
+        }
+        if (sub === 'reset' || sub === 'clear') {
+          heatmapManager.reset();
+          return msg('heatmap-reset') || '已重置积木热力图统计数据。';
+        }
+        if (sub === 'max') {
+          if (args.length < 2) {
+            return "\u5F53\u524D\u70ED\u529B\u56FE\u5CF0\u503C\u4E0A\u9650: ".concat(heatmapManager.customMax || '自动缩放 (自适应最大执行频次)', "\n\u7528\u6CD5: heatmap max <\u6570\u503C> (\u4F8B\u5982 heatmap max 500)");
+          }
+          heatmapManager.setMax(args[1]);
+          return "\u70ED\u529B\u56FE\u5CF0\u503C\u4E0A\u9650\u5DF2\u8BBE\u7F6E\u4E3A: ".concat(heatmapManager.customMax || '自动缩放');
+        }
+        if (sub === 'status') {
+          const status = heatmapManager.getStatus();
+          return "\u79EF\u6728\u6267\u884C\u70ED\u529B\u56FE\u72B6\u6001:\n  \u8FD0\u884C\u72B6\u6001: ".concat(status.active ? '【开启中】' : '【已关闭】', "\n  \u5DF2\u8FFD\u8E2A\u79EF\u6728\u6570: ").concat(status.trackedBlocks, "\n  \u6700\u9AD8\u6267\u884C\u9891\u6B21: ").concat(status.maxExecutions, "\n  \u81EA\u5B9A\u4E49\u4E0A\u9650: ").concat(status.customMax || '自动缩放');
+        }
+        return '未知参数。用法: heatmap on | off | reset | max <数值> | status';
+      }
+    },
+    compiler: {
+      description: msg('command-compiler-desc') || 'TurboWarp 编译器开关控制（解释器模式下支持精准积木单步高亮）',
+      usage: 'compiler [on | off]',
+      example: 'compiler off  (关闭编译器，进入解释器模式)\ncompiler on  (开启编译器，进入全速运行模式)',
+      aliases: [],
+      execute: args => {
+        const currentEnabled = !!(vm.runtime.compilerOptions && vm.runtime.compilerOptions.enabled);
+        if (!args || args.length === 0) {
+          return "\u5F53\u524D\u7F16\u8BD1\u5668\u72B6\u6001: ".concat(currentEnabled ? '【已开启】(全速高性能模式)' : '【已关闭】(解释器模式，支持高保真单步调试与高亮)', "\n\u7528\u6CD5: compiler on (\u5F00\u542F) \u6216 compiler off (\u5173\u95ED)");
+        }
+        const opt = args[0].toLowerCase();
+        if (opt === 'on' || opt === 'enable' || opt === '1' || opt === 'true') {
+          vm.setCompilerOptions({
+            enabled: true
+          });
+          return msg('compiler-on') || 'TurboWarp 编译器已开启（全速高性能模式）。';
+        } else if (opt === 'off' || opt === 'disable' || opt === '0' || opt === 'false') {
+          vm.setCompilerOptions({
+            enabled: false
+          });
+          return msg('compiler-off') || 'TurboWarp 编译器已关闭。项目现在处于解释器模式，支持最精准的积木单步调试与高亮！';
+        }
+        return '未知参数。用法: compiler on 或 compiler off';
+      }
     },
     'creeper?': {
       description: '',
+      usage: 'creeper?',
+      example: 'creeper?',
+      aliases: [],
       execute: () => msg('command-creeper') || 'Awwww Man!'
     }
   };
@@ -3015,11 +3932,6 @@ class TerminalVirtualList {
       historyIndex = commandHistory.length;
     }
     resetLogTracking();
-    if (cmdName === 'clear') {
-      virtualList.clear();
-      resetLogTracking();
-      return;
-    }
     const commandLine = document.createElement('div');
     commandLine.className = 'sa-terminal-command-line';
     const commandText = document.createElement('span');
@@ -3034,26 +3946,26 @@ class TerminalVirtualList {
     if (!cmdName) {
       return;
     }
+    const isHelpArg = args.length > 0 && ['help', '-h', '--help', '-?', '?'].includes(args[0].toLowerCase());
+    if (cmdName === 'clear') {
+      if (isHelpArg) {
+        renderOutputLines(formatCommandHelp('clear', commands.clear));
+        return;
+      }
+      virtualList.clear();
+      resetLogTracking();
+      return;
+    }
     const cmd = commands[cmdName];
     if (cmd) {
+      if (isHelpArg) {
+        renderOutputLines(formatCommandHelp(cmdName, cmd));
+        return;
+      }
       try {
         const result = await cmd.execute(args);
         if (result) {
-          const lines = result.split('\n');
-          lines.forEach(lineContent => {
-            const resultLine = document.createElement('div');
-            resultLine.className = 'sa-terminal-result-line';
-            // 解析 BBCode
-            let parsedContent = parseBBCode(lineContent);
-            // 将文本节点中的空格转换为非断行空格以保留格式（不破坏 BBCode 生成的标签属性）
-            parsedContent = parsedContent.replace(/(^|>)([^<]*)(?=<|$)/g, (match, prefix, content) => prefix + content.replace(/ /g, '&nbsp;'));
-            resultLine.innerHTML = parsedContent;
-            resultLine.title = lineContent;
-            virtualList.appendLog({
-              element: resultLine,
-              contentHash: lineContent
-            });
-          });
+          renderOutputLines(result);
         }
       } catch (e) {
         const errorLine = document.createElement('div');
@@ -3065,6 +3977,20 @@ class TerminalVirtualList {
           contentHash: errorLine.textContent
         });
       }
+    } else if (userCommands[cmdName]) {
+      if (isHelpArg) {
+        renderOutputLines("\u3010\u81EA\u5B9A\u4E49\u6307\u4EE4\u3011".concat(cmdName, "\n  \u8BF4\u660E\uFF1A").concat(userCommands[cmdName], "\n  \u7528\u6CD5\uFF1A").concat(cmdName, " [\u53C2\u6570...]"));
+        return;
+      }
+    } else {
+      const errorLine = document.createElement('div');
+      errorLine.className = 'sa-terminal-error-line';
+      errorLine.textContent = "\u672A\u77E5\u6307\u4EE4: \"".concat(cmdName, "\"\u3002\u8F93\u5165 \"help\" \u67E5\u770B\u6240\u6709\u53EF\u7528\u6307\u4EE4\u3002");
+      errorLine.title = errorLine.textContent;
+      virtualList.appendLog({
+        element: errorLine,
+        contentHash: errorLine.textContent
+      });
     }
   };
 
@@ -4720,7 +5646,44 @@ ___CSS_LOADER_EXPORT___.push([module.id, `/* Terminal plugin styles */
   filter: grayscale(100%);
 }
 
+.sa-terminal-continue-button:hover {
+  background-color: var(--ui-primary-transparent);
+}
+
 .sa-terminal-continue-button:active {
+  transform: scale(0.95);
+}
+
+/* 单步执行按钮样式 */
+.sa-terminal-step-button {
+  background: none;
+  border: 1px solid #ffffff26;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ui-text-primary);
+  transition: all 0.2s;
+  font-family: inherit;
+  min-width: 32px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sa-terminal-step-button img {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  filter: grayscale(100%);
+}
+
+.sa-terminal-step-button:hover {
+  background-color: var(--ui-primary-transparent);
+}
+
+.sa-terminal-step-button:active {
   transform: scale(0.95);
 }
 
@@ -5395,7 +6358,102 @@ ___CSS_LOADER_EXPORT___.push([module.id, `/* Terminal plugin styles */
     background-color: rgba(255, 255, 255, 0.1);
   }
 } */
-`, "",{"version":3,"sources":["webpack://./src/addons/addons/Terminal/terminal.css"],"names":[],"mappings":"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","sourcesContent":["/* Terminal plugin styles */\n\n/* Terminal容器样式 */\n.sa-terminal-container {\n  width: calc(100% + 20px);\n  height: calc(100% + 20px);\n  margin: -10px;\n  display: flex;\n  flex-direction: column;\n  background: #1e1e1e;\n  border-radius: 0;\n  overflow: hidden;\n  font-family: 'Courier New', monospace;\n}\n\n/* Terminal头部样式 */\n.sa-terminal-header {\n  background: #2d2d2d;\n  color: #ffffff;\n  padding: 8px 12px;\n  font-size: 12px;\n  border-bottom: 1px solid #3c3c3c;\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  flex-shrink: 0;\n}\n\n/* 标题样式 */\n.sa-terminal-title {\n  font-weight: bold;\n  flex-shrink: 0;\n}\n\n/* 按钮容器样式 - 确保所有按钮并排靠右 */\n.sa-terminal-header-buttons {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n}\n\n/* 继续按钮样式 */\n.sa-terminal-continue-button {\n  background: none;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  padding: 4px 8px;\n  cursor: pointer;\n  font-size: 12px;\n  color: var(--ui-text-primary);\n  transition: all 0.2s;\n  font-family: inherit;\n  min-width: 32px;\n  height: 24px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.sa-terminal-continue-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-terminal-continue-button:active {\n  transform: scale(0.95);\n}\n\n/* 导出按钮样式 */\n.sa-terminal-export-button {\n  background: none;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  padding: 4px 8px;\n  cursor: pointer;\n  font-size: 12px;\n  color: var(--ui-text-primary);\n  transition: all 0.2s;\n  font-family: inherit;\n  min-width: 32px;\n  height: 24px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.sa-terminal-export-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-terminal-export-button:hover {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-export-button:active {\n  transform: scale(0.95);\n}\n\n.sa-terminal-settings-button {\n  background: none;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  padding: 4px 8px;\n  cursor: pointer;\n  font-size: 12px;\n  color: var(--ui-text-primary);\n  transition: all 0.2s;\n  font-family: inherit;\n  min-width: 32px;\n  height: 24px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.sa-terminal-settings-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-terminal-settings-button:hover {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-settings-button:active {\n  transform: scale(0.95);\n}\n\n.sa-terminal-settings-panel {\n  background: #1e1e1e;\n}\n\n.sa-terminal-settings-content {\n  color: #eeeeee;\n}\n\n.sa-terminal-setting-item {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n\n.sa-terminal-switch {\n  position: relative;\n  display: inline-block;\n  width: 40px;\n  height: 22px;\n}\n\n.sa-terminal-switch-input {\n  opacity: 0;\n  width: 0;\n  height: 0;\n  position: absolute;\n}\n\n.sa-terminal-switch-background {\n  position: absolute;\n  cursor: pointer;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  background-color: #555555;\n  transition: 0.3s;\n  border-radius: 22px;\n}\n\n.sa-terminal-switch-slider {\n  position: absolute;\n  cursor: pointer;\n  height: 16px;\n  width: 16px;\n  left: 3px;\n  bottom: 3px;\n  background-color: white;\n  transition: 0.3s;\n  border-radius: 50%;\n  z-index: 1;\n}\n\n.sa-terminal-status {\n  color: var(--looks-secondary);\n  font-size: 11px;\n}\n\n/* Terminal输出区域样式 */\n.sa-terminal-output {\n  flex: 1;\n  background: #1e1e1e;\n  color: #eeeeee;\n  font-size: 13px;\n  overflow-y: auto;\n  white-space: pre-wrap;\n  word-wrap: break-word;\n  line-height: 1.2;\n  min-height: 0;\n}\n\n.sa-terminal-output-inner {\n  position: relative;\n  padding: 10px;\n}\n\n.sa-terminal-log-end {\n  position: absolute;\n  width: 100%;\n  pointer-events: none;\n}\n\n/* Terminal输入行样式 */\n.sa-terminal-input-line {\n  display: flex;\n  align-items: center;\n  background: #1e1e1e;\n  padding: 8px;\n  border-top: 1px solid #3c3c3c;\n  flex-shrink: 0;\n}\n\n.sa-terminal-prompt {\n  color: var(--looks-secondary);\n  font-size: 13px;\n  margin-right: 5px;\n  flex-shrink: 0;\n}\n\n.sa-terminal-input {\n  flex: 1;\n  background: transparent;\n  border: none;\n  color: #eeeeee;\n  font-size: 13px;\n  outline: none;\n  font-family: 'Courier New', monospace;\n}\n\n.sa-terminal-input::placeholder {\n  color: #606060;\n}\n\n/* Terminal按钮样式 - 类似编辑器 tabs */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button {\n  padding: 0 12px !important;\n  border: none !important;\n  border-right: 1px solid var(--ui-black-transparent) !important;\n  border-left: 2px solid transparent !important;\n  border-top: 2px solid transparent !important;\n  height: 24px !important;\n  min-height: 24px !important;\n  background: var(--ui-white) !important;\n  color: #ffffff26 !important;\n  font-size: 12px !important;\n  cursor: pointer !important;\n  display: flex !important;\n  align-items: center !important;\n  justify-content: center !important;\n  gap: 6px !important;\n  transition: all 0.2s !important;\n  margin: 0 !important;\n  line-height: 1 !important;\n  font-weight: normal !important;\n}\n\n/* Terminal按钮hover状态 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button:hover {\n  background: var(--ui-primary) !important;\n}\n\n/* Terminal按钮图标样式 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button img {\n  width: 16px !important;\n  height: 16px !important;\n  margin: 0 !important;\n}\n\n/* Terminal按钮文本样式 - 非激活状态显示灰色 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button span {\n  font-size: 12px !important;\n  color: var(--text-primary-transparent) !important;\n}\n\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active {\n  background: var(--ui-white) !important;\n  color: var(--looks-secondary) !important;\n  font-weight: bold !important;\n  border-bottom: 2px solid var(--looks-secondary) !important;\n}\n\n/* 激活状态下图标颜色 - 显示主题色 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active img {\n  filter: none !important;\n}\n\n/* 激活状态下文字颜色 - 显示主题色 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active span {\n  color: var(--looks-secondary) !important;\n}\n\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active:hover {\n  background: var(--ui-white) !important;\n}\n\n/* VSCode 布局下的侧边栏按钮样式 - 与 SPA、bookmark 一致 */\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab {\n  width: 40px;\n  height: 40px;\n  font-size: 0;\n  background-color: #00000000;\n  border: 0;\n  border-radius: 0 !important;\n  margin: 0 !important;\n  padding-top: 5px;\n  padding-bottom: 5px;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab img {\n  width: 22px;\n  height: auto;\n  filter: grayscale(100%);\n}\n\n/* VSCode 布局下按钮激活状态 */\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab.sa-terminal-toggle-active,\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab.is-selected {\n  background-color: var(--ui-white) !important;\n  box-shadow: inset 3px 0px 0px 0px var(--looks-secondary) !important;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab.sa-terminal-toggle-active img,\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab.is-selected img {\n  filter: grayscale(0%);\n}\n/* \n@media (prefers-color-scheme: dark) {\n  .addons-bottom-panel-button-bar .sa-terminal-toggle-button {\n    background: var(--ui-dark) !important;\n  }\n\n  .addons-bottom-panel-button-bar .sa-terminal-toggle-button:hover {\n    background: #333333 !important;\n  }\n\n  .addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active {\n    background: var(--ui-dark) !important;\n  }\n\n  .addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active:hover {\n    background: var(--ui-dark) !important;\n  }\n\n  [class*=\"tabs\"][class*=\"vscodeList\"] .sa-terminal-toggle-button.vscode-tab.sa-terminal-toggle-active,\n  [class*=\"tabs\"][class*=\"vscodeList\"] .sa-terminal-toggle-button.vscode-tab.is-selected {\n    background-color: var(--ui-dark) !important;\n  }\n} */\n\n/* Bottom panel specific styles */\n.addons-bottom-panel .sa-terminal-container {\n  width: calc(100% + 20px);\n  height: calc(100% + 20px);\n  margin: -10px;\n  border-radius: 0;\n}\n\n/* 滚动条样式 */\n.sa-terminal-output::-webkit-scrollbar {\n  width: 8px;\n}\n\n.sa-terminal-output::-webkit-scrollbar-track {\n  background: #2d2d2d;\n}\n\n.sa-terminal-output::-webkit-scrollbar-thumb {\n  background: #4c4c4c;\n  border-radius: 4px;\n}\n\n.sa-terminal-output::-webkit-scrollbar-thumb:hover {\n  background: #5c5c5c;\n}\n\n.sa-terminal-output-inner::-webkit-scrollbar {\n  display: none;\n}\n\n/* 命令行样式 */\n.sa-terminal-command-line {\n  padding: 2px 0;\n  color: #eeeeee;\n  display: flex;\n  align-items: center;\n}\n\n.sa-terminal-command-line-text {\n  flex: 1;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n/* 结果行样式 */\n.sa-terminal-result-line {\n  padding: 2px 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  color: #eeeeee;\n}\n\n/* 错误行样式 */\n.sa-terminal-error-line {\n  padding: 2px 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  color: #ff6b6b;\n}\n\n/* 日志行样式 */\n.sa-terminal-log-line {\n  padding: 2px 0;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  position: relative;\n}\n\n.sa-terminal-log-text {\n  flex: 1;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: pre;\n}\n\n.sa-terminal-text-plain {\n  color: inherit;\n}\n\n.sa-terminal-url-link {\n  color: inherit;\n  text-decoration: underline;\n  cursor: pointer;\n}\n\n.sa-terminal-url-link:hover {\n  color: #4fc3f7;\n}\n\n.sa-terminal-log-link-wrapper {\n  flex-shrink: 0;\n  margin-left: 4px;\n}\n\n/* 重复内容计数器 */\n.sa-terminal-log-counter {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  min-width: 18px;\n  height: 18px;\n  background: var(--looks-secondary);\n  color: #000;\n  border-radius: 5px;\n  font-size: 10px;\n  font-weight: bold;\n  margin-right: 6px;\n  padding: 0 4px;\n}\n\n/* 块链接样式 */\n.sa-terminal-block-link {\n  color: var(--looks-secondary);\n  text-decoration: underline;\n  cursor: pointer;\n  font-size: 11px;\n  padding: 0 2px;\n  border-radius: 2px;\n  transition: background-color 0.2s;\n}\n\n.sa-terminal-block-link:hover {\n  background-color: #3c3c3c;\n  text-decoration: none;\n}\n\n.sa-terminal-block-link-unknown {\n  color: #808080;\n  cursor: default;\n  text-decoration: none;\n}\n\n.sa-terminal-block-link-unknown:hover {\n  background-color: transparent;\n}\n\n/* 日志标记样式 */\n.sa-terminal-log-mark {\n  flex-shrink: 0;\n  font-weight: bold;\n  padding: 0 4px;\n  border-radius: 2px;\n  font-size: 11px;\n}\n\n.sa-terminal-log-mark.log {\n  color: #ffffff;\n  background-color: #666666;\n}\n\n.sa-terminal-log-mark.warn {\n  color: #ffffff;\n  background-color: #ff9900;\n}\n\n.sa-terminal-log-mark.error {\n  color: #ffffff;\n  background-color: #ff4444;\n}\n\n.sa-terminal-log-mark.console-error {\n  color: #ffffff;\n  background-color: #e74c3c;\n}\n\n.sa-terminal-log-stack {\n  color: #888888;\n  font-size: 10px;\n  margin-left: 4px;\n}\n\n/* 位置切换按钮样式 */\n.sa-terminal-position-switch {\n  display: flex;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  gap: 4px;\n  align-items: center;\n  position: relative;\n}\n\n/* 轮换按钮样式 */\n.sa-terminal-rotate-button {\n  background: none;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  padding: 4px 8px;\n  cursor: pointer;\n  font-size: 12px;\n  color: var(--ui-text-primary);\n  transition: all 0.2s;\n  font-family: inherit;\n  min-width: 32px;\n  height: 24px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n/* 轮换按钮图标样式 */\n.sa-terminal-rotate-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n}\n\n.sa-terminal-rotate-button:hover {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-rotate-button:active {\n  transform: scale(0.95);\n}\n\n/* 浮窗容器样式 */\n.sa-terminal-position-popup {\n  position: absolute;\n  top: 100%;\n  right: 0;\n  margin-top: 4px;\n  background: #1e1e1e !important;\n  border: 1px solid #ffffff26 !important;\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);\n  padding: 4px;\n  display: none;\n  flex-direction: column;\n  gap: 2px;\n  z-index: 1000;\n  min-width: 120px;\n}\n\n/* 浮窗按钮样式 */\n.sa-terminal-popup-button {\n  background: none;\n  border: none;\n  border-radius: 4px;\n  padding: 6px 10px;\n  cursor: pointer;\n  font-size: 12px;\n  /* color: var(--ui-text-primary); */\n  text-align: left;\n  transition: background-color 0.2s;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-family: inherit;\n}\n\n/* 浮窗按钮图标样式 */\n.sa-terminal-popup-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n}\n\n.sa-terminal-popup-button:hover:not(:disabled) {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-popup-button:disabled {\n  opacity: 0.3;\n  cursor: not-allowed;\n}\n\n.sa-terminal-popup-button:active:not(:disabled) {\n  transform: scale(0.98);\n}\n\n/* Sidebar 模式样式 */\n.addons-side-bar .sa-terminal-container {\n  width: 100%;\n  height: 100%;\n  margin: 0;\n  border-radius: 0;\n}\n\n.addons-side-bar .sa-terminal-header {\n  border-radius: 0;\n}\n\n/* 独立窗口模式样式 */\n.sa-terminal-floating-window {\n  position: absolute;\n  top: 100px;\n  left: 100px;\n  width: 600px;\n  height: 400px;\n  min-width: 400px;\n  min-height: 300px;\n  background-color: var(--ui-white);\n  border: 1px solid #ffffff26;\n  border-radius: 8px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);\n  z-index: 1000;\n  display: flex;\n  flex-direction: column;\n  overflow: hidden;\n}\n\n/* 独立窗口中的 terminalHeader 作为标题栏 */\n.sa-terminal-floating-window .sa-terminal-header {\n  cursor: move;\n  user-select: none;\n  border-top-left-radius: 8px;\n  border-top-right-radius: 8px;\n}\n\n/* 独立窗口关闭按钮 */\n.sa-terminal-window-close-button {\n  background: none;\n  border: none;\n  color: inherit;\n  font-size: 20px;\n  cursor: pointer;\n  padding: 0 4px;\n  line-height: 1;\n  margin-left: 8px;\n  font-family: inherit;\n}\n\n.sa-terminal-window-close-button:hover {\n  opacity: 0.7;\n}\n\n/* 独立窗口中的 Terminal 容器 */\n.sa-terminal-floating-window .sa-terminal-container {\n  width: 100%;\n  height: 100%;\n  margin: 0;\n  border-radius: 0;\n  flex: 1;\n  overflow: auto;\n}\n\n/* 舞台头部按钮样式 */\n.sa-terminal-stage-header-button {\n  display: inline-block;\n}\n\n.sa-terminal-stage-header-button.sa-terminal-toggle-active .stage-header_stage-button {\n  background: var(--ui-primary) !important;\n}\n\n/* 暗色主题适配 */\n/* @media (prefers-color-scheme: dark) {\n  .sa-terminal-floating-window {\n    background-color: #1e1e1e;\n    border-color: #3c3c3c;\n  }\n\n  .sa-terminal-position-popup {\n    background-color: #2d2d2d;\n    border-color: #3c3c3c;\n  }\n\n  .sa-terminal-rotate-button {\n    color: #eeeeee;\n  }\n\n  .sa-terminal-rotate-button:hover {\n    background-color: rgba(255, 255, 255, 0.1);\n  }\n\n  .sa-terminal-popup-button:hover:not(:disabled) {\n    background-color: rgba(255, 255, 255, 0.1);\n  }\n} */\n"],"sourceRoot":""}]);
+
+/* CUI 状态监控栏（停靠在输入框上一行） */
+.sa-terminal-cui-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #141414;
+  border-top: 1px solid #2e2e2e;
+  border-bottom: 1px solid #242424;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: #c5c5c5;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  user-select: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.sa-terminal-cui-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.sa-terminal-cui-badge {
+  background: #29beb8;
+  color: #121212;
+  font-weight: 900;
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.sa-terminal-cui-chart-box {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sa-terminal-cui-canvas {
+  width: 110px;
+  height: 24px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: block;
+}
+
+.sa-terminal-cui-fps {
+  font-weight: bold;
+  font-size: 11px;
+  min-width: 46px;
+  flex-shrink: 0;
+}
+
+.sa-terminal-cui-separator {
+  color: #3e3e3e;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.sa-terminal-cui-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sa-terminal-cui-section .cui-val {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.sa-terminal-cui-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #777;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 4px;
+  line-height: 1;
+  border-radius: 3px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.sa-terminal-cui-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+`, "",{"version":3,"sources":["webpack://./src/addons/addons/Terminal/terminal.css"],"names":[],"mappings":"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","sourcesContent":["/* Terminal plugin styles */\n\n/* Terminal容器样式 */\n.sa-terminal-container {\n  width: calc(100% + 20px);\n  height: calc(100% + 20px);\n  margin: -10px;\n  display: flex;\n  flex-direction: column;\n  background: #1e1e1e;\n  border-radius: 0;\n  overflow: hidden;\n  font-family: 'Courier New', monospace;\n}\n\n/* Terminal头部样式 */\n.sa-terminal-header {\n  background: #2d2d2d;\n  color: #ffffff;\n  padding: 8px 12px;\n  font-size: 12px;\n  border-bottom: 1px solid #3c3c3c;\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  flex-shrink: 0;\n}\n\n/* 标题样式 */\n.sa-terminal-title {\n  font-weight: bold;\n  flex-shrink: 0;\n}\n\n/* 按钮容器样式 - 确保所有按钮并排靠右 */\n.sa-terminal-header-buttons {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-shrink: 0;\n}\n\n/* 继续按钮样式 */\n.sa-terminal-continue-button {\n  background: none;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  padding: 4px 8px;\n  cursor: pointer;\n  font-size: 12px;\n  color: var(--ui-text-primary);\n  transition: all 0.2s;\n  font-family: inherit;\n  min-width: 32px;\n  height: 24px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.sa-terminal-continue-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-terminal-continue-button:hover {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-continue-button:active {\n  transform: scale(0.95);\n}\n\n/* 单步执行按钮样式 */\n.sa-terminal-step-button {\n  background: none;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  padding: 4px 8px;\n  cursor: pointer;\n  font-size: 12px;\n  color: var(--ui-text-primary);\n  transition: all 0.2s;\n  font-family: inherit;\n  min-width: 32px;\n  height: 24px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.sa-terminal-step-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-terminal-step-button:hover {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-step-button:active {\n  transform: scale(0.95);\n}\n\n/* 导出按钮样式 */\n.sa-terminal-export-button {\n  background: none;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  padding: 4px 8px;\n  cursor: pointer;\n  font-size: 12px;\n  color: var(--ui-text-primary);\n  transition: all 0.2s;\n  font-family: inherit;\n  min-width: 32px;\n  height: 24px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.sa-terminal-export-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-terminal-export-button:hover {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-export-button:active {\n  transform: scale(0.95);\n}\n\n.sa-terminal-settings-button {\n  background: none;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  padding: 4px 8px;\n  cursor: pointer;\n  font-size: 12px;\n  color: var(--ui-text-primary);\n  transition: all 0.2s;\n  font-family: inherit;\n  min-width: 32px;\n  height: 24px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.sa-terminal-settings-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n  filter: grayscale(100%);\n}\n\n.sa-terminal-settings-button:hover {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-settings-button:active {\n  transform: scale(0.95);\n}\n\n.sa-terminal-settings-panel {\n  background: #1e1e1e;\n}\n\n.sa-terminal-settings-content {\n  color: #eeeeee;\n}\n\n.sa-terminal-setting-item {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n\n.sa-terminal-switch {\n  position: relative;\n  display: inline-block;\n  width: 40px;\n  height: 22px;\n}\n\n.sa-terminal-switch-input {\n  opacity: 0;\n  width: 0;\n  height: 0;\n  position: absolute;\n}\n\n.sa-terminal-switch-background {\n  position: absolute;\n  cursor: pointer;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  background-color: #555555;\n  transition: 0.3s;\n  border-radius: 22px;\n}\n\n.sa-terminal-switch-slider {\n  position: absolute;\n  cursor: pointer;\n  height: 16px;\n  width: 16px;\n  left: 3px;\n  bottom: 3px;\n  background-color: white;\n  transition: 0.3s;\n  border-radius: 50%;\n  z-index: 1;\n}\n\n.sa-terminal-status {\n  color: var(--looks-secondary);\n  font-size: 11px;\n}\n\n/* Terminal输出区域样式 */\n.sa-terminal-output {\n  flex: 1;\n  background: #1e1e1e;\n  color: #eeeeee;\n  font-size: 13px;\n  overflow-y: auto;\n  white-space: pre-wrap;\n  word-wrap: break-word;\n  line-height: 1.2;\n  min-height: 0;\n}\n\n.sa-terminal-output-inner {\n  position: relative;\n  padding: 10px;\n}\n\n.sa-terminal-log-end {\n  position: absolute;\n  width: 100%;\n  pointer-events: none;\n}\n\n/* Terminal输入行样式 */\n.sa-terminal-input-line {\n  display: flex;\n  align-items: center;\n  background: #1e1e1e;\n  padding: 8px;\n  border-top: 1px solid #3c3c3c;\n  flex-shrink: 0;\n}\n\n.sa-terminal-prompt {\n  color: var(--looks-secondary);\n  font-size: 13px;\n  margin-right: 5px;\n  flex-shrink: 0;\n}\n\n.sa-terminal-input {\n  flex: 1;\n  background: transparent;\n  border: none;\n  color: #eeeeee;\n  font-size: 13px;\n  outline: none;\n  font-family: 'Courier New', monospace;\n}\n\n.sa-terminal-input::placeholder {\n  color: #606060;\n}\n\n/* Terminal按钮样式 - 类似编辑器 tabs */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button {\n  padding: 0 12px !important;\n  border: none !important;\n  border-right: 1px solid var(--ui-black-transparent) !important;\n  border-left: 2px solid transparent !important;\n  border-top: 2px solid transparent !important;\n  height: 24px !important;\n  min-height: 24px !important;\n  background: var(--ui-white) !important;\n  color: #ffffff26 !important;\n  font-size: 12px !important;\n  cursor: pointer !important;\n  display: flex !important;\n  align-items: center !important;\n  justify-content: center !important;\n  gap: 6px !important;\n  transition: all 0.2s !important;\n  margin: 0 !important;\n  line-height: 1 !important;\n  font-weight: normal !important;\n}\n\n/* Terminal按钮hover状态 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button:hover {\n  background: var(--ui-primary) !important;\n}\n\n/* Terminal按钮图标样式 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button img {\n  width: 16px !important;\n  height: 16px !important;\n  margin: 0 !important;\n}\n\n/* Terminal按钮文本样式 - 非激活状态显示灰色 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button span {\n  font-size: 12px !important;\n  color: var(--text-primary-transparent) !important;\n}\n\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active {\n  background: var(--ui-white) !important;\n  color: var(--looks-secondary) !important;\n  font-weight: bold !important;\n  border-bottom: 2px solid var(--looks-secondary) !important;\n}\n\n/* 激活状态下图标颜色 - 显示主题色 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active img {\n  filter: none !important;\n}\n\n/* 激活状态下文字颜色 - 显示主题色 */\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active span {\n  color: var(--looks-secondary) !important;\n}\n\n.addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active:hover {\n  background: var(--ui-white) !important;\n}\n\n/* VSCode 布局下的侧边栏按钮样式 - 与 SPA、bookmark 一致 */\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab {\n  width: 40px;\n  height: 40px;\n  font-size: 0;\n  background-color: #00000000;\n  border: 0;\n  border-radius: 0 !important;\n  margin: 0 !important;\n  padding-top: 5px;\n  padding-bottom: 5px;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab img {\n  width: 22px;\n  height: auto;\n  filter: grayscale(100%);\n}\n\n/* VSCode 布局下按钮激活状态 */\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab.sa-terminal-toggle-active,\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab.is-selected {\n  background-color: var(--ui-white) !important;\n  box-shadow: inset 3px 0px 0px 0px var(--looks-secondary) !important;\n}\n\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab.sa-terminal-toggle-active img,\n[class*='tabs'][class*='vscodeList'] .sa-terminal-toggle-button.vscode-tab.is-selected img {\n  filter: grayscale(0%);\n}\n/* \n@media (prefers-color-scheme: dark) {\n  .addons-bottom-panel-button-bar .sa-terminal-toggle-button {\n    background: var(--ui-dark) !important;\n  }\n\n  .addons-bottom-panel-button-bar .sa-terminal-toggle-button:hover {\n    background: #333333 !important;\n  }\n\n  .addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active {\n    background: var(--ui-dark) !important;\n  }\n\n  .addons-bottom-panel-button-bar .sa-terminal-toggle-button.sa-terminal-toggle-active:hover {\n    background: var(--ui-dark) !important;\n  }\n\n  [class*=\"tabs\"][class*=\"vscodeList\"] .sa-terminal-toggle-button.vscode-tab.sa-terminal-toggle-active,\n  [class*=\"tabs\"][class*=\"vscodeList\"] .sa-terminal-toggle-button.vscode-tab.is-selected {\n    background-color: var(--ui-dark) !important;\n  }\n} */\n\n/* Bottom panel specific styles */\n.addons-bottom-panel .sa-terminal-container {\n  width: calc(100% + 20px);\n  height: calc(100% + 20px);\n  margin: -10px;\n  border-radius: 0;\n}\n\n/* 滚动条样式 */\n.sa-terminal-output::-webkit-scrollbar {\n  width: 8px;\n}\n\n.sa-terminal-output::-webkit-scrollbar-track {\n  background: #2d2d2d;\n}\n\n.sa-terminal-output::-webkit-scrollbar-thumb {\n  background: #4c4c4c;\n  border-radius: 4px;\n}\n\n.sa-terminal-output::-webkit-scrollbar-thumb:hover {\n  background: #5c5c5c;\n}\n\n.sa-terminal-output-inner::-webkit-scrollbar {\n  display: none;\n}\n\n/* 命令行样式 */\n.sa-terminal-command-line {\n  padding: 2px 0;\n  color: #eeeeee;\n  display: flex;\n  align-items: center;\n}\n\n.sa-terminal-command-line-text {\n  flex: 1;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n/* 结果行样式 */\n.sa-terminal-result-line {\n  padding: 2px 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  color: #eeeeee;\n}\n\n/* 错误行样式 */\n.sa-terminal-error-line {\n  padding: 2px 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  color: #ff6b6b;\n}\n\n/* 日志行样式 */\n.sa-terminal-log-line {\n  padding: 2px 0;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  position: relative;\n}\n\n.sa-terminal-log-text {\n  flex: 1;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: pre;\n}\n\n.sa-terminal-text-plain {\n  color: inherit;\n}\n\n.sa-terminal-url-link {\n  color: inherit;\n  text-decoration: underline;\n  cursor: pointer;\n}\n\n.sa-terminal-url-link:hover {\n  color: #4fc3f7;\n}\n\n.sa-terminal-log-link-wrapper {\n  flex-shrink: 0;\n  margin-left: 4px;\n}\n\n/* 重复内容计数器 */\n.sa-terminal-log-counter {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  min-width: 18px;\n  height: 18px;\n  background: var(--looks-secondary);\n  color: #000;\n  border-radius: 5px;\n  font-size: 10px;\n  font-weight: bold;\n  margin-right: 6px;\n  padding: 0 4px;\n}\n\n/* 块链接样式 */\n.sa-terminal-block-link {\n  color: var(--looks-secondary);\n  text-decoration: underline;\n  cursor: pointer;\n  font-size: 11px;\n  padding: 0 2px;\n  border-radius: 2px;\n  transition: background-color 0.2s;\n}\n\n.sa-terminal-block-link:hover {\n  background-color: #3c3c3c;\n  text-decoration: none;\n}\n\n.sa-terminal-block-link-unknown {\n  color: #808080;\n  cursor: default;\n  text-decoration: none;\n}\n\n.sa-terminal-block-link-unknown:hover {\n  background-color: transparent;\n}\n\n/* 日志标记样式 */\n.sa-terminal-log-mark {\n  flex-shrink: 0;\n  font-weight: bold;\n  padding: 0 4px;\n  border-radius: 2px;\n  font-size: 11px;\n}\n\n.sa-terminal-log-mark.log {\n  color: #ffffff;\n  background-color: #666666;\n}\n\n.sa-terminal-log-mark.warn {\n  color: #ffffff;\n  background-color: #ff9900;\n}\n\n.sa-terminal-log-mark.error {\n  color: #ffffff;\n  background-color: #ff4444;\n}\n\n.sa-terminal-log-mark.console-error {\n  color: #ffffff;\n  background-color: #e74c3c;\n}\n\n.sa-terminal-log-stack {\n  color: #888888;\n  font-size: 10px;\n  margin-left: 4px;\n}\n\n/* 位置切换按钮样式 */\n.sa-terminal-position-switch {\n  display: flex;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  gap: 4px;\n  align-items: center;\n  position: relative;\n}\n\n/* 轮换按钮样式 */\n.sa-terminal-rotate-button {\n  background: none;\n  border: 1px solid #ffffff26;\n  border-radius: 4px;\n  padding: 4px 8px;\n  cursor: pointer;\n  font-size: 12px;\n  color: var(--ui-text-primary);\n  transition: all 0.2s;\n  font-family: inherit;\n  min-width: 32px;\n  height: 24px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n/* 轮换按钮图标样式 */\n.sa-terminal-rotate-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n}\n\n.sa-terminal-rotate-button:hover {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-rotate-button:active {\n  transform: scale(0.95);\n}\n\n/* 浮窗容器样式 */\n.sa-terminal-position-popup {\n  position: absolute;\n  top: 100%;\n  right: 0;\n  margin-top: 4px;\n  background: #1e1e1e !important;\n  border: 1px solid #ffffff26 !important;\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);\n  padding: 4px;\n  display: none;\n  flex-direction: column;\n  gap: 2px;\n  z-index: 1000;\n  min-width: 120px;\n}\n\n/* 浮窗按钮样式 */\n.sa-terminal-popup-button {\n  background: none;\n  border: none;\n  border-radius: 4px;\n  padding: 6px 10px;\n  cursor: pointer;\n  font-size: 12px;\n  /* color: var(--ui-text-primary); */\n  text-align: left;\n  transition: background-color 0.2s;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-family: inherit;\n}\n\n/* 浮窗按钮图标样式 */\n.sa-terminal-popup-button img {\n  width: 16px;\n  height: 16px;\n  flex-shrink: 0;\n}\n\n.sa-terminal-popup-button:hover:not(:disabled) {\n  background-color: var(--ui-primary-transparent);\n}\n\n.sa-terminal-popup-button:disabled {\n  opacity: 0.3;\n  cursor: not-allowed;\n}\n\n.sa-terminal-popup-button:active:not(:disabled) {\n  transform: scale(0.98);\n}\n\n/* Sidebar 模式样式 */\n.addons-side-bar .sa-terminal-container {\n  width: 100%;\n  height: 100%;\n  margin: 0;\n  border-radius: 0;\n}\n\n.addons-side-bar .sa-terminal-header {\n  border-radius: 0;\n}\n\n/* 独立窗口模式样式 */\n.sa-terminal-floating-window {\n  position: absolute;\n  top: 100px;\n  left: 100px;\n  width: 600px;\n  height: 400px;\n  min-width: 400px;\n  min-height: 300px;\n  background-color: var(--ui-white);\n  border: 1px solid #ffffff26;\n  border-radius: 8px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);\n  z-index: 1000;\n  display: flex;\n  flex-direction: column;\n  overflow: hidden;\n}\n\n/* 独立窗口中的 terminalHeader 作为标题栏 */\n.sa-terminal-floating-window .sa-terminal-header {\n  cursor: move;\n  user-select: none;\n  border-top-left-radius: 8px;\n  border-top-right-radius: 8px;\n}\n\n/* 独立窗口关闭按钮 */\n.sa-terminal-window-close-button {\n  background: none;\n  border: none;\n  color: inherit;\n  font-size: 20px;\n  cursor: pointer;\n  padding: 0 4px;\n  line-height: 1;\n  margin-left: 8px;\n  font-family: inherit;\n}\n\n.sa-terminal-window-close-button:hover {\n  opacity: 0.7;\n}\n\n/* 独立窗口中的 Terminal 容器 */\n.sa-terminal-floating-window .sa-terminal-container {\n  width: 100%;\n  height: 100%;\n  margin: 0;\n  border-radius: 0;\n  flex: 1;\n  overflow: auto;\n}\n\n/* 舞台头部按钮样式 */\n.sa-terminal-stage-header-button {\n  display: inline-block;\n}\n\n.sa-terminal-stage-header-button.sa-terminal-toggle-active .stage-header_stage-button {\n  background: var(--ui-primary) !important;\n}\n\n/* 暗色主题适配 */\n/* @media (prefers-color-scheme: dark) {\n  .sa-terminal-floating-window {\n    background-color: #1e1e1e;\n    border-color: #3c3c3c;\n  }\n\n  .sa-terminal-position-popup {\n    background-color: #2d2d2d;\n    border-color: #3c3c3c;\n  }\n\n  .sa-terminal-rotate-button {\n    color: #eeeeee;\n  }\n\n  .sa-terminal-rotate-button:hover {\n    background-color: rgba(255, 255, 255, 0.1);\n  }\n\n  .sa-terminal-popup-button:hover:not(:disabled) {\n    background-color: rgba(255, 255, 255, 0.1);\n  }\n} */\n\n/* CUI 状态监控栏（停靠在输入框上一行） */\n.sa-terminal-cui-bar {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  background: #141414;\n  border-top: 1px solid #2e2e2e;\n  border-bottom: 1px solid #242424;\n  padding: 4px 10px;\n  font-size: 11px;\n  font-family: 'Courier New', monospace;\n  color: #c5c5c5;\n  flex-shrink: 0;\n  box-sizing: border-box;\n  user-select: none;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n\n.sa-terminal-cui-bar::-webkit-scrollbar {\n  display: none;\n}\n\n.sa-terminal-cui-badge {\n  background: #29beb8;\n  color: #121212;\n  font-weight: 900;\n  font-size: 9px;\n  letter-spacing: 0.6px;\n  padding: 2px 5px;\n  border-radius: 3px;\n  flex-shrink: 0;\n  line-height: 1;\n}\n\n.sa-terminal-cui-chart-box {\n  display: flex;\n  align-items: center;\n  flex-shrink: 0;\n}\n\n.sa-terminal-cui-canvas {\n  width: 110px;\n  height: 24px;\n  border-radius: 3px;\n  background: rgba(0, 0, 0, 0.45);\n  border: 1px solid rgba(255, 255, 255, 0.08);\n  display: block;\n}\n\n.sa-terminal-cui-fps {\n  font-weight: bold;\n  font-size: 11px;\n  min-width: 46px;\n  flex-shrink: 0;\n}\n\n.sa-terminal-cui-separator {\n  color: #3e3e3e;\n  flex-shrink: 0;\n  font-size: 11px;\n}\n\n.sa-terminal-cui-section {\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  white-space: nowrap;\n  flex-shrink: 0;\n}\n\n.sa-terminal-cui-section .cui-val {\n  color: #ffffff;\n  font-weight: 600;\n}\n\n.sa-terminal-cui-close {\n  margin-left: auto;\n  background: none;\n  border: none;\n  color: #777;\n  cursor: pointer;\n  font-size: 13px;\n  padding: 0 4px;\n  line-height: 1;\n  border-radius: 3px;\n  transition: all 0.2s;\n  flex-shrink: 0;\n}\n\n.sa-terminal-cui-close:hover {\n  color: #fff;\n  background: rgba(255, 255, 255, 0.15);\n}\n"],"sourceRoot":""}]);
 // Exports
 module.exports = ___CSS_LOADER_EXPORT___;
 
@@ -5635,6 +6693,32 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 
     const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" ry=\"2\"></rect>\n  <line x1=\"9\" y1=\"3\" x2=\"9\" y2=\"21\"></line>\n</svg>";
+
+    const getSRC = () => {
+        const recolored = typeof Recolor === 'object' ? (
+            original.replace(/#855cd6/gi, Recolor.primary)
+        ) : original;
+        return 'data:image/svg+xml;,' + encodeURIComponent(recolored);
+    };
+
+    /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (getSRC);
+
+
+/***/ },
+
+/***/ "./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-step.svg"
+/*!********************************************************************************!*\
+  !*** ./src/lib/tw-recolor/build.js!./src/addons/addons/Terminal/icon-step.svg ***!
+  \********************************************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+
+    const original = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#855cd6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <polygon points=\"5 4 15 12 5 20 5 4\" fill=\"#855cd6\"></polygon>\n  <line x1=\"19\" y1=\"5\" x2=\"19\" y2=\"19\"></line>\n</svg>\n";
 
     const getSRC = () => {
         const recolored = typeof Recolor === 'object' ? (
